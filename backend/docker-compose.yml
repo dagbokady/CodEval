@@ -1,0 +1,20 @@
+# Base de données de développement, pour les postes sans PostgreSQL local.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: codeval
+      POSTGRES_PASSWORD: codeval
+      POSTGRES_DB: codeval
+    ports:
+      - "5432:5432"
+    volumes:
+      - codeval-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeval"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  codeval-data:

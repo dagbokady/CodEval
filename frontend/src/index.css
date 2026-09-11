@@ -1,0 +1,2140 @@
+@import './styles/tokens.css';
+
+/* ─── Inter & JetBrains Mono from Google Fonts ─── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@600;700&display=swap');
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-body);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+h1, h2, h3, p, ul, ol { margin: 0; }
+ul { padding: 0; list-style: none; }
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* ========== App layout ========== */
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px 20px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-title);
+}
+.brand-icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius);
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 700; font-family: var(--mono);
+  flex-shrink: 0;
+}
+.brand-dot {
+  width: 10px; height: 10px; border-radius: 3px;
+  background: var(--primary);
+}
+
+.nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.nav--bottom { flex: 0; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+
+.nav-group { margin-top: 16px; }
+.nav-group:first-child { margin-top: 8px; }
+.nav-group-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-faint);
+  padding: 0 10px 6px; margin-top: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+}
+.nav-item:hover { background: var(--bg-subtle); color: var(--text-body); text-decoration: none; }
+.nav-item[aria-current='page'] {
+  background: var(--bg-nav-active);
+  color: var(--primary);
+  font-weight: 600;
+}
+.nav-item svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+
+.sidebar-footer {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
+.sidebar-menu-btn {
+  margin-left: auto; background: none; border: none;
+  cursor: pointer; color: var(--text-muted); padding: 4px;
+  border-radius: var(--radius-xs);
+}
+.sidebar-menu-btn:hover { background: var(--bg-subtle); color: var(--text-body); }
+.sidebar-menu {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-elevated);
+  padding: 4px; margin-bottom: 4px; z-index: 10;
+}
+.sidebar-menu button {
+  width: 100%; text-align: left; border: none; background: none;
+  padding: 8px 12px; font-size: 13px; color: var(--danger);
+  border-radius: var(--radius-xs); cursor: pointer;
+}
+.sidebar-menu button:hover { background: var(--danger-bg); }
+
+.avatar {
+  width: 32px; height: 32px; border-radius: var(--radius-pill);
+  background: var(--primary-light); border: none;
+  display: grid; place-items: center; font-size: 12px; color: var(--primary);
+  flex-shrink: 0; font-weight: 600;
+}
+.avatar--sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar--topbar { width: 34px; height: 34px; font-size: 13px; }
+.identity { min-width: 0; }
+.identity strong { display: block; font-size: 13px; font-weight: 500; color: var(--text-body); }
+.identity span { font-size: 12px; color: var(--text-muted); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg-app); }
+
+/* ========== Top bar ========== */
+.topbar {
+  height: 52px; background: var(--bg-card);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 24px; flex-shrink: 0;
+}
+.topbar-breadcrumb {
+  flex: 1; font-size: 13px; color: var(--text-muted); font-weight: 500;
+  display: flex; align-items: center; gap: 4px; min-width: 0;
+  overflow: hidden; white-space: nowrap;
+}
+.topbar-sep { color: var(--border); margin: 0 4px; }
+.topbar-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topbar-icon-btn {
+  position: relative; width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: none; background: none; border-radius: var(--radius);
+  cursor: pointer; color: var(--text-muted);
+  transition: background 0.12s;
+}
+.topbar-icon-btn:hover { background: var(--bg-subtle); color: var(--text-body); }
+.topbar-icon-btn svg { width: 20px; height: 20px; }
+.topbar-badge {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 16px; height: 16px; border-radius: 8px;
+  background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 16px;
+  text-align: center; padding: 0 4px;
+}
+
+.notif-wrapper { position: relative; }
+.notif-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 360px; max-height: 420px; overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 100;
+}
+.notif-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-bottom: 1px solid var(--border-soft);
+}
+.notif-read-all {
+  border: none; background: none; color: var(--primary);
+  font-size: 13px; cursor: pointer; font-weight: 500;
+}
+.notif-read-all:hover { text-decoration: underline; }
+.notif-empty { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 14px; margin: 0; }
+.notif-item {
+  display: block; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer;
+  padding: 12px 16px; border-bottom: 1px solid var(--border-soft);
+  transition: background 0.1s;
+}
+.notif-item:hover { background: var(--bg-subtle); }
+.notif-item--unread { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.notif-item--unread:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+.notif-item-title { font-size: 14px; font-weight: 600; color: var(--text-body); margin-bottom: 2px; }
+.notif-item-body { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+.notif-item-time { font-size: 12px; color: var(--text-muted); opacity: .7; }
+
+.page-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.breadcrumb { font-size: 12px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.02em; }
+.page-header h1 { font-size: 26px; font-weight: 700; color: var(--text-title); letter-spacing: -0.625px; line-height: 1.23; }
+.header-actions { margin-left: auto; display: flex; gap: 8px; }
+
+.content { padding: 24px 32px 40px; }
+.content.flush { padding: 0; }
+
+/* ========== Buttons ========== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 36px; padding: 0 18px; border-radius: var(--radius-pill);
+  border: 1px solid transparent; background: var(--primary); color: #fff;
+  font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.btn:hover:not(:disabled) { background: var(--primary-hover); }
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary {
+  background: var(--bg-card); color: var(--text-body);
+  border-color: var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.btn.secondary:hover:not(:disabled) { background: var(--bg-subtle); }
+.btn.danger { background: var(--danger); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-hover); }
+.btn.ghost { background: transparent; color: var(--primary); }
+.btn.ghost:hover:not(:disabled) { background: var(--primary-light); }
+.btn.large { width: 100%; height: 40px; }
+.btn.small { height: 30px; padding: 0 12px; font-size: 13px; }
+
+/* ========== Chips ========== */
+.chip {
+  height: 30px; padding: 0 14px; border-radius: var(--radius-pill);
+  background: var(--bg-subtle); color: var(--text-muted); border: none;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.chip:hover { background: var(--border); }
+.chip[aria-pressed='true'] { background: var(--bg-nav-active); color: var(--primary); font-weight: 600; }
+.chip-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 32px; background: var(--bg-card); border-bottom: 1px solid var(--border-soft); }
+.chip-bar .label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+
+/* ========== Tabs ========== */
+.tabs { display: flex; gap: 0; background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 0 32px; }
+.tab {
+  height: 44px; padding: 0 16px; border: none; background: none;
+  color: var(--text-muted); font-size: 14px; font-weight: 500; cursor: pointer;
+  border-bottom: 2px solid transparent; transition: color 0.12s;
+}
+.tab:hover { color: var(--text-body); }
+.tab[aria-selected='true'] { color: var(--primary); font-weight: 600; border-bottom-color: var(--primary); }
+
+/* ========== Tags ========== */
+.tag {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px;
+  border-radius: var(--radius-pill); font-size: 12px; font-weight: 500;
+  background: var(--bg-subtle); color: var(--text-muted);
+}
+.tag.info { background: var(--info-bg); color: var(--info); }
+.tag.success { background: var(--success-bg); color: var(--success); }
+.tag.warning { background: var(--warning-bg); color: var(--warning); }
+.tag.danger { background: var(--danger-bg); color: var(--danger); }
+.tag.purple { background: var(--info-bg); color: var(--info); }
+.tag.solid { background: var(--primary); color: #fff; }
+
+/* ========== Cards ========== */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.stat .label { font-size: 12px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.02em; }
+.stat .value { font-size: 28px; font-weight: 700; color: var(--text-title); margin-top: 6px; letter-spacing: -0.5px; }
+
+/* ========== Tables ========== */
+.table-wrap {
+  background: var(--bg-card); overflow-x: auto;
+  margin: 0 32px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-card);
+}
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+thead th {
+  text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted);
+  padding: 12px 16px; background: var(--bg-subtle); border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px;
+}
+tbody td { padding: 14px 16px; border-bottom: 1px solid var(--border-soft); font-size: 14px; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--bg-row-hover); }
+td .sub, .sub { font-size: 12px; color: var(--text-muted); }
+th:first-child, td:first-child { padding-left: 20px; }
+th:last-child, td:last-child { padding-right: 20px; }
+
+/* ========== Forms ========== */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+.field label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.field input, .field select, .field textarea {
+  height: 40px; padding: 0 14px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--bg-card); font-size: 14px; color: var(--text-body);
+  width: 100%; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  outline: none;
+}
+.field textarea { height: auto; padding: 12px 14px; resize: vertical; min-height: 80px; }
+.field .hint { font-size: 12px; color: var(--text-faint); }
+.field.error input, .field.error textarea, .field.error select { border-color: var(--danger); }
+.field .error-text { font-size: 12px; color: var(--danger); }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
+
+.switch { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.switch input { margin-top: 3px; }
+.switch strong { display: block; font-size: 14px; font-weight: 500; }
+
+/* ========== Alerts ========== */
+.alert { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; font-weight: 500; }
+.alert.error { background: var(--danger-bg); color: var(--danger); }
+.alert.info { background: var(--info-bg); color: var(--primary); }
+.alert.success { background: var(--success-bg); color: var(--success); }
+
+.empty { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+.empty h3 { font-size: 16px; color: var(--text-title); margin-bottom: 6px; font-weight: 600; }
+
+/* ========== Spinner ========== */
+.spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--primary);
+  animation: spin 0.8s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading { display: flex; align-items: center; gap: 10px; padding: 40px 32px; color: var(--text-muted); }
+
+.pagination { display: flex; align-items: center; gap: 12px; padding: 14px 32px; font-size: 13px; color: var(--text-muted); }
+
+/* ========== Stepper ========== */
+.stepper { display: flex; align-items: center; gap: 10px; padding: 16px 32px; background: var(--bg-card); border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+.step { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); background: none; border: none; cursor: pointer; font-weight: 500; }
+.step .num { width: 24px; height: 24px; border-radius: var(--radius-pill); display: grid; place-items: center; background: var(--bg-subtle); font-size: 12px; font-weight: 600; }
+.step[aria-current='step'] { color: var(--text-title); font-weight: 600; }
+.step[aria-current='step'] .num { background: var(--primary); color: #fff; }
+.step .sep { color: var(--border); }
+
+/* ========== Auth ========== */
+.auth { display: flex; min-height: 100vh; }
+.auth-brand {
+  width: 480px; flex-shrink: 0;
+  background: var(--primary);
+  padding: 48px;
+  display: flex; flex-direction: column; justify-content: center; gap: 18px;
+}
+.auth-brand .brand { color: #fff; padding-bottom: 8px; }
+.auth-brand .brand-icon { background: rgba(255,255,255,0.2); color: #fff; }
+.auth-brand h2 { font-size: 22px; font-weight: 700; color: #fff; max-width: 340px; letter-spacing: -0.5px; line-height: 1.3; }
+.auth-brand p { font-size: 15px; color: rgba(255,255,255,0.75); max-width: 340px; line-height: 1.5; }
+.auth-zone { flex: 1; display: grid; place-items: center; padding: 24px; background: var(--bg-app); }
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 36px;
+  box-shadow: var(--shadow-elevated);
+}
+.auth-card h1 { font-size: 26px; font-weight: 700; color: var(--text-title); letter-spacing: -0.5px; }
+.auth-card .subtitle { font-size: 14px; color: var(--text-muted); margin: 8px 0 28px; }
+.auth-footer { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-soft); font-size: 13px; color: var(--text-muted); text-align: center; }
+
+/* ========== Exam (student) ========== */
+.exam { height: 100vh; background: var(--exam-bg); color: var(--exam-text); display: flex; flex-direction: column; overflow: hidden; }
+.exam-topbar {
+  height: 56px; background: var(--exam-topbar); border-bottom: 1px solid var(--exam-border);
+  display: flex; align-items: center; gap: 16px; padding: 0 20px;
+}
+.exam-topbar .title { font-size: 13px; color: var(--exam-muted); font-weight: 500; }
+.exam-timer {
+  margin-left: auto; background: var(--bg-subtle); color: var(--text-title);
+  border-radius: var(--radius-pill); padding: 6px 16px;
+  font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px;
+}
+.exam-timer.urgent { background: var(--exam-timer-bg); color: var(--exam-timer); }
+.exam-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.exam.exam-done { height: auto; min-height: 100vh; overflow: auto; }
+/* La réglette d'exercices : elle remplace la colonne de gauche. Pendant
+   l'épreuve, l'écran ne porte que le sujet et la copie. */
+.exam-regle {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 18px; background: var(--exam-topbar);
+  border-bottom: 1px solid var(--exam-border);
+}
+.exam-regle-avance { font-size: 12px; font-weight: 600; color: var(--exam-muted); }
+.exam-regle-pastilles { display: flex; gap: 6px; flex-wrap: wrap; }
+.exam-pastille {
+  width: 28px; height: 28px; border-radius: var(--radius-pill);
+  border: 1px solid var(--exam-border); background: var(--exam-panel);
+  color: var(--exam-muted); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  display: grid; place-items: center;
+}
+.exam-pastille:hover { background: var(--bg-subtle); color: var(--exam-text); }
+.exam-pastille.done { border-color: var(--exam-done); color: var(--exam-done); }
+.exam-pastille[aria-current='true'] {
+  background: var(--primary); border-color: var(--primary); color: var(--text-inverse);
+}
+.exam-regle-sujet {
+  margin-left: auto; height: 28px; padding: 0 14px;
+  border-radius: var(--radius-pill); border: 1px solid var(--exam-border);
+  background: var(--exam-panel); color: var(--exam-muted);
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.exam-regle-sujet:hover { background: var(--bg-subtle); color: var(--exam-text); }
+.exam-regle-sujet.active {
+  background: var(--bg-nav-active); border-color: var(--primary); color: var(--primary);
+}
+
+.exam-main { flex: 1; display: flex; flex-direction: row; min-width: 0; min-height: 0; padding: 0; gap: 0; overflow: hidden; }
+.exam-main--subject { flex-direction: column; padding: 0; }
+
+.exam-preview {
+  width: 46%; min-width: 340px; max-width: 640px; flex-shrink: 0;
+  overflow-y: auto; padding: 16px;
+  background: var(--bg-app); border-right: 1px solid var(--exam-border);
+}
+
+/* ── La feuille de composition (colonne de gauche pendant l'épreuve) ───────
+   Le sujet distribué, posé sur le bureau : un onglet qui dit où l'on en est,
+   puis la feuille elle-même. Elle défile pour elle seule et ne bouge pas
+   pendant que l'apprenant écrit à droite. */
+.exam-feuille {
+  width: 46%; min-width: 340px; max-width: 620px; flex-shrink: 0;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--bg-app); border-right: 1px solid var(--exam-border);
+}
+.exam-feuille-tete {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 18px; border-bottom: 1px solid var(--exam-border);
+  background: var(--exam-topbar);
+}
+.exam-feuille-onglet {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--exam-muted);
+}
+.exam-feuille-rang { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--exam-muted); }
+.exam-feuille-papier {
+  flex: 1; overflow-y: auto; margin: 14px; padding: 30px 32px 24px;
+  background: var(--bg-paper); color: var(--text-title);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  font-size: 14px;
+}
+.exam-feuille-pied {
+  margin: 22px 0 0; padding-top: 12px; border-top: 1px dashed var(--border);
+  font-size: 11.5px; font-style: italic; color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .exam-feuille { width: 100%; max-width: none; border-right: none; }
+}
+.exam-preview-paper {
+  background: var(--bg-paper); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 28px 26px; box-shadow: var(--shadow-card);
+  min-height: 100%;
+}
+.exam-preview-paper-header {
+  text-align: center; padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 2px solid var(--text-title);
+}
+.exam-preview-paper-header .sheet-type { font-size: 10px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 4px; }
+.exam-preview-paper-header .sheet-title { font-size: 15px; font-weight: 700; color: var(--text-title); margin-bottom: 3px; }
+.exam-preview-paper-header .sheet-meta { font-size: 11px; color: var(--text-muted); }
+.exam-preview-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.exam-preview-num { font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
+.exam-preview-pts { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.exam-preview-title { font-size: 15px; font-weight: 600; margin-bottom: 10px; color: var(--text-title); }
+.exam-preview-statement { font-size: 13px; color: var(--text-body); white-space: pre-wrap; line-height: 1.65; }
+.exam-preview-code-section { margin-top: 14px; }
+.exam-preview-code-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.exam-preview-code {
+  background: var(--surface-dark); color: var(--on-dark);
+  border: none; border-radius: var(--radius);
+  padding: 12px 16px; font-family: var(--mono); font-size: 13px;
+  overflow-x: auto; white-space: pre; margin: 0;
+}
+
+.exam-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 14px 18px; gap: 10px; }
+
+.exam-statement {
+  background: var(--exam-card); border: 1px solid var(--exam-border);
+  border-radius: var(--radius-lg); padding: 18px 20px;
+}
+.exam-statement h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--text-title); letter-spacing: -0.25px; }
+.exam-statement p { color: var(--text-muted); font-size: 14px; white-space: pre-wrap; line-height: 1.5; }
+.exam-editor {
+  flex: 1; min-height: 260px; border: 1px solid var(--exam-border);
+  border-radius: var(--radius-lg); overflow: hidden; background: var(--exam-card);
+}
+/* L'éditeur de code doit d'abord montrer ce qu'on y tape. Le thème de
+   CodeMirror pose sa coloration syntaxique ; on ne reprend la main que là où la
+   frappe est en jeu — le fond, le texte, le curseur, la sélection — pour que
+   l'apprenant se relise aussi bien en thème clair qu'en thème sombre. */
+.exam-editor .cm-editor { height: 100%; font-size: 13.5px; font-family: var(--mono); background: var(--exam-card); }
+.exam-editor .cm-scroller { font-family: var(--mono); line-height: 1.65; }
+.exam-editor .cm-content { color: var(--exam-text); caret-color: var(--exam-text); }
+.exam-editor .cm-gutters {
+  background: var(--bg-subtle); color: var(--text-faint);
+  border-right: 1px solid var(--border-soft);
+}
+.exam-editor .cm-activeLineGutter { background: var(--bg-row-hover); color: var(--text-body); }
+.exam-editor .cm-activeLine { background: var(--bg-row-hover); }
+/* Un curseur d'un pixel se perd sur un écran de salle de classe. */
+.exam-editor .cm-cursor, .exam-editor .cm-dropCursor { border-left: 2px solid var(--exam-text); }
+.exam-editor .cm-selectionBackground,
+.exam-editor .cm-focused .cm-selectionBackground,
+.exam-editor .cm-content ::selection { background: var(--primary-light) !important; }
+.exam-editor .cm-focused { outline: none; }
+.exam-status { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--exam-muted); }
+
+.exam-subject-panel {
+  flex: 1; overflow-y: auto; padding: 12px;
+  background: var(--bg-app);
+}
+.exam-subject-panel .sheet-paper {
+  max-width: 700px; margin: 0 auto; background: var(--bg-paper); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 36px 40px; box-shadow: var(--shadow-card);
+}
+.exam-subject-panel .sheet-header { text-align: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid var(--text-title); }
+.exam-subject-panel .sheet-type { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-muted); margin-bottom: 6px; }
+.exam-subject-panel .sheet-title { font-size: 22px; font-weight: 700; color: var(--text-title); margin-bottom: 6px; letter-spacing: -0.5px; }
+.exam-subject-panel .sheet-meta { font-size: 12px; color: var(--text-muted); }
+.exam-subject-panel .sheet-exercise { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px dashed var(--border); }
+.exam-subject-panel .sheet-exercise:last-of-type { border-bottom: none; }
+.exam-subject-panel .sheet-exercise-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.exam-subject-panel .sheet-exercise-num { font-size: 13px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.5px; }
+.exam-subject-panel .sheet-exercise-pts { font-size: 12px; color: var(--text-muted); font-style: italic; }
+.exam-subject-panel .sheet-exercise-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.25px; }
+.exam-subject-panel .sheet-exercise-statement { font-size: 14px; color: var(--text-body); white-space: pre-wrap; line-height: 1.6; margin-bottom: 12px; }
+.exam-subject-panel .sheet-code {
+  background: var(--surface-dark); color: var(--on-dark);
+  border: none; border-radius: var(--radius);
+  padding: 12px 16px; font-family: var(--mono); font-size: 13px;
+  overflow-x: auto; margin-bottom: 12px; white-space: pre;
+}
+.exam-subject-panel .sheet-answer-zone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 16px; text-align: center; color: var(--text-faint); font-size: 12px;
+  background: var(--bg-subtle);
+  min-height: 60px; display: grid; place-items: center;
+}
+.exam-subject-panel .sheet-answer-label { background: var(--bg-card); padding: 2px 8px; border-radius: var(--radius-xs); font-weight: 500; }
+.exam-subject-panel .sheet-footer { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 20px; padding-top: 16px; border-top: 2px solid var(--text-title); }
+
+.exam-footer {
+  border-top: 1px solid var(--exam-border); background: var(--exam-panel);
+  padding: 10px 20px; font-size: 12px; color: var(--exam-muted);
+}
+.exam-incidents {
+  background: var(--exam-timer-bg); color: var(--exam-timer);
+  border-radius: var(--radius-pill); padding: 4px 12px; font-size: 12px; font-weight: 600;
+}
+
+.exam-overlay {
+  position: fixed; inset: 0; background: var(--overlay);
+  display: grid; place-items: center; padding: 24px; z-index: 50;
+  backdrop-filter: blur(4px);
+}
+.exam-overlay-card {
+  max-width: 440px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px; text-align: center;
+  box-shadow: var(--shadow-elevated);
+}
+.exam-overlay-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 10px; color: var(--text-title); letter-spacing: -0.25px; }
+.exam-overlay-card p { color: var(--text-muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+.exam-overlay-card strong { color: var(--exam-timer); }
+
+.disclosure { border: 1px solid var(--border-soft); border-radius: var(--radius-lg); margin: 16px 0; overflow: hidden; }
+.disclosure-head {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: none; border: none; cursor: pointer; text-align: left; color: var(--text-body);
+  transition: background 0.12s;
+}
+.disclosure-head:hover { background: var(--bg-subtle); }
+.disclosure-head strong { display: block; font-size: 14px; font-weight: 600; }
+.disclosure-head .sub { display: block; margin-top: 2px; }
+.disclosure-sign { margin-left: auto; font-size: 18px; color: var(--text-muted); line-height: 1; }
+.disclosure-body { padding: 0 16px 16px; border-top: 1px solid var(--border-soft); }
+.disclosure-body .switch:first-child { border-top: none; }
+
+/* ========== Responsive ========== */
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: static; flex-direction: row; align-items: center;
+    gap: 8px; padding: 10px 14px; overflow-x: auto; border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .brand { padding: 0 8px 0 0; }
+  .nav { flex-direction: row; flex: 0; }
+  .nav--bottom { display: none; }
+  .nav-group { margin: 0; display: flex; gap: 2px; }
+  .nav-group-title { display: none; }
+  .nav-item span { display: none; }
+  .sidebar-footer { margin: 0 0 0 auto; border: none; padding: 0; }
+  .sidebar-menu-btn { display: none; }
+  .identity { display: none; }
+  .topbar { padding: 0 16px; }
+  .page-header, .chip-bar, .tabs, .content { padding-left: 16px; padding-right: 16px; }
+  .table-wrap { margin-left: 16px; margin-right: 16px; }
+  th:first-child, td:first-child { padding-left: 16px; }
+  th:last-child, td:last-child { padding-right: 16px; }
+  .auth-brand { display: none; }
+  .cd-header { padding: 20px 16px; }
+  .cd-layout { padding: 16px; gap: 16px; }
+}
+
+/* ========== Exam done ========== */
+.exam-done-body { flex: 1; display: grid; place-items: center; padding: 24px; }
+.exam-done-card {
+  width: 100%; max-width: 440px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 36px; text-align: center; box-shadow: var(--shadow-elevated);
+}
+.exam-done-mark {
+  width: 48px; height: 48px; margin: 0 auto 16px; border-radius: var(--radius-pill);
+  background: var(--success-bg); color: var(--success);
+  display: grid; place-items: center; font-size: 24px;
+}
+.exam-waiting-spinner {
+  width: 40px; height: 40px; margin: 0 auto 16px; border-radius: var(--radius-pill);
+  border: 3px solid var(--border); border-top-color: var(--primary);
+  animation: spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .exam-waiting-spinner { animation-duration: 3s; } }
+.exam-done-card h1 { font-size: 22px; font-weight: 700; color: var(--text-title); margin-bottom: 8px; letter-spacing: -0.25px; }
+.exam-done-card p { color: var(--text-muted); font-size: 14px; line-height: 1.5; }
+.exam-done-facts {
+  margin: 24px 0; padding: 16px 0; border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft); display: grid; gap: 10px; text-align: left;
+}
+.exam-done-facts div { display: flex; gap: 12px; font-size: 13px; }
+.exam-done-facts dt { color: var(--text-muted); min-width: 130px; font-weight: 500; }
+.exam-done-facts dd { margin: 0; color: var(--text-title); }
+.exam-done-card .btn { margin-top: 20px; }
+
+/* ========== Algo editor ========== */
+.algo-editor { display: flex; height: 100%; min-height: 0; background: var(--bg-card); }
+.algo-palette {
+  width: 210px; flex-shrink: 0; border-right: 1px solid var(--border-soft);
+  padding: 16px 14px; overflow-y: auto; background: var(--bg-app);
+}
+.algo-palette h3 { font-size: 14px; color: var(--text-title); font-weight: 600; }
+.algo-palette .sub { font-size: 12px; margin-bottom: 14px; display: block; color: var(--text-muted); }
+.algo-group { margin-bottom: 16px; }
+.algo-group-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin-bottom: 8px; font-weight: 600;
+}
+.algo-palette-item {
+  width: 100%; text-align: left; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 12px; margin-bottom: 6px; font-size: 13px;
+  cursor: pointer; color: var(--text-body); font-weight: 500;
+  transition: border-color 0.12s, color 0.12s;
+}
+.algo-palette-item:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.algo-palette-item span { color: var(--text-muted); margin-right: 4px; }
+.algo-palette-item:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.algo-canvas { flex: 1; overflow: auto; padding: 18px 20px; min-width: 0; }
+.algo-empty { padding: 14px 0; }
+.algo-block { margin-bottom: 6px; }
+.algo-line {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--bg-app); border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border); border-radius: var(--radius);
+  padding: 8px 12px; font-size: 13px;
+}
+.algo-si > .algo-line, .algo-tantque > .algo-line { border-left-color: var(--info); }
+.algo-pour > .algo-line { border-left-color: var(--accent); }
+.algo-lire > .algo-line, .algo-ecrire > .algo-line { border-left-color: var(--success); }
+.algo-fonction > .algo-line { border-left-color: var(--primary); }
+.algo-line .kw { font-weight: 600; color: var(--text-title); font-family: var(--mono); font-size: 12px; }
+.algo-line .op { color: var(--primary); font-weight: 600; }
+.algo-field {
+  height: 28px; border: 1px solid var(--border); border-radius: var(--radius-xs);
+  padding: 0 8px; font-family: var(--mono); font-size: 12px; background: var(--bg-card);
+  color: var(--text-body);
+}
+.algo-actions { margin-left: auto; display: flex; gap: 2px; }
+.algo-actions button {
+  width: 24px; height: 24px; border: none; background: none; cursor: pointer;
+  color: var(--text-muted); border-radius: var(--radius-xs); line-height: 1;
+  transition: background 0.12s, color 0.12s;
+}
+.algo-actions button:hover { background: var(--bg-subtle); color: var(--text-title); }
+.algo-children { margin: 4px 0 4px 22px; border-left: 1px dashed var(--border); padding-left: 14px; }
+.algo-sub {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--text-muted); margin: 4px 0;
+}
+.algo-end {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--text-muted); margin: 2px 0 8px;
+}
+.algo-slot {
+  display: block; width: 100%; text-align: left; background: none;
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  padding: 8px 12px; font-size: 12px; color: var(--text-muted); cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.algo-slot:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.algo-slot.active { border-color: var(--primary); background: var(--bg-nav-active); color: var(--primary); }
+.algo-slot:disabled { cursor: not-allowed; }
+
+/* Le squelette obligatoire de l'algorithme : Algorithme / Déclaration / Début / Fin.
+   Encadré et non modifiable, il rappelle la forme du cours à chaque instant. */
+.algo-cadre {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; background: var(--bg-card);
+}
+.algo-cadre-ligne { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.algo-cadre-mot { margin-top: 10px; }
+.algo-cadre-ligne .kw {
+  font-weight: 700; color: var(--text-title); font-family: var(--mono); font-size: 13px;
+}
+.algo-cadre-section, .algo-cadre-corps {
+  margin: 4px 0 4px 22px; border-left: 1px dashed var(--border); padding-left: 14px;
+}
+.algo-rubrique { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+.algo-rubrique-titre {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-title);
+  min-width: 86px; padding-top: 6px;
+}
+.algo-rubrique-lignes { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.algo-rubrique-vide { font-size: 12px; padding: 4px 0; }
+.algo-decl-ligne {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  background: var(--bg-subtle); border-radius: var(--radius);
+  border-left: 3px solid var(--primary); padding: 5px 10px;
+}
+.algo-decl-ligne .kw {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-title);
+}
+.algo-decl-ligne .op { color: var(--primary); font-weight: 600; }
+.algo-end-champ { display: flex; align-items: center; gap: 8px; }
+
+/* ========== Evaluation editor: split layout + sheet preview ========== */
+.exercises-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 65%) minmax(0, 35%);
+  gap: 20px;
+  align-items: start;
+}
+.exercises-editor { min-width: 0; }
+
+.sheet-preview {
+  position: sticky;
+  top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  background: var(--bg-paper-tray);
+  padding: 18px;
+}
+.sheet-paper {
+  background: var(--bg-paper);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  padding: 28px 24px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-title);
+  min-height: 500px;
+}
+.sheet-header { text-align: center; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 2px solid var(--text-title); }
+.sheet-institution { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 4px; }
+.sheet-title { font-size: 16px; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.25px; }
+.sheet-meta { font-size: 10px; color: var(--text-muted); display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.sheet-sep { color: var(--border); }
+.sheet-instructions {
+  margin-top: 10px; text-align: left; font-style: italic; color: var(--text-muted); font-size: 10px;
+  padding: 8px 10px; background: var(--bg-subtle); border-radius: var(--radius-xs);
+  border-left: 3px solid var(--primary);
+}
+
+.sheet-empty { padding: 40px 10px; text-align: center; color: var(--text-faint); font-size: 12px; }
+
+.sheet-exercises { display: grid; gap: 14px; }
+.sheet-exercise { padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+.sheet-exercise:last-child { border-bottom: none; }
+.sheet-ex-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.sheet-ex-num { font-weight: 700; font-size: 12px; color: var(--primary); }
+.sheet-ex-pts { font-size: 10px; color: var(--text-muted); font-style: italic; }
+.sheet-ex-title { font-weight: 600; font-size: 11px; margin-bottom: 4px; }
+.sheet-ex-statement { white-space: pre-wrap; color: var(--text-body); font-size: 10.5px; margin-bottom: 6px; }
+.sheet-ex-code {
+  background: var(--surface-dark); color: var(--on-dark);
+  border: none; border-radius: var(--radius-xs);
+  padding: 8px 10px; font-family: var(--mono); font-size: 9.5px;
+  margin-bottom: 6px; overflow-x: auto; white-space: pre;
+}
+.sheet-ex-algo-tag {
+  display: inline-block; background: var(--info-bg); color: var(--info);
+  font-size: 9px; padding: 2px 8px; border-radius: var(--radius-pill);
+  margin-bottom: 6px; font-weight: 600;
+}
+.sheet-ex-answer {
+  border: 1px dashed var(--border); border-radius: var(--radius-xs); padding: 14px 10px;
+  text-align: center; color: var(--text-faint); font-size: 10px; font-style: italic;
+  min-height: 50px; display: grid; place-items: center;
+  background: var(--bg-subtle);
+}
+.sheet-footer { margin-top: 16px; padding-top: 10px; border-top: 2px solid var(--text-title); text-align: center; font-size: 10px; color: var(--text-muted); font-style: italic; }
+
+@media (max-width: 1100px) {
+  .exercises-layout { grid-template-columns: 1fr; }
+  .sheet-preview { position: static; max-height: none; order: -1; }
+}
+
+@media (max-width: 900px) {
+  .algo-editor { flex-direction: column; }
+  .algo-palette { width: 100%; display: flex; gap: 8px; overflow-x: auto; padding: 10px; }
+  .algo-palette h3, .algo-palette .sub { display: none; }
+  .algo-group { margin: 0; display: flex; gap: 6px; }
+  .algo-group-title { display: none; }
+  .algo-palette-item { width: auto; white-space: nowrap; margin: 0; }
+}
+
+/* ========== Student Home Dashboard ========== */
+.stu-home { padding: 36px 40px; max-width: 960px; }
+
+.stu-home-header { margin-bottom: 32px; }
+.stu-home-header h1 { font-size: 26px; font-weight: 700; color: var(--text-title); letter-spacing: -0.625px; }
+.stu-home-header .sub { font-size: 14px; color: var(--text-muted); margin-top: 6px; }
+
+.stu-section { margin-bottom: 32px; }
+.stu-section-title {
+  font-size: 12px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 12px;
+}
+
+.stu-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 18px 20px;
+  margin-bottom: 10px; transition: box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.stu-card:hover { box-shadow: var(--shadow-card-hover); }
+
+.stu-card--active {
+  border-color: var(--primary);
+  background: var(--gradient-active);
+  box-shadow: 0 0 0 1px var(--primary-light), var(--shadow-card);
+}
+
+.stu-card--done { opacity: 0.8; }
+.stu-card--done:hover { opacity: 1; }
+
+.stu-card-icon {
+  width: 42px; height: 42px; border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.stu-card-icon--play { background: var(--primary); color: var(--text-inverse); }
+.stu-card-icon--upcoming { background: var(--primary-light); color: var(--primary); }
+.stu-card-icon--done { background: var(--success-bg); color: var(--success); }
+
+.stu-card-body { flex: 1; min-width: 0; }
+.stu-card-body h3 { font-size: 15px; font-weight: 600; color: var(--text-title); margin: 0; }
+.stu-card-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+.stu-card-right {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+
+.stu-card-timer { text-align: right; }
+.stu-card-timer-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.stu-card-timer-value { font-size: 16px; font-weight: 700; color: var(--exam-timer); font-variant-numeric: tabular-nums; }
+
+.stu-card-progress {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px;
+  font-size: 11px; color: var(--text-muted); min-width: 140px;
+}
+.stu-progress-bar {
+  grid-column: 1 / -1; height: 5px; border-radius: 3px;
+  background: var(--border-soft); overflow: hidden;
+}
+.stu-progress-fill { height: 100%; background: var(--primary); border-radius: 3px; transition: width 0.3s; }
+
+.stu-card-score { display: flex; align-items: baseline; gap: 2px; }
+.stu-card-score-value { font-size: 22px; font-weight: 700; color: var(--primary); letter-spacing: -0.5px; }
+.stu-card-score-total { font-size: 13px; color: var(--text-muted); }
+
+.stu-card-chevron {
+  background: none; border: none; cursor: pointer; font-size: 20px;
+  color: var(--text-muted); padding: 4px 8px; border-radius: var(--radius);
+  transition: color 0.12s, background 0.12s;
+}
+.stu-card-chevron:hover { color: var(--primary); background: var(--primary-light); }
+
+.stu-card--ready { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 4%, var(--bg-card)); }
+.stu-card--ready:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent), var(--shadow-card-hover); }
+
+.stu-countdown { text-align: right; min-width: 110px; }
+.stu-countdown-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px; }
+.stu-countdown-value {
+  font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--primary); font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  letter-spacing: -0.5px;
+}
+
+/* ========== Classes grid ========== */
+.class-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.class-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 20px;
+  cursor: pointer; text-align: left; width: 100%;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  box-shadow: var(--shadow-card);
+}
+.class-card:hover { box-shadow: var(--shadow-card-hover); border-color: var(--primary); }
+.class-card-icon {
+  width: 44px; height: 44px; border-radius: var(--radius);
+  background: var(--primary-light); color: var(--primary);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.class-card-icon svg { width: 22px; height: 22px; }
+.class-card-body { flex: 1; min-width: 0; }
+.class-card-level { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px; }
+.class-card-body h3 { font-size: 16px; font-weight: 700; color: var(--text-title); margin: 0 0 4px; letter-spacing: -0.25px; }
+.class-card-meta { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.class-card-meta svg { width: 14px; height: 14px; }
+.class-card-arrow { color: var(--text-faint); flex-shrink: 0; transition: color 0.12s; }
+.class-card:hover .class-card-arrow { color: var(--primary); }
+
+/* ========== Class detail page ========== */
+.cd-header {
+  background: var(--bg-card); border-bottom: 1px solid var(--border-soft);
+  padding: 24px 32px; display: flex; align-items: center; gap: 16px;
+}
+.cd-header-left { display: flex; align-items: center; gap: 16px; flex: 1; }
+.cd-header-icon {
+  width: 52px; height: 52px; border-radius: var(--radius-lg);
+  background: var(--primary-light); color: var(--primary);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.cd-header-icon svg { width: 28px; height: 28px; }
+.cd-header-title-row { display: flex; align-items: center; gap: 10px; }
+.cd-header-title-row h1 { font-size: 26px; font-weight: 700; color: var(--text-title); letter-spacing: -0.625px; }
+.cd-header-meta { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+.cd-header-actions { flex-shrink: 0; }
+
+.cd-layout {
+  display: grid; grid-template-columns: 1fr 300px;
+  gap: 24px; padding: 24px 32px 40px;
+  align-items: start;
+}
+.cd-main { min-width: 0; }
+
+/* Stats row */
+.cd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.cd-stat {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 18px 16px;
+  box-shadow: var(--shadow-card); text-align: left;
+  cursor: default; width: 100%;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.cd-stat:not(:disabled) { cursor: pointer; }
+.cd-stat:not(:disabled):hover { box-shadow: var(--shadow-card-hover); border-color: var(--primary); }
+.cd-stat-icon {
+  width: 40px; height: 40px; border-radius: var(--radius);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.cd-stat-icon svg { width: 20px; height: 20px; }
+.cd-stat-body { flex: 1; min-width: 0; }
+.cd-stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.cd-stat-value { font-size: 24px; font-weight: 700; color: var(--text-title); letter-spacing: -0.5px; line-height: 1.2; }
+.cd-stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.cd-stat-arrow { color: var(--text-faint); font-size: 20px; flex-shrink: 0; }
+
+/* Sections */
+.cd-section { margin-bottom: 24px; }
+.cd-section-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.cd-section-header h2 { font-size: 18px; font-weight: 700; color: var(--text-title); letter-spacing: -0.25px; }
+.cd-link {
+  font-size: 13px; color: var(--primary); font-weight: 500;
+  background: none; border: none; cursor: pointer; padding: 0;
+}
+.cd-link:hover { text-decoration: underline; }
+
+.cd-empty {
+  padding: 48px 20px; text-align: center; color: var(--text-muted); font-size: 14px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+/* Progress bar inline */
+.cd-progress {
+  width: 80px; height: 6px; border-radius: 3px;
+  background: var(--border-soft); overflow: hidden;
+}
+.cd-progress-fill { height: 100%; background: var(--primary); border-radius: 3px; }
+
+/* Eval icon */
+.cd-eval-icon {
+  width: 36px; height: 36px; border-radius: var(--radius);
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.cd-eval-icon svg { width: 18px; height: 18px; }
+
+/* More button */
+.cd-more-btn {
+  width: 32px; height: 32px; border: none; background: none;
+  cursor: pointer; color: var(--text-muted); font-size: 18px;
+  border-radius: var(--radius-xs); display: grid; place-items: center;
+  transition: background 0.12s;
+}
+.cd-more-btn:hover { background: var(--bg-subtle); color: var(--text-body); }
+
+/* Right sidebar */
+.cd-aside { display: flex; flex-direction: column; gap: 16px; }
+.cd-aside-card {
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 24px;
+  box-shadow: var(--shadow-card);
+}
+.cd-aside-card-title { font-size: 15px; font-weight: 700; color: var(--text-title); margin-bottom: 12px; }
+
+.cd-aside-info { text-align: center; }
+.cd-aside-illustration {
+  width: 72px; height: 72px; border-radius: var(--radius-lg);
+  background: var(--primary-light); color: var(--primary);
+  display: grid; place-items: center; margin: 0 auto 16px;
+}
+.cd-aside-illustration svg { width: 36px; height: 36px; }
+.cd-aside-info h3 { font-size: 18px; font-weight: 700; color: var(--text-title); margin-bottom: 4px; }
+.cd-aside-subtitle { font-size: 14px; color: var(--text-muted); }
+.cd-aside-desc { font-size: 13px; color: var(--text-muted); margin: 12px 0 16px; line-height: 1.5; text-align: left; }
+.cd-aside-details { text-align: left; margin-bottom: 16px; display: grid; gap: 8px; }
+.cd-aside-details > div {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-body);
+}
+.cd-aside-details svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+
+.cd-quick-action {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border: none; background: none; cursor: pointer;
+  font-size: 14px; color: var(--text-body); font-weight: 500;
+  border-bottom: 1px solid var(--border-soft);
+  transition: color 0.12s;
+}
+.cd-quick-action:last-child { border-bottom: none; }
+.cd-quick-action:hover { color: var(--primary); }
+.cd-quick-action-icon {
+  width: 32px; height: 32px; border-radius: var(--radius);
+  background: var(--bg-subtle); display: grid; place-items: center;
+  flex-shrink: 0;
+}
+.cd-quick-action-icon svg { width: 16px; height: 16px; }
+.cd-quick-action-arrow { margin-left: auto; color: var(--text-faint); font-size: 16px; }
+
+@media (max-width: 1100px) {
+  .cd-layout { grid-template-columns: 1fr; }
+  .cd-aside { order: -1; }
+  .cd-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .cd-stats { grid-template-columns: 1fr; }
+}
+
+/* ========== Copies de l'apprenant ========== */
+.copy-page { padding: 28px 40px 60px; max-width: 900px; margin: 0 auto; display: grid; gap: 16px; }
+.copy-toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.copy-toolbar-score { font-size: 18px; color: var(--text-title); }
+.copy-toolbar > :last-child { margin-left: auto; }
+
+.copy-sheet {
+  background: var(--bg-paper); color: var(--text-title);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-card);
+  padding: 40px 44px; line-height: 1.6;
+}
+/* L'en-tête de la copie porte la note écrite en travers : il lui faut un
+   repère de position. */
+/* L'en-tête de la copie porte la note au stylo rouge par-dessus. La première
+   ligne — établissement à gauche, session à droite — garde toute la largeur :
+   c'est la ligne d'identité de l'épreuve. La note se pose en dessous, et ce
+   sont le titre et le cartouche qui lui font de la place. */
+.copy-sheet-head { position: relative; }
+.copy-sheet-head .sujet-concours,
+.copy-sheet-head .sujet-cartouche { padding-right: 150px; }
+
+.copy-exercise { padding: 20px 0; border-bottom: 1px dashed var(--border); }
+.copy-exercise:last-of-type { border-bottom: none; }
+.copy-exercise-head { display: flex; justify-content: space-between; align-items: baseline; }
+.copy-exercise-num { font-weight: 700; font-size: 13px; color: var(--primary); }
+.copy-exercise-score { font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; }
+.copy-exercise-score .note-main { font-size: 26px; }
+.copy-exercise-score--pending { color: var(--text-muted); font-weight: 500; font-style: italic; }
+.copy-exercise-title { font-size: 15px; font-weight: 600; margin: 4px 0 8px; }
+.copy-statement { white-space: pre-wrap; font-size: 13px; color: var(--text-body); margin-bottom: 12px; }
+.copy-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); margin: 12px 0 6px;
+}
+.copy-code { border-radius: var(--radius-xs); }
+.copy-code--starter { opacity: 0.7; }
+.copy-starter > summary { cursor: pointer; list-style: revert; margin-bottom: 0; }
+.copy-starter[open] > summary { margin-bottom: 6px; }
+
+/* ── La feuille corrigée de l'enseignant ──────────────────────────────────
+   Un exercice s'y lit comme sur papier : l'énoncé, la production juste en
+   dessous, la vérification ensuite. Les outils de correction — appréciation,
+   note — se replient, sinon trois exercices tiennent sur un écran de haut. */
+.copie-exercice-tete {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+}
+/* Appréciation et note vont de pair : l'une explique l'autre. Elles se
+   partagent la largeur au lieu de s'empiler sur toute la feuille. */
+.copie-outils {
+  display: grid; gap: 10px; margin-top: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start;
+}
+.copie-outils--global { margin-top: 0; }
+@media (max-width: 900px) {
+  .copie-outils { grid-template-columns: 1fr; }
+}
+.copie-tests { margin-top: 14px; }
+.copie-tests-barre { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* Réponse rédigée : du texte, pas du code — fond clair et césure normale. */
+.copy-texte {
+  background: var(--bg-subtle); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); padding: 14px 16px;
+  font-size: 13.5px; line-height: 1.6; white-space: pre-wrap;
+  color: var(--text-body); margin: 0;
+}
+.copy-empty {
+  border: 1px dashed var(--border); border-radius: var(--radius-xs);
+  padding: 18px; text-align: center; color: var(--text-faint);
+  font-size: 13px; font-style: italic; background: var(--bg-subtle);
+}
+.copy-compile-log {
+  background: var(--danger-bg); color: var(--danger);
+  border-radius: var(--radius-xs); padding: 12px 14px; margin-top: 10px;
+  font-family: var(--mono); font-size: 12px; overflow-x: auto;
+}
+.copy-verdict { margin-top: 10px; }
+
+/* Copie corrigée : les questions d'un exercice qui en porte plusieurs. */
+.copy-questions { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.copy-question-enonce { margin: 0 0 6px; font-weight: 500; white-space: pre-wrap; }
+.copy-question-num { font-weight: 700; color: var(--text-muted); }
+
+.copy-choices, .copy-pairs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.copy-choice {
+  display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-xs);
+  padding: 9px 12px; font-size: 13.5px;
+}
+.copy-choice-mark {
+  width: 16px; height: 16px; flex: none; display: grid; place-items: center;
+  border: 1.5px solid var(--text-muted); border-radius: 3px;
+  font-size: 11px; font-weight: 700; line-height: 1;
+}
+.copy-choice--chosen { border-color: var(--text-muted); background: var(--bg-subtle); }
+.copy-choice--correct { border-color: var(--success); background: var(--success-bg); }
+.copy-choice--wrong { border-color: var(--danger); background: var(--danger-bg); }
+.copy-choice-tag {
+  margin-left: auto; font-size: 11px; font-weight: 600;
+  color: var(--success); text-transform: uppercase; letter-spacing: 0.05em;
+}
+
+.copy-pairs li {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-xs);
+  padding: 9px 12px; font-size: 13.5px;
+}
+.copy-pair--correct { border-color: var(--success); background: var(--success-bg); }
+.copy-pair--wrong { border-color: var(--danger); background: var(--danger-bg); }
+.copy-pair-expected {
+  grid-column: 1 / -1; font-size: 12px; color: var(--danger); font-style: italic;
+}
+
+.copy-tests ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.copy-tests li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.copy-tests li.passed > span:first-child { color: var(--success); font-weight: 700; }
+.copy-tests li.failed > span:first-child { color: var(--danger); font-weight: 700; }
+.copy-tests li .sub { margin-left: auto; }
+/* Le repère de sous-question, quand l'exercice de code en compte plusieurs. */
+.copy-part-label {
+  margin: 8px 0 4px; font-size: 12px; font-weight: 600; color: var(--text-muted);
+}
+.copy-tests > div:first-child .copy-part-label { margin-top: 0; }
+
+.copy-appreciation {
+  margin-top: 14px; padding: 12px 14px;
+  background: var(--info-bg); border-left: 3px solid var(--info);
+  border-radius: var(--radius-xs);
+}
+.copy-appreciation--global { margin: 0 0 20px; }
+.copy-appreciation-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--info); margin-bottom: 4px;
+}
+.copy-appreciation p { font-size: 13.5px; color: var(--text-body); white-space: pre-wrap; }
+
+.copy-sheet-footer {
+  margin-top: 24px; padding-top: 12px; border-top: 2px solid var(--text-title);
+  text-align: center; font-size: 12px; color: var(--text-muted); font-style: italic;
+}
+
+@media print {
+  .sidebar, .topbar, .copy-toolbar, .alert { display: none !important; }
+  .copy-page { padding: 0; max-width: none; }
+  .copy-sheet { box-shadow: none; padding: 0; }
+}
+
+@media (max-width: 720px) {
+  .copy-page { padding: 20px 16px 40px; }
+  .copy-sheet { padding: 24px 20px; }
+  .copy-card { flex-direction: column; align-items: flex-start; }
+  .copy-card-right { margin-left: 0; }
+}
+
+/* ========== Accueil enseignant ========== */
+.th-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.th-section-head h2 { font-size: 15px; font-weight: 600; color: var(--text-title); }
+.th-live { color: var(--success); display: inline-flex; }
+.th-empty { padding: 8px 0; }
+
+.th-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.th-list li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-top: 1px solid var(--border-soft);
+}
+.th-list li:first-child { border-top: none; }
+.th-list-body { min-width: 0; display: grid; gap: 2px; margin-right: auto; }
+.th-list-body strong { font-size: 14px; font-weight: 500; color: var(--text-body); }
+
+.th-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.th-action {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--border-soft);
+  border-radius: var(--radius); background: var(--bg-card); cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.th-action:hover { border-color: var(--primary); background: var(--bg-subtle); }
+.th-action strong { display: block; font-size: 14px; font-weight: 600; color: var(--text-title); }
+.th-action .sub { font-size: 12.5px; }
+.th-action-icon {
+  width: 34px; height: 34px; flex: none; border-radius: var(--radius);
+  background: var(--primary-light); color: var(--primary);
+  display: grid; place-items: center;
+}
+
+/* ========== Feuille de sujet (mise en page « épreuve officielle ») ==========
+   Toutes les tailles sont en em : le contexte fixe la taille de base sur .sujet
+   (petite dans l'aperçu de l'enseignant, pleine dans l'épreuve et la copie). */
+.sujet {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-title);
+}
+
+.sujet-entete { margin-bottom: 1.6em; }
+.sujet-entete-haut {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 1.5em; margin-bottom: 1.4em;
+}
+.sujet-etablissement-nom {
+  font-size: 1.15em; font-weight: 600; line-height: 1.25;
+  max-width: 18em;
+}
+.sujet-etablissement-sous { font-size: 0.92em; color: var(--text-muted); margin-top: 0.15em; }
+.sujet-session { font-size: 1.05em; font-weight: 700; white-space: nowrap; }
+
+.sujet-concours {
+  text-align: center; font-weight: 700; font-size: 1.05em;
+  letter-spacing: 0.03em; margin-bottom: 1em;
+}
+
+.sujet-cartouche {
+  max-width: 26em; margin: 0 auto 1.2em;
+  border: 2px solid var(--text-title); border-radius: 0.6em;
+  padding: 0.8em 1.2em; text-align: center;
+}
+.sujet-cartouche-ligne { font-size: 1.05em; }
+.sujet-cartouche-cle { font-weight: 700; text-decoration: underline; }
+.sujet-cartouche-ligne--fine {
+  font-size: 0.85em; color: var(--text-muted); margin-top: 0.35em;
+}
+
+.sujet-filet { border-top: 3px solid var(--text-title); margin-top: 1.2em; }
+
+.sujet-consignes {
+  margin-bottom: 1.6em; text-align: center;
+  font-weight: 600; font-style: italic; font-size: 0.95em;
+  color: var(--text-body); white-space: pre-wrap;
+}
+
+.sujet-bloc { margin-bottom: 1.6em; }
+.sujet-bloc-titre {
+  text-align: center; font-weight: 700; font-size: 1.05em;
+  letter-spacing: 0.02em; margin-bottom: 1em;
+}
+
+.sujet-question { margin-bottom: 1.5em; }
+.sujet-question-tete {
+  display: flex; align-items: baseline; gap: 1em; margin-bottom: 0.4em;
+}
+.sujet-question-num { font-weight: 700; font-size: 1em; }
+.sujet-question-pts {
+  margin-left: auto; white-space: nowrap;
+  font-size: 0.85em; color: var(--text-muted); font-style: italic;
+}
+.sujet-enonce {
+  white-space: pre-wrap; color: var(--text-body);
+  margin-bottom: 0.7em; padding-left: 1.2em;
+}
+
+/* Éditeur d'exercice : les champs à gauche, l'aperçu du sujet à droite.
+   L'aperçu suit le défilement, pour rester visible pendant qu'on écrit. */
+.editeur-apercu-duo {
+  display: grid; grid-template-columns: minmax(0, 65%) minmax(0, 35%); gap: 18px;
+  align-items: start;
+}
+.editeur-apercu-champs { min-width: 0; }
+.editeur-apercu { position: sticky; top: 12px; min-width: 0; }
+.editeur-apercu-titre {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.editeur-apercu-feuille {
+  background: var(--bg-paper); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 18px; box-shadow: var(--shadow-card);
+  max-height: calc(100vh - 120px); overflow-y: auto;
+}
+.editeur-apercu-feuille .sujet { font-size: 12px; }
+
+/* Sous cette largeur, deux colonnes rendraient l'aperçu illisible : il passe dessous. */
+@media (max-width: 1100px) {
+  .editeur-apercu-duo { grid-template-columns: minmax(0, 1fr); }
+  .editeur-apercu { position: static; }
+}
+
+/* Les sous-questions d'un exercice de code : « 1) déclarez une fonction… ». */
+/* Les exemples d'exécution, en aperçu enseignant : deux colonnes, ce qu'on
+   entre et ce qui doit sortir. */
+.sujet-exemples { margin-top: 0.7em; display: grid; gap: 0.35em; }
+.sujet-exemples-titre {
+  font-size: 0.85em; font-weight: 600; letter-spacing: 0.02em;
+}
+/* `fixed` : sans lui, une longue valeur étire le tableau hors de la feuille. */
+.sujet-exemples-table {
+  width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse;
+  font-size: 0.85em;
+}
+.sujet-exemples-table th, .sujet-exemples-table td { width: 50%; }
+.sujet-exemples-table th {
+  text-align: left; font-weight: 500; padding: 0.15em 0.5em 0.15em 0;
+  border-bottom: 1px solid var(--border);
+}
+.sujet-exemples-table td {
+  padding: 0.2em 0.5em 0.2em 0; vertical-align: top;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sujet-exemples-table code {
+  font-family: var(--mono); font-size: 0.95em; white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sujet-parts {
+  margin: 0.6em 0 0; padding: 0 0 0 2.2em;
+  display: grid; gap: 0.6em;
+}
+.sujet-parts li { display: grid; gap: 0.25em; }
+.sujet-signature {
+  font-family: var(--mono); font-size: 0.9em;
+  color: var(--text-muted); justify-self: start;
+}
+
+/* Les questions d'un exercice à plusieurs questions, numérotées « a) », « b) »… */
+.sujet-sous-questions {
+  list-style: none; margin: 0; padding: 0 0 0 1.2em;
+  display: grid; gap: 0.9em;
+}
+.sujet-sous-questions .sujet-enonce { padding-left: 0; margin-bottom: 0.4em; }
+
+.sujet-choix, .sujet-colonne { list-style: none; margin: 0; padding: 0 0 0 2.4em; display: grid; gap: 0.4em; }
+.sujet-choix li, .sujet-colonne li { display: flex; gap: 0.7em; align-items: baseline; }
+.sujet-lettre { flex: none; min-width: 1.4em; }
+.sujet-vide { color: var(--text-faint); }
+
+/* Vrai/Faux : la case à cocher du sujet imprimé, alignée à droite de l'affirmation. */
+.sujet-vf {
+  margin-left: auto; flex: none;
+  letter-spacing: 0.08em; color: var(--text-muted); font-size: 0.85em;
+}
+
+/* Question-réponse : les lignes vierges d'une copie d'examen. */
+.sujet-lignes {
+  display: grid; gap: 1.1em; margin: 0.2em 0 0.9em 1.2em; padding-top: 0.6em;
+}
+.sujet-ligne { display: block; border-bottom: 1px solid var(--border); }
+
+.sujet-correspondance {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em;
+  padding-left: 0; align-items: start;
+}
+.sujet-correspondance .sujet-colonne { padding-left: 1.6em; }
+/* Les attaches à relier : un point plein derrière les éléments de gauche,
+   un point plein devant ceux de droite — les deux se font face, le trait
+   de l'apprenant va de l'une à l'autre. */
+.sujet-colonne--gauche li { justify-content: flex-end; text-align: right; }
+.sujet-attache {
+  flex: none; align-self: center;
+  width: 0.42em; height: 0.42em; border-radius: 50%;
+  background: currentColor;
+}
+
+/* Le code d'un énoncé garde la mesure de la feuille : sa taille suit celle du
+   sujet, pas celle de l'application. */
+.sujet-code {
+  border-radius: 0.4em; padding: 0.8em 1em; margin: 0 0 0.7em 1.2em;
+  font-size: 0.85em; line-height: 1.5;
+}
+.sujet-etiquette {
+  display: inline-block; margin-left: 1.2em; margin-bottom: 0.7em;
+  background: var(--info-bg); color: var(--info);
+  font-size: 0.8em; font-weight: 600;
+  padding: 0.15em 0.8em; border-radius: var(--radius-pill);
+}
+.sujet-reponse {
+  margin-left: 1.2em; border: 1px dashed var(--border); border-radius: 0.4em;
+  padding: 1.1em 0.8em; text-align: center; background: var(--bg-subtle);
+  color: var(--text-faint); font-size: 0.85em; font-style: italic;
+}
+
+.sujet-vide-bloc {
+  padding: 3em 1em; text-align: center;
+  color: var(--text-faint); font-size: 0.9em;
+}
+.sujet-pied {
+  margin-top: 1.6em; padding-top: 0.8em; border-top: 3px solid var(--text-title);
+  text-align: center; font-size: 0.85em; color: var(--text-muted); font-style: italic;
+}
+
+/* Aperçu de l'enseignant : même feuille, réduite. */
+.sheet-preview .sujet { font-size: 9.5px; }
+.sheet-preview .sujet-cartouche { border-width: 1.5px; }
+.sheet-preview .sujet-filet, .sheet-preview .sujet-pied { border-top-width: 2px; }
+
+@media (max-width: 640px) {
+  .sujet-correspondance { grid-template-columns: 1fr; gap: 0.4em; }
+}
+
+/* ─── Choix du thème (paramètres) ─── */
+.theme-choices { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme-choice {
+  padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer;
+  color: var(--text-body); background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-pill);
+}
+.theme-choice:hover { background: var(--bg-subtle); }
+.theme-choice--on {
+  color: var(--primary); background: var(--bg-nav-active);
+  border-color: var(--primary);
+}
+
+/* --- Choix du type de question : première étape de toute création --- */
+.type-picker-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.type-card {
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: center; cursor: pointer;
+  padding: 10px 10px 12px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--bg-card);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.type-card:hover, .type-card:focus-visible {
+  border-color: var(--primary); background: var(--primary-light);
+  transform: translateY(-1px);
+}
+/* La miniature porte la carte : elle dit la forme du type avant que le nom ne
+   la confirme. */
+.type-apercu {
+  display: block; width: 100%; height: auto; margin-bottom: 8px;
+  border-radius: var(--radius-xs); border: 1px solid var(--border-soft);
+}
+.type-card-titre { font-size: 13.5px; font-weight: 600; color: var(--text-title); }
+.type-card-tagline { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
+/* Sur les cartes qui remplacent une miniature par du code — choix d'une
+   déclaration attendue, choix de la cible d'un test — l'exemple joue le rôle de
+   l'aperçu : on reconnaît la forme avant de lire le nom. */
+.type-card-code {
+  display: block; margin-bottom: 8px; padding: 8px 6px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.4;
+  color: var(--text-body); background: var(--bg-subtle);
+  border-radius: var(--radius-xs); border: 1px solid var(--border-soft);
+  overflow-wrap: anywhere;
+}
+
+/* ========== Barème & jeux de tests (étape « contenu et correction ») ========== */
+
+.bareme-editeur, .tests-editeur { display: grid; gap: 10px; }
+
+.tests-tete { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.tests-tete .btn { flex-shrink: 0; }
+
+/* Le choix par cartes s'ouvre en place, encadré, pour qu'on voie qu'on est en
+   train de choisir et non de remplir. */
+.tests-choix {
+  padding: 12px; border-radius: var(--radius);
+  border: 1px dashed var(--border); background: var(--bg-row-hover);
+}
+
+.tests-vide {
+  padding: 18px; text-align: center; border-radius: var(--radius);
+  border: 1px dashed var(--border); background: var(--bg-row-hover);
+}
+
+.bareme-critere, .test-carte {
+  display: grid; gap: 10px; padding: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-card);
+}
+.bareme-critere-code {
+  margin: 0; padding: 6px 8px; font-family: var(--mono); font-size: 12px;
+  color: var(--text-body); background: var(--bg-subtle);
+  border-radius: var(--radius-xs); overflow-wrap: anywhere;
+}
+
+.test-carte-tete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.test-carte-numero, .test-etape-numero {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: var(--radius-pill);
+  font-size: 11px; font-weight: 600;
+}
+.test-carte-numero { background: var(--primary); color: var(--text-inverse); }
+.test-etape-numero {
+  background: var(--bg-subtle); color: var(--text-muted);
+  border: 1px solid var(--border-soft);
+}
+.test-carte-nom { flex: 1; min-width: 140px; font-weight: 600; }
+
+/* Les trois temps d'un test — ce qui tourne, ce qu'on lui donne, ce qu'on
+   attend — alignés sous leur numéro : on remplit de haut en bas. */
+.test-etape { display: flex; gap: 10px; align-items: flex-start; }
+.test-etape-corps { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.test-etape-titre { font-size: 12.5px; font-weight: 600; color: var(--text-title); }
+.test-etape-aide { font-size: 11.5px; }
+.test-etape-champs { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 4px; }
+.test-etape-champs > * { min-width: 0; }
+
+/* Les valeurs d'un test tiennent côte à côte tant que la place le permet :
+   un appel se lit d'un trait, pas en colonne. */
+.test-valeurs {
+  display: grid; gap: 10px; flex: 1;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 220px));
+  align-items: end;
+}
+.test-valeur { display: flex; gap: 6px; align-items: flex-end; }
+.test-valeur--large { grid-column: 1 / -1; }
+/* Une valeur libre porte son type et son bouton de retrait : elle prend la
+   ligne entière, sinon le champ se réduit à deux caractères. */
+.test-valeur--large > label { flex: 1; min-width: 120px; }
+
+/* Un tableau se dessine : une case par élément, l'indice au-dessus, comme au
+   tableau noir. */
+/* Le type d'une valeur : la liste des types, et — pour un tableau — celle du
+   type de ses éléments, juste à côté. */
+.type-select { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.type-select select { min-width: 0; }
+
+/* Le récapitulatif des jeux de tests : quatre colonnes, une ligne par test.
+   `fixed` : sans lui, une longue sortie attendue étire le tableau hors carte. */
+.tests-recap { margin-top: 4px; display: grid; gap: 6px; }
+.tests-recap-titre {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.tests-recap-table {
+  width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12.5px;
+}
+.tests-recap-table th {
+  text-align: left; font-weight: 500; font-size: 11.5px; color: var(--text-muted);
+  padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border);
+}
+.tests-recap-table td {
+  padding: 6px 8px 6px 0; vertical-align: top;
+  border-bottom: 1px solid var(--border-soft);
+}
+.tests-recap-table code {
+  font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.tests-recap-type { color: var(--text-muted); }
+.tests-recap-nom { display: block; color: var(--text-title); font-weight: 600; font-size: 12px; }
+
+.tableau-saisie { display: grid; gap: 6px; width: 100%; }
+.tableau-cases { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; }
+.tableau-case { position: relative; display: grid; justify-items: center; gap: 2px; }
+.tableau-case input {
+  width: 64px; text-align: center; font-family: var(--mono);
+  border-radius: var(--radius-xs);
+}
+.tableau-index {
+  font-size: 10.5px; font-family: var(--mono); color: var(--text-faint);
+}
+.tableau-retirer {
+  position: absolute; top: 12px; right: -6px;
+  width: 16px; height: 16px; padding: 0; line-height: 1;
+  display: none; align-items: center; justify-content: center;
+  font-size: 12px; cursor: pointer; color: var(--text-muted);
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.tableau-case:hover .tableau-retirer,
+.tableau-case:focus-within .tableau-retirer { display: flex; }
+.tableau-retirer:hover { color: var(--danger); border-color: var(--danger); }
+.tableau-ajouter {
+  height: 30px; padding: 0 10px; cursor: pointer;
+  font-size: 12px; color: var(--text-muted);
+  background: var(--bg-card); border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.tableau-ajouter:hover { color: var(--primary); border-color: var(--primary); }
+.tableau-legende { font-size: 11px; font-family: var(--mono); }
+
+.case-char { text-align: center; font-family: var(--mono); }
+
+/* La sortie attendue se saisit sur un écran, pas dans un champ : c'est ce que
+   l'apprenant verra. */
+.ecran-attendu-bloc { display: grid; gap: 4px; flex: 1; min-width: 220px; }
+.ecran-attendu-bloc > select { width: max-content; max-width: 100%; }
+.ecran-attendu {
+  display: grid; gap: 4px; padding: 8px 10px 10px;
+  background: var(--surface-dark); border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.ecran-attendu-barre {
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--on-dark-soft);
+}
+.ecran-attendu textarea {
+  width: 100%; resize: vertical; min-height: 46px; padding: 6px 8px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
+  color: var(--on-dark); background: var(--surface-dark-elevated);
+  border: 1px solid var(--border); border-radius: var(--radius-xs);
+}
+.ecran-attendu textarea::placeholder { color: var(--on-dark-soft); opacity: 0.6; }
+
+.test-cibles { display: flex; flex-wrap: wrap; gap: 6px; }
+.test-cible {
+  padding: 5px 12px; border-radius: var(--radius-pill); cursor: pointer;
+  font-size: 12.5px; color: var(--text-muted);
+  border: 1px solid var(--border); background: var(--bg-card);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.test-cible:hover { border-color: var(--primary); color: var(--text-title); }
+.test-cible.active {
+  border-color: var(--primary); background: var(--primary-light);
+  color: var(--primary); font-weight: 600;
+}
+
+.test-comparaison { display: grid; gap: 4px; }
+.comparaison-tout { display: grid; gap: 4px; margin-left: auto; justify-items: end; }
+.test-comparaison .sub { font-size: 11px; }
+
+/* La phrase que le correcteur appliquera : le seul endroit où l'enseignant
+   relit son test comme une consigne, et non comme un formulaire. */
+.test-resume {
+  margin: 0; padding: 8px 10px; border-radius: var(--radius-xs);
+  font-family: var(--mono); font-size: 12px; line-height: 1.45;
+  color: var(--text-body); background: var(--bg-subtle);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .test-etape { gap: 8px; }
+  .test-carte-nom { min-width: 100%; order: 3; }
+}
+
+/* ========== Outils autorisés (exercices algorithmiques) ========== */
+
+.outils-editeur { display: grid; gap: 12px; }
+
+/* La structure imposée se lit comme au tableau : un bloc de texte, pas un
+   formulaire — rien n'y est cliquable, parce que rien n'y est négociable. */
+.outils-squelette {
+  padding: 14px 16px; border-radius: var(--radius);
+  border: 1px solid var(--border-soft); background: var(--bg-row-hover);
+}
+.outils-squelette-titre { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.outils-squelette pre {
+  margin: 0 0 10px; font-family: var(--mono); font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap;
+}
+.outils-squelette pre strong { font-weight: 700; }
+.outils-squelette .barré { text-decoration: line-through; opacity: 0.45; }
+.outils-squelette p { margin: 0; font-size: 12px; }
+
+.outils-tete { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.outils-groupe { display: grid; gap: 6px; }
+.outils-groupe-titre { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.outils-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-actif { background: var(--bg-nav-active); color: var(--primary); font-weight: 600; }
+
+/* ========== Points (dernière étape) ========== */
+
+.points-editeur { display: grid; gap: 10px; margin: 10px 0 4px; }
+.points-editeur-tete { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.points-mode { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.points-lignes { display: grid; gap: 6px; }
+
+.points-ligne {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-top: 1px solid var(--border-soft);
+}
+.points-ligne:first-child { border-top: none; }
+.points-ligne-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 50%; background: var(--bg-nav-active); color: var(--primary);
+  font-size: 12px; font-weight: 600;
+}
+.points-ligne-titre { flex: 1; min-width: 0; }
+.points-ligne-champ { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.points-ligne-champ input { width: 72px; }
+
+.points-total {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px;
+}
+
+/* ---- Épreuves en pile de feuilles (espace enseignant) ------------------- */
+/* Chaque évaluation est une feuille de sujet posée sur le bureau ; les
+   feuilles fantômes derrière rappellent la liasse d'exemplaires qu'on
+   distribue à la classe. */
+.exam-stack {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 26px 22px;
+  padding: 22px;
+  background: var(--bg-paper-tray);
+  border-radius: var(--radius-lg);
+}
+.exam-sheet {
+  position: relative;
+  background: var(--bg-paper);
+  color: var(--text-title);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px 16px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+/* Les deux exemplaires du dessous : décalés, jamais cliquables. */
+.exam-sheet::before,
+.exam-sheet::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  z-index: -1;
+}
+.exam-sheet::before { transform: translate(5px, 5px) rotate(0.7deg); opacity: 0.85; }
+.exam-sheet::after { transform: translate(10px, 10px) rotate(1.4deg); opacity: 0.6; }
+.exam-sheet:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
+/* Une épreuve unique (pas de liasse) : une seule feuille. */
+.exam-sheet.is-single::before,
+.exam-sheet.is-single::after { display: none; }
+
+.exam-sheet-top {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  border-bottom: 2px solid var(--text-title);
+  padding-bottom: 10px; margin-bottom: 12px;
+}
+.exam-sheet-kind {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-muted); margin-bottom: 3px;
+}
+.exam-sheet-title { font-size: 15px; font-weight: 700; line-height: 1.3; margin: 0; }
+.exam-sheet-lines { display: grid; gap: 5px; font-size: 12px; color: var(--text-muted); }
+.exam-sheet-lines b { color: var(--text-title); font-weight: 600; }
+.exam-sheet-foot {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);
+}
+.exam-sheet-warn {
+  margin-top: 10px; font-size: 11px; line-height: 1.4;
+  color: var(--text-title); background: var(--bg-paper-tray);
+  border-left: 3px solid var(--primary); padding: 7px 9px; border-radius: var(--radius-xs);
+}
+
+/* ========== Coloration du code =============================================
+   Les copies, les énoncés et le code de départ se lisent comme dans un
+   éditeur : un mot réservé, une chaîne et un commentaire ne se confondent
+   plus. Les jetons sont posés par `highlight.jsx`, les couleurs par le thème. */
+
+.code-bloc {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  color: var(--code-text);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 4;
+}
+.code-bloc code { font: inherit; color: inherit; background: none; }
+.code-inline {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0 4px;
+  color: var(--code-text);
+}
+
+.tok-com { color: var(--code-comment); font-style: italic; }
+.tok-pre { color: var(--code-preproc); }
+.tok-str { color: var(--code-string); }
+.tok-num { color: var(--code-number); }
+.tok-kw  { color: var(--code-keyword); font-weight: 600; }
+.tok-typ { color: var(--code-type); font-weight: 500; }
+.tok-fn  { color: var(--code-function); }
+.tok-op  { color: var(--code-operator); }
+.tok-pon { color: var(--code-punct); }
+
+/* Sur les fonds déjà sombres (éditeur, écran attendu), le bloc garde sa
+   propre bordure mais pas de second cadre. */
+.code-bloc--nu { border: none; background: transparent; padding: 0; }
+
+/* ========== La note écrite à la main sur la copie ==========================
+   Une copie corrigée porte sa note au stylo rouge, en travers de la feuille.
+   Voir `GradeMark.jsx` : la mise en page est une fraction penchée. */
+
+.note-main {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-items: center;
+  position: relative;
+  font-family: var(--main);
+  font-weight: 700;
+  color: var(--encre-rouge);
+  line-height: 0.9;
+  transform: rotate(-7deg);
+  user-select: none;
+}
+/* Les deux chiffres se serrent contre la barre : sur une copie, la main ne
+   laisse pas d'air autour du trait, elle l'écrit entre les deux nombres. */
+.note-main-num { grid-area: 1 / 1; padding-right: 0.08em; }
+.note-main-den { grid-area: 2 / 2; padding-left: 0.08em; }
+/* La barre est franche, presque debout : une soixantaine de degrés dans le
+   sens inverse des aiguilles. Sa longueur se calcule sur la hauteur des deux
+   chiffres, sinon la rotation la ferait dépasser de la feuille. */
+.note-main-barre {
+  grid-area: 1 / 1 / 3 / 3;
+  align-self: center;
+  justify-self: center;
+  width: 2.1em;
+  height: 0.075em;
+  min-height: 2px;
+  background: currentColor;
+  border-radius: 999px;
+  transform: rotate(-60deg);
+}
+.note-main--sm { font-size: 26px; }
+.note-main--md { font-size: 46px; }
+.note-main--lg { font-size: 64px; }
+.note-main--attente { color: var(--encre-rouge-pale); }
+
+.note-marge {
+  font-family: var(--main);
+  font-size: 19px;
+  line-height: 1.25;
+  transform: rotate(-1.5deg);
+  margin: 0;
+}
+.note-marge--rouge { color: var(--encre-rouge); }
+.note-marge--sobre { color: var(--text-muted); }
+
+/* La note posée sur l'en-tête d'une copie : elle déborde légèrement, comme un
+   trait de stylo qui ne respecte pas la marge imprimée. */
+/* La note descend sous la ligne « Session : … », qui garde sa place en haut à
+   droite de l'en-tête : deux mentions au même endroit s'écrasaient. */
+.copie-note-posee {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  z-index: 2;
+}
+.copie-note-mention {
+  font-family: var(--main);
+  font-size: 17px;
+  color: var(--encre-rouge);
+  transform: rotate(-4deg);
+}
+
+/* ========== Le paquet de copies corrigées =================================
+   Les feuilles se suivent sur le bureau : on les balaie au doigt, à la
+   souris ou aux flèches, et un clic ouvre la copie. */
+
+.copies-deck {
+  background: var(--bg-paper-tray);
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 18px;
+  display: grid;
+  gap: 12px;
+}
+.copies-deck-vide { padding: 24px 0; }
+.copies-deck-barre { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.copies-deck-compteur { font-size: 13px; font-weight: 600; color: var(--text-title); }
+.copies-deck-aide { font-size: 12px; }
+.copies-deck-fleches { margin-left: auto; display: flex; gap: 6px; }
+.copies-deck-fleche {
+  width: 30px; height: 30px; border-radius: var(--radius-pill);
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-title); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.copies-deck-fleche:hover:not(:disabled) { background: var(--bg-subtle); }
+.copies-deck-fleche:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.copies-deck-piste {
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 6px 2px 10px;
+  scrollbar-width: thin;
+}
+.copies-deck-piste:focus-visible { outline-offset: 4px; }
+
+.copie-feuille {
+  position: relative;
+  flex: 0 0 300px;
+  scroll-snap-align: center;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 10px;
+  min-height: 320px;
+  padding: 16px 18px 14px;
+  background: var(--bg-paper);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.copie-feuille:hover { transform: translateY(-3px); box-shadow: var(--shadow-card-hover); }
+.copie-feuille--active { border-color: var(--primary); }
+
+.copie-feuille-entete {
+  display: grid; gap: 2px;
+  border-bottom: 2px solid var(--text-title);
+  padding-bottom: 8px;
+}
+.copie-feuille-eta {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted);
+}
+.copie-feuille-eval { font-size: 13px; font-weight: 700; color: var(--text-title); line-height: 1.25; }
+
+.copie-feuille-corps { display: flex; align-items: flex-start; gap: 10px; }
+.copie-feuille-identite { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.copie-feuille-mention { min-width: 0; }
+.copie-feuille-identite dt {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);
+}
+.copie-feuille-identite dd {
+  margin: 0; font-size: 13px; font-weight: 600; color: var(--text-title); line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.copie-feuille-corps .note-main { margin-left: auto; flex: none; }
+
+/* La réglure : le corps de la copie, suggéré. Il ne se lit pas en vignette. */
+/* Les réglures de la vignette ne sont plus décoratives : chaque ligne porte
+   un exercice et ce qu'il a rapporté, écrit dessus comme sur un relevé. */
+.copie-feuille-reglure {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; align-content: start;
+  min-height: 96px;
+}
+.copie-feuille-ligne {
+  display: flex; align-items: baseline; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  min-height: 22px; padding-bottom: 2px;
+  font-size: 12px; color: var(--text-body);
+}
+.copie-feuille-ligne-nom {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.copie-feuille-ligne-note {
+  margin-left: auto; flex: none;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--encre-rouge);
+}
+.copie-feuille-ligne--suite { color: var(--text-faint); font-style: italic; }
+
+.copie-feuille-pied {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  border-top: 1px dashed var(--border); padding-top: 10px;
+}
+.copie-feuille-meta { font-size: 11.5px; color: var(--text-muted); }
+.copie-feuille-pied .btn { margin-left: auto; }
+
+@media (max-width: 640px) {
+  .copie-feuille { flex-basis: 82vw; }
+}
+
+/* La copie corrigée vue par l'enseignant : même feuille que celle de
+   l'apprenant, pour qu'il note sur ce que l'apprenant lira. */
+.copie-entete {
+  background: var(--bg-paper); color: var(--text-title);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-card);
+  padding: 28px 32px 22px;
+}
+
+/* ── La copie corrigée de l'enseignant, d'un seul tenant ──────────────────
+   Les outils de notation en tête — c'est par là qu'on commence —, puis une
+   seule feuille : en-tête d'épreuve, identité, exercices à la suite. La copie
+   ne se lit pas en cartes empilées, elle se lit comme du papier. */
+.copie-corrigee { display: grid; gap: 16px; }
+.copie-correction-titre { font-size: 15px; margin-bottom: 14px; }
+.copie-outil-titre { font-size: 13.5px; font-weight: 600; margin: 0 0 4px; }
+.copie-outil {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px 16px; background: var(--bg-subtle); min-width: 0;
+}
+.copie-historique { margin-top: 14px; display: grid; gap: 8px; }
+
+.copie-feuille-corrigee {
+  background: var(--bg-paper); color: var(--text-title);
+  padding: 30px 34px 24px;
+}
+.copie-feuille-corrigee .copie-exercice {
+  padding: 22px 0; border-top: 1px dashed var(--border);
+}
+.copie-feuille-corrigee .copie-exercice:first-of-type { margin-top: 6px; }
+.copie-identite {
+  margin: 18px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px;
+  border-top: 1px dashed var(--border); padding-top: 14px;
+}
+.copie-identite dt {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted);
+  align-self: center;
+}
+.copie-identite dd { margin: 0; font-size: 14px; font-weight: 600; }
+
+@media (max-width: 640px) {
+  .copy-sheet-head .sujet-concours,
+  .copy-sheet-head .sujet-cartouche { padding-right: 0; }
+  .copie-note-posee { position: static; justify-items: start; margin-top: 12px; }
+}
+
+/* Le bloc de code prend la mesure de son contexte : plus petit sur une feuille
+   de sujet réduite, plus dense dans une copie. Ces règles suivent `.code-bloc`
+   pour pouvoir la corriger. */
+.sujet-code { font-size: 0.85em; padding: 0.8em 1em; margin: 0 0 0.7em 1.2em; }
+.sheet-preview .sujet-code, .editeur-apercu-feuille .sujet-code { font-size: 0.9em; }
+.copy-code { font-size: 12.5px; max-height: 460px; }
+
+
+/* ========== Correspondance : deux blocs, un trait entre les deux ===========
+   Voir `MatchingBoard.jsx`. Les traits sont un calque SVG posé par-dessus les
+   deux blocs ; les blocs restent du texte, sélectionnable et lisible. */
+
+.match-plateau {
+  position: relative;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px;
+  align-items: start;
+  padding: 6px 0;
+}
+.match-traits {
+  position: absolute; inset: 0; pointer-events: none; overflow: visible;
+}
+.match-trait {
+  stroke: var(--primary); stroke-width: 2; stroke-linecap: round;
+}
+.match-trait--correct { stroke: var(--success, #16a34a); }
+.match-trait--wrong { stroke: var(--danger, #dc2626); stroke-dasharray: 6 4; }
+
+.match-bloc { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.match-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 12px; font: inherit; font-size: 14px; text-align: left;
+  color: var(--text-body); background: var(--bg-card);
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.match-item:disabled { cursor: default; }
+.match-item:not(:disabled):hover { border-color: var(--primary); }
+.match-bloc--droite .match-item { flex-direction: row-reverse; text-align: right; }
+.match-texte { flex: 1; min-width: 0; }
+/* Le point d'attache : c'est de là que part le trait, il est donc au bord. */
+.match-point {
+  flex: none; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--bg-card); border: 2px solid var(--text-muted);
+}
+.match-item--relie { border-color: var(--primary); background: var(--primary-soft, var(--bg-nav-active)); }
+.match-item--relie .match-point { background: var(--primary); border-color: var(--primary); }
+.match-item--arme { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.match-item--correct { border-color: var(--success, #16a34a); }
+.match-item--wrong { border-color: var(--danger, #dc2626); }
+.match-aide { grid-column: 1 / -1; margin: 4px 0 0; }
+
+@media (max-width: 640px) {
+  .match-plateau { grid-template-columns: 1fr 1fr; gap: 20px; }
+  .match-item { font-size: 13px; padding: 8px 10px; }
+}

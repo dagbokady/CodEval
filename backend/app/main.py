@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .config import settings
+from .db import init_db
+from .routers import auth, bank, corrections, evaluations, notifications, org, student
+from .scheduler import run_scheduler
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    task = asyncio.create_task(run_scheduler())
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(
+    title="CodEval API",
+    version="1.0.0",
+    description="Plateforme SaaS d'évaluation pratique en programmation et algorithmique",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+for module in (auth, org, evaluations, corrections, student, bank, notifications):
+    app.include_router(module.router)
+
+
+@app.exception_handler(Exception)
+async def unhandled(_request: Request, exc: Exception) -> JSONResponse:
+    logging.getLogger("codeval").exception("Erreur non gérée", exc_info=exc)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Erreur interne du serveur"},
+    )
+
+
+@app.get("/api/health", tags=["observabilité"])
+def health() -> dict:
+    return {"status": "ok"}
