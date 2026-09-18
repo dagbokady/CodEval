@@ -1,5 +1,5 @@
 /**
- * L'attribution des points d'un exercice — toujours en dernier.
+ * L'attribution des points d'un exercice : toujours en dernier.
  *
  * Un test ne vaut rien tant qu'on ne sait pas quels tests existent : décider
  * qu'un test pèse 2 points au moment où on l'écrit, c'est noter à l'aveugle et
@@ -130,8 +130,8 @@ export default function PointsEditor({ exercise, onChange, readOnly = false, sho
                 Barème saisi : {weight} / {total} pts
                 {écart !== 0 &&
                   (écart > 0
-                    ? ` — ${écart} pt${écart > 1 ? 's' : ''} de trop`
-                    : ` — ${-écart} pt${-écart > 1 ? 's' : ''} à placer`)}
+                    ? `, ${écart} pt${écart > 1 ? 's' : ''} de trop`
+                    : `, ${-écart} pt${-écart > 1 ? 's' : ''} à placer`)}
               </span>
             )}
             {!simple && !readOnly && (

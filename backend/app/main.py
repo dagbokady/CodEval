@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
 from .db import init_db
@@ -35,6 +36,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+class UnhandledErrors(BaseHTTPMiddleware):
+    """Répond 500 en JSON à toute erreur non prévue.
+
+    Un gestionnaire `exception_handler(Exception)` répond depuis la couche la
+    plus externe, hors de CORS : la réponse partait sans en-têtes CORS et le
+    navigateur la faisait passer pour une panne réseau (« Serveur injoignable »).
+    Placée sous CORS, cette couche garde l'erreur lisible par le client.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001 (c'est précisément le filet)
+            logging.getLogger("codeval").exception("Erreur non gérée", exc_info=exc)
+            return JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Erreur interne du serveur"},
+            )
+
+
+# Le premier middleware ajouté est le plus interne : les erreurs sont converties
+# en réponses avant que CORS n'y pose ses en-têtes.
+app.add_middleware(UnhandledErrors)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
@@ -45,15 +69,6 @@ app.add_middleware(
 
 for module in (auth, org, evaluations, corrections, student, bank, notifications):
     app.include_router(module.router)
-
-
-@app.exception_handler(Exception)
-async def unhandled(_request: Request, exc: Exception) -> JSONResponse:
-    logging.getLogger("codeval").exception("Erreur non gérée", exc_info=exc)
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Erreur interne du serveur"},
-    )
 
 
 @app.get("/api/health", tags=["observabilité"])

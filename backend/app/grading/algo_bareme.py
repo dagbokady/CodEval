@@ -2,11 +2,11 @@
 
 Un exercice de code se contrôle par compilation : on engendre une sonde du type
 exact attendu, et si elle compile, la déclaration existe. Un algorithme n'a rien
-à compiler — il est traduit en Python pour être exécuté, et ce Python a perdu
+à compiler : il est traduit en Python pour être exécuté, et ce Python a perdu
 l'essentiel de ce qu'on voulait vérifier : le type déclaré d'une variable, le
 nom d'un enregistrement, la présence d'une boucle POUR plutôt que d'un TANT QUE.
 
-On ne lit donc pas la traduction, mais le document même de l'apprenant — le JSON
+On ne lit donc pas la traduction, mais le document même de l'apprenant : le JSON
 que produit l'éditeur en blocs, dont la forme est décrite dans
 `frontend/src/algoVocabulary.js`. La partie déclarative répond des variables, des
 constantes et des types ; le corps, parcouru récursivement, répond des fonctions
@@ -35,14 +35,12 @@ ALGO_CRITERION_KINDS = (
 # Les types de données du cours, tels qu'ils s'écrivent sur le sujet. Cette table
 # couvre `algo.TYPES_DONNEES` : un type ajouté à l'éditeur se nomme aussi ici.
 TYPE_LABELS = {
-    "entier": "entier",
-    "reel": "réel",
-    "caractere": "caractère",
-    "chaine": "chaîne",
-    "booleen": "booléen",
-    "tableau_entier": "tableau d'entiers",
-    "tableau_reel": "tableau de réels",
-    "tableau_chaine": "tableau de chaînes",
+    "entier": "ENTIER",
+    "reel": "REEL",
+    "caractere": "CARACTERE",
+    "chaine": "CHAINE",
+    "booleen": "BOOLEEN",
+    "pointeur": "^",
 }
 
 # Les clés des enfants d'un bloc : c'est par elles qu'on descend dans le corps.
@@ -73,11 +71,18 @@ def describe_algo(criterion: dict) -> str:
     if kind == "algo_structure":
         bloc = ELEMENTS.get(str(criterion.get("element") or ""), (None, "?"))[1]
         fois = _entier(criterion.get("min")) or 1
-        return f"{bloc} — {fois} fois" if fois > 1 else bloc
+        return f"{bloc} ({fois} fois)" if fois > 1 else bloc
 
-    label = TYPE_LABELS.get(str(criterion.get("vtype") or "entier"), "entier")
-    taille = str(criterion.get("taille") or "").strip()
-    return f"{nom} : {label}[{taille}]" if taille else f"{nom} : {label}"
+    return f"{nom} :{type_notation(str(criterion.get('vtype') or 'entier'), criterion.get('taille'))}"
+
+
+def type_notation(vtype: str, taille=None) -> str:
+    """Le type tel qu'il s'écrit au cours : ENTIER, TABLEAU[1..MAX] DE REEL."""
+    if vtype.startswith("tableau_"):
+        éléments = TYPE_LABELS.get(vtype.removeprefix("tableau_"), vtype.removeprefix("tableau_"))
+        borne = str(taille or "").strip()
+        return f"TABLEAU[1..{borne}] DE {éléments}" if borne else f"TABLEAU DE {éléments}"
+    return TYPE_LABELS.get(vtype, vtype.upper())
 
 
 def parse_document(production: str) -> dict:

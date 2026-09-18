@@ -194,7 +194,7 @@ def test_full_flow(context):
     assert adjust.json()["adjustments"][0]["previous_score"] == 10.0
 
     # Note posée sur un exercice : elle remplace la note automatique de cet
-    # exercice, et la copie repart de la somme des exercices — la note globale
+    # exercice, et la copie repart de la somme des exercices : la note globale
     # posée juste avant ne fige pas les corrections qui la suivent.
     participation_id = results["participants"][0]["participation_id"]
     par_exercice = client.post(
@@ -374,10 +374,12 @@ def test_algorithme_en_blocs_est_traduit_et_corrige():
     hors_palette = _json.dumps(algorithme + [{"type": "tantque", "condition": "n > 0", "corps": []}])
     refus = grade_exercise(hors_palette, exercise, tests)
     assert refus.status.value == "compile_error"
-    assert "TANT QUE" in refus.compile_log
+    assert "TANTQUE" in refus.compile_log
 
-    # Les expressions sont filtrées : pas d'échappatoire vers le système.
-    for expression in ["__import__('os').system('ls')", "open('/etc/passwd')"]:
+    # Les expressions sont filtrées : pas d'échappatoire vers le système, pas même
+    # par une chaîne formatée.
+    for expression in ["__import__('os').system('ls')", "open('/etc/passwd')",
+                       "f\"{__import__('os')}\"", "rb'x'"]:
         with pytest.raises(AlgoError):
             transpile(_json.dumps([{"type": "ecrire", "expression": expression}]))
 
@@ -639,6 +641,93 @@ def test_copie_de_l_apprenant_puis_publication_des_notes(context):
     assert client.get(f"/api/evaluations/{eid}/results", headers=s).status_code == 403
 
 
+def test_corrige_publie_avec_les_notes(context):
+    """Le corrigé reste au serveur pendant l'épreuve et paraît avec les notes,
+    sauf si l'enseignant a choisi de ne pas le proposer."""
+    t = auth(context["teacher"])
+    s = auth(context["student"])
+
+    for show in (True, False):
+        eid = client.post(
+            "/api/evaluations",
+            headers=t,
+            json={
+                "title": "Épreuve avec corrigé",
+                "language": "python",
+                "duration_minutes": 30,
+                "classroom_id": context["classroom"],
+                "total_points": 10,
+                "rules": {"allow_early_submit": True, "show_solutions": show},
+            },
+        ).json()["id"]
+        exercise_id = client.put(
+            f"/api/evaluations/{eid}/exercises",
+            headers=t,
+            json=[
+                {
+                    "title": "Tripler",
+                    "statement": "Lire un entier et afficher son triple.",
+                    "language": "python",
+                    "points": 10,
+                    "settings": {
+                        "solution": "print(int(input()) * 3)",
+                        "solution_notes": "On lit l'entier, on le multiplie par 3.",
+                    },
+                    "tests": [{"name": "T1", "stdin": "2\n", "expected_stdout": "6", "points": 10}],
+                }
+            ],
+        ).json()["exercises"][0]["id"]
+        client.post(f"/api/evaluations/{eid}/publish", headers=t)
+        client.post(f"/api/evaluations/{eid}/start", headers=t)
+
+        # Pendant l'épreuve, le corrigé ne quitte pas le serveur.
+        exam = client.get(f"/api/me/evaluations/{eid}", headers=s).json()
+        assert "solution" not in exam["exercises"][0]["settings"]
+        assert "solution_notes" not in exam["exercises"][0]["settings"]
+
+        client.put(
+            f"/api/me/evaluations/{eid}/exercises/{exercise_id}",
+            headers=s,
+            json={"code": "print(int(input()) * 3)\n", "version": 0},
+        )
+        listed = client.get("/api/me/evaluations", headers=s).json()
+        entry = next(e for e in listed if e["id"] == eid)
+        assert entry["exercises_count"] == 1 and entry["answered_count"] == 1
+
+        client.post(f"/api/me/evaluations/{eid}/submit", headers=s)
+        client.post(f"/api/evaluations/{eid}/close", headers=t)
+
+        # Clôturée, non publiée : ni note, ni corrigé.
+        before = client.get(f"/api/me/results/{eid}", headers=s).json()
+        assert before["solutions_available"] is False
+        assert before["exercises"][0]["solution"] == ""
+
+        run = client.post(f"/api/evaluations/{eid}/corrections", headers=t).json()
+        db = SessionLocal()
+        process_run(db, db.get(CorrectionRun, run["id"]))
+        db.close()
+        assert client.post(f"/api/evaluations/{eid}/validate", headers=t).status_code == 200
+
+        copy = client.get(f"/api/me/results/{eid}", headers=s).json()
+        sheet = copy["exercises"][0]
+        assert "solution" not in sheet["settings"]
+        assert copy["solutions_available"] is show
+        if show:
+            assert sheet["solution"] == "print(int(input()) * 3)"
+            assert sheet["solution_notes"].startswith("On lit")
+            assert [(x["name"], x["input"], x["expected"]) for x in sheet["expected_tests"]] == [
+                ("T1", "2\n", "6")
+            ]
+        else:
+            assert sheet["solution"] == "" and sheet["expected_tests"] == []
+
+        listed = client.get("/api/me/evaluations", headers=s).json()
+        entry = next(e for e in listed if e["id"] == eid)
+        assert entry["published"] is True and entry["score"] == 10.0
+        assert entry["status_label"] == "Publié"
+        assert entry["solutions_available"] is show
+
+
 def test_accueil_enseignant_expose_ses_indicateurs(context):
     stats = client.get("/api/stats/teacher", headers=auth(context["teacher"]))
     assert stats.status_code == 200, stats.text
@@ -766,7 +855,7 @@ def test_le_sel_d_une_correspondance_survit_a_une_modification(context):
 
 
 def test_appreciation_refusee_avant_toute_correction(context):
-    """Sans campagne de correction, l'appréciation est refusée — pas enregistrée puis perdue."""
+    """Sans campagne de correction, l'appréciation est refusée : pas enregistrée puis perdue."""
     t = auth(context["teacher"])
     eid = client.post(
         "/api/evaluations",
@@ -1271,3 +1360,101 @@ def test_start_without_schedule_dates_the_evaluation(context):
     body = started.json()
     assert body["scheduled_start"] is not None
     assert body["scheduled_start"] == body["started_at"]
+
+
+
+def test_algorithme_du_cours_tableau_indice_depuis_un():
+    """Le modèle du cours : chaînes accentuées, LIRE dans une case, tableau 1..N,
+    boucle POUR à rebours et ECRIRE de plusieurs morceaux."""
+    import json as _json
+
+    from app.grading.engine import grade_exercise
+    from app.models import Exercise, TestCase, TestKind
+
+    document = {
+        "nom": "SaisieAffichageNotes",
+        "constantes": [{"nom": "MAX_NB_NOTES", "valeur": "500"}],
+        "variables": [
+            {"nom": "notes", "type": "tableau_reel", "taille": "MAX_NB_NOTES"},
+            {"nom": "i", "type": "entier"},
+            {"nom": "reponse", "type": "chaine"},
+        ],
+        "corps": [
+            {"type": "affectation", "cible": "reponse", "expression": '"oui"'},
+            {"type": "affectation", "cible": "i", "expression": "0"},
+            {"type": "tantque", "condition": 'reponse = "oui" ET i < MAX_NB_NOTES', "corps": [
+                {"type": "affectation", "cible": "i", "expression": "i + 1"},
+                {"type": "lire", "cible": "notes[i]"},
+                {"type": "lire", "cible": "reponse"},
+            ]},
+            {"type": "pour", "variable": "i", "debut": "i", "fin": "1", "pas": "-1", "corps": [
+                {"type": "ecrire", "expression": '"note numéro ", i, " : ", notes[i]'},
+            ]},
+        ],
+    }
+    exercise = Exercise(
+        id=903, evaluation_id=1, position=1, title="Notes", statement="", language="c",
+        points=2, starter_code="", kind="algo",
+        settings={"allowed_elements": ["constante", "declaration", "lire", "ecrire",
+                                       "tantque", "pour", "affectation"]},
+    )
+    tests = [
+        TestCase(id=1, exercise_id=903, position=1, name="deux notes", kind=TestKind.OFFICIAL,
+                 stdin="12 oui 15.5 non", comparison="exact", points=2, timeout_ms=2000,
+                 expected_stdout="note numéro 2 : 15.5\nnote numéro 1 : 12\n"),
+    ]
+    outcome = grade_exercise(_json.dumps(document), exercise, tests)
+    assert outcome.score == 2.0, outcome
+
+
+def test_annuler_une_evaluation_terminee(context):
+    """Une épreuve close s'annule : elle reste chez l'enseignant, sort des résultats
+    de l'apprenant, qui en est prévenu, et ne se publie plus."""
+    t = auth(context["teacher"])
+    s = auth(context["student"])
+
+    eid = client.post(
+        "/api/evaluations",
+        headers=t,
+        json={
+            "title": "Épreuve à annuler",
+            "language": "python",
+            "duration_minutes": 30,
+            "classroom_id": context["classroom"],
+            "total_points": 10,
+        },
+    ).json()["id"]
+    client.put(
+        f"/api/evaluations/{eid}/exercises",
+        headers=t,
+        json=[{"title": "Doubler", "language": "python", "points": 10,
+               "tests": [{"name": "T1", "stdin": "4\n", "expected_stdout": "8", "points": 10}]}],
+    )
+
+    # Un brouillon ne s'annule pas : il se supprime.
+    assert client.post(f"/api/evaluations/{eid}/cancel", headers=t).status_code == 409
+
+    client.post(f"/api/evaluations/{eid}/publish", headers=t)
+    client.post(f"/api/evaluations/{eid}/start", headers=t)
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+    assert any(r["evaluation_id"] == eid for r in client.get("/api/me/results", headers=s).json())
+
+    # L'apprenant ne peut pas annuler.
+    assert client.post(f"/api/evaluations/{eid}/cancel", headers=s).status_code == 403
+
+    response = client.post(f"/api/evaluations/{eid}/cancel", headers=t)
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "cancelled"
+
+    # Toujours dans l'historique de l'enseignant.
+    corrected = client.get("/api/evaluations?group=corrected", headers=t).json()["items"]
+    assert any(e["id"] == eid and e["status"] == "cancelled" for e in corrected)
+
+    # Sorti des résultats de l'apprenant, copie fermée, notification reçue.
+    assert all(r["evaluation_id"] != eid for r in client.get("/api/me/results", headers=s).json())
+    assert client.get(f"/api/me/results/{eid}", headers=s).status_code == 403
+    titres = [n["title"] for n in client.get("/api/me/notifications", headers=s).json()]
+    assert "Évaluation annulée : Épreuve à annuler" in titres
+
+    # Plus de publication possible.
+    assert client.post(f"/api/evaluations/{eid}/validate", headers=t).status_code == 409

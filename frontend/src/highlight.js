@@ -3,7 +3,7 @@
  * dans un éditeur et non comme un bloc de texte gris.
  *
  * Pas de dépendance : CodeMirror sait déjà colorer ce qu'on *écrit*, mais les
- * copies rendues, les énoncés et le code de départ sont du texte figé — un
+ * copies rendues, les énoncés et le code de départ sont du texte figé : un
  * découpage en jetons suffit, et il tient dans un fichier.
  *
  * Les couleurs vivent dans les tokens CSS (`--code-*`) : elles suivent donc le
@@ -40,8 +40,20 @@ const C_BUILTINS = new Set([
   'sprintf', 'std', 'strcmp', 'strcpy', 'strlen', 'vector',
 ]);
 
-/** Les mots du pseudo-code : ils s'écrivent en capitales, on les reconnaît à ça. */
-const ALGO_WORD = /^[A-ZÀ-Þ][A-ZÀ-Þ_]+$/;
+/**
+ * Les mots du pseudo-code, tels qu'ils s'écrivent au cours. On les nomme un à
+ * un : une constante en capitales (MAX_NB_NOTES) n'est pas un mot-clé.
+ */
+const ALGO_KEYWORDS = new Set([
+  'ALGORITHME', 'CONSTANTES', 'TYPES', 'VARIABLES', 'DEBUT', 'DÉBUT', 'FIN',
+  'ENTIER', 'REEL', 'RÉEL', 'CARACTERE', 'CARACTÈRE', 'CHAINE', 'CHAÎNE', 'BOOLEEN', 'BOOLÉEN',
+  'TABLEAU', 'DE', 'TAILLE', 'STRUCTURE', 'FINSTRUCTURE',
+  'SI', 'ALORS', 'SINON', 'FINSI', 'POUR', 'FINPOUR', 'TANTQUE', 'FAIRE', 'FINTANTQUE',
+  'REPETER', 'RÉPÉTER', 'JUSQU', 'LIRE', 'ECRIRE', 'ÉCRIRE', 'RETOURNE', 'RETOUR',
+  'FONCTION', 'FINFONCTION', 'ET', 'OU', 'NON', 'VRAI', 'FAUX', 'MOD', 'DIV',
+  // anciennes copies
+  'VARIABLE', 'TANT', 'QUE', 'CONSTANTE', 'DÉCLARATION',
+]);
 
 /** Ce que le nom de langage d'un exercice veut dire pour le coloriseur. */
 export function highlightFamily(language) {
@@ -58,13 +70,13 @@ export function highlightFamily(language) {
  * relu depuis sa forme JSON.
  */
 export function looksLikeAlgo(code) {
-  return /^\s*(ALGORITHME|VARIABLE|TABLEAU|POUR|TANT QUE|SI|FONCTION|LIRE|ECRIRE|ÉCRIRE|RETOUR|DÉBUT|DEBUT)\b/m
-    .test(code ?? '');
+  return /^\s*(ALGORITHME|VARIABLE|TABLEAU|POUR|TANTQUE|TANT QUE|SI|FONCTION|LIRE|ECRIRE|ÉCRIRE|RETOUR|DÉBUT|DEBUT)\b/m
+    .test(code ?? '') || /^algorithme\b/.test((code ?? '').trimStart());
 }
 
 function commentPattern(family) {
   if (family === 'python') return String.raw`#[^\n]*`;
-  if (family === 'algo') return String.raw`//[^\n]*`;
+  if (family === 'algo') return String.raw`//[^\n]*|/\*[\s\S]*?\*/`;
   return String.raw`//[^\n]*|/\*[\s\S]*?\*/`;
 }
 
@@ -97,7 +109,7 @@ function regexFor(family) {
 /** Le rôle d'un identifiant : mot réservé, type, appel de fonction, ou variable. */
 function classifyWord(word, family, after) {
   if (family === 'algo') {
-    if (ALGO_WORD.test(word)) return 'kw';
+    if (ALGO_KEYWORDS.has(word)) return 'kw';
     return after === '(' ? 'fn' : 'var';
   }
   if (family === 'python') {

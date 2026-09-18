@@ -1,66 +1,87 @@
-/* Design tokens — Notion warmth × Expo developer clarity */
+/* ─────────────────────────────────────────────────────────────
+   Jetons de design.
+
+   Une interface d'outil : fond blanc, gris neutres, une seule couleur
+   d'action. La hiérarchie vient de la typographie et des filets, pas des
+   ombres ni des aplats colorés. Les couleurs sémantiques servent à signaler,
+   jamais à décorer.
+   ───────────────────────────────────────────────────────────── */
 :root {
-  /* ─── Brand ─── */
   color-scheme: light;
-  --primary: #0075de;
-  --primary-hover: #005bab;
-  --primary-light: #e8f2fc;
-  --accent: #4a9eed;
 
-  /* ─── Canvas & surfaces ─── */
-  --bg-app: #f6f5f4;
+  /* ─── Action ─── */
+  --primary: #2458d3;
+  --primary-hover: #1d48b0;
+  --primary-light: #edf2fd;     /* sélection, repère discret */
+  --accent: #2458d3;
+
+  /* ─── Surfaces ─── */
+  --bg-app: #ffffff;
   --bg-card: #ffffff;
-  --bg-sidebar: #ffffff;
-  --bg-subtle: #f0efed;
-  --bg-nav-active: #e8f2fc;
-  --bg-row-hover: #f9f8f7;
+  --bg-sidebar: #f7f7f8;
+  --bg-subtle: #f4f4f5;         /* champs figés, code, zones de saisie */
+  --bg-hover: rgba(24, 24, 27, 0.045);
+  --bg-nav-active: #e9e9ec;     /* sélection neutre : navigation, filtres */
+  --bg-row-hover: #fafafa;
   --bg-paper: #ffffff;          /* la « feuille » du sujet et de la copie */
-  --bg-paper-tray: #dddcda;     /* le plan de travail sous la feuille */
-  --overlay: rgba(246, 245, 244, 0.92);
-  --gradient-active: linear-gradient(135deg, #f5f9ff 0%, #e8f2fc 100%);
+  --bg-paper-tray: #f4f4f5;     /* le plan de travail sous la feuille */
+  --overlay: rgba(255, 255, 255, 0.9);
+  --gradient-active: var(--bg-card);
 
-  /* ─── Text ─── */
-  --text-title: #000000;
-  --text-body: #31302e;
-  --text-muted: #615d59;
-  --text-faint: #a39e98;
+  /* ─── Texte ─── */
+  --text-title: #18181b;
+  --text-body: #2e2e33;
+  --text-muted: #62626b;
+  /* 4,5:1 au moins sur le blanc comme sur la barre latérale : le texte
+     « discret » (aides, légendes) reste du texte (WCAG AA). */
+  --text-faint: #6f6f78;
   --text-inverse: #ffffff;
 
-  /* ─── Borders ─── */
-  --border: #e6e6e6;
-  --border-soft: #edeceb;
+  /* ─── Filets ─── */
+  --border: #e4e4e7;
+  --border-soft: #eeeef0;
+  --border-strong: #d4d4d8;     /* contour des champs et des boutons secondaires */
 
-  /* ─── Semantic ─── */
-  --success: #16a34a;
-  --success-bg: #ecfdf3;
-  --warning: #ab6400;
-  --warning-bg: #fef7e6;
-  --danger: #dc3545;
-  --danger-hover: #c82333;
-  --danger-bg: #fef2f2;
-  --info: #0075de;
-  --info-bg: #e8f2fc;
+  /* ─── Focus : un seul anneau pour tous les champs ─── */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 
-  /* ─── Exam (student) ─── */
-  --exam-bg: #f6f5f4;
+  /* ─── Sémantique ─── texte foncé lisible sur fond pâle ; le point d'état
+     prend une teinte plus vive, il ne porte pas de texte. */
+  --success: #1a7f37;
+  --success-bg: #effaf2;
+  --success-dot: #2da44e;
+  --warning: #8a5a00;
+  --warning-bg: #fdf7e7;
+  --warning-dot: #d4a72c;
+  --danger: #c4323f;
+  --danger-hover: #a52632;
+  --danger-bg: #fdf2f3;
+  --info: #2458d3;
+  --info-bg: #f1f5fd;
+  --dot-neutral: #a1a1aa;
+  /* Mots-clés du pseudo-code, en rouge comme sur les polycopiés du cours. */
+  --algo-kw: #e0301e;
+
+  /* ─── Épreuve (apprenant) ─── */
+  --exam-bg: #ffffff;
   --exam-panel: #ffffff;
   --exam-topbar: #ffffff;
   --exam-card: #ffffff;
-  --exam-border: #e6e6e6;
-  --exam-text: #000000;
-  --exam-muted: #615d59;
-  --exam-done: #16a34a;
-  --exam-timer: #dc3545;
-  --exam-timer-bg: #fef2f2;
+  --exam-border: #e4e4e7;
+  --exam-text: #18181b;
+  --exam-muted: #62626b;
+  --exam-done: #1a7f37;
+  --exam-timer: #c4323f;
+  --exam-timer-bg: #fdf2f3;
 
-  /* ─── Dark surfaces (code, IDE) ─── */
-  --surface-dark: #171717;
-  --surface-dark-elevated: #1e1e1e;
-  --on-dark: #ffffff;
-  --on-dark-soft: #b0b4ba;
+  /* ─── Surfaces sombres (code, IDE) ─── */
+  --surface-dark: #18181b;
+  --surface-dark-elevated: #202024;
+  --on-dark: #fafafa;
+  --on-dark-soft: #a1a1aa;
 
   /* ─── Coloration du code (thème clair) ─── */
-  --code-bg: #f7f7f6;
+  --code-bg: #f7f7f8;
   --code-text: #24292f;
   --code-comment: #6a737d;
   --code-keyword: #cf222e;
@@ -68,7 +89,7 @@
   --code-string: #0a7c42;
   --code-number: #0550ae;
   --code-function: #8250df;
-  --code-operator: #0075de;
+  --code-operator: #0550ae;
   --code-punct: #57606a;
   --code-preproc: #953800;
 
@@ -77,34 +98,27 @@
   --encre-rouge-pale: #f3a3ad;
   --main: 'Caveat', 'Segoe Script', 'Bradley Hand', cursive;
 
-  /* ─── Radii ─── */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* ─── Rayons : modérés et constants. `--radius-pill` ne sert qu'aux
+     formes réellement rondes (avatar, point d'état). ─── */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
   --radius-pill: 9999px;
-  --sidebar-w: 240px;
+  --sidebar-w: 232px;
 
-  /* ─── Typography ─── */
+  /* ─── Typographie ─── */
   --font: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* ─── Shadows (Notion-style layered) ─── */
-  --shadow-card:
-    0 0.175px 1px rgba(0,0,0,0.01),
-    0 0.8px 3px rgba(0,0,0,0.02),
-    0 2px 8px rgba(0,0,0,0.027),
-    0 4px 18px rgba(0,0,0,0.04);
-  --shadow-card-hover:
-    0 1px 2px rgba(0,0,0,0.02),
-    0 4px 12px rgba(0,0,0,0.04),
-    0 10px 32px rgba(0,0,0,0.06);
+  /* ─── Ombres : aucune sur les surfaces posées dans la page. Seul ce qui
+     flotte au-dessus (menu, liste déroulante, fenêtre) en porte une. ─── */
+  --shadow-card: none;
+  --shadow-card-hover: none;
   --shadow-elevated:
-    0 0.4px 1.4px rgba(0,0,0,0.012),
-    0 1.1px 3.5px rgba(0,0,0,0.018),
-    0 2.7px 8.4px rgba(0,0,0,0.028),
-    0 9px 28px rgba(0,0,0,0.05);
+    0 0 0 1px rgba(24, 24, 27, 0.06),
+    0 6px 20px rgba(24, 24, 27, 0.08);
 }
 
 
@@ -121,60 +135,66 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* ─── Brand ─── */
-  --primary: #4c9df0;
-  --primary-hover: #6fb2f5;
-  --primary-light: #14263a;
-  --accent: #7bb8f5;
+  /* ─── Action ─── */
+  --primary: #6d9cf5;
+  --primary-hover: #8cb2f7;
+  --primary-light: #1c2640;
+  --accent: #6d9cf5;
 
-  /* ─── Canvas & surfaces ─── */
-  --bg-app: #16171a;
-  --bg-card: #1d1f23;
-  --bg-sidebar: #1a1c1f;
-  --bg-subtle: #24262b;
-  --bg-nav-active: #1c3049;
-  --bg-row-hover: #24262b;
-  --bg-paper: #1d1f23;
-  --bg-paper-tray: #101114;
-  --overlay: rgba(16, 17, 20, 0.92);
-  --gradient-active: linear-gradient(135deg, #1a2b3f 0%, #14263a 100%);
+  /* ─── Surfaces ─── */
+  --bg-app: #161618;
+  --bg-card: #161618;
+  --bg-sidebar: #1b1b1e;
+  --bg-subtle: #212124;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-nav-active: #2a2a2e;
+  --bg-row-hover: #1c1c1f;
+  --bg-paper: #1c1c1f;
+  --bg-paper-tray: #111113;
+  --overlay: rgba(17, 17, 19, 0.9);
+  --gradient-active: var(--bg-card);
 
-  /* ─── Text ─── */
-  --text-title: #f3f4f6;
-  --text-body: #dcdee2;
-  --text-muted: #9ba1aa;
-  --text-faint: #6b717a;
-  --text-inverse: #16171a;
+  /* ─── Texte ─── */
+  --text-title: #ededef;
+  --text-body: #d4d4d8;
+  --text-muted: #a1a1aa;
+  --text-faint: #8e8e97;
+  --text-inverse: #161618;
 
-  /* ─── Borders ─── */
-  --border: #303338;
-  --border-soft: #26282d;
+  /* ─── Filets ─── */
+  --border: #2e2e33;
+  --border-soft: #252529;
+  --border-strong: #3a3a40;
 
-  /* ─── Semantic ─── */
-  --success: #4ade80;
-  --success-bg: #12291c;
-  --warning: #fbbf24;
-  --warning-bg: #2e2312;
-  --danger: #f87171;
-  --danger-hover: #ef4444;
-  --danger-bg: #2e1717;
-  --info: #4c9df0;
-  --info-bg: #14263a;
+  /* ─── Sémantique ─── */
+  --success: #57c078;
+  --success-bg: #13241a;
+  --success-dot: #3fb95f;
+  --warning: #e0b54a;
+  --warning-bg: #2a2412;
+  --warning-dot: #d4a72c;
+  --danger: #f2767b;
+  --danger-hover: #e5484d;
+  --danger-bg: #2c1719;
+  --info: #6d9cf5;
+  --info-bg: #182033;
+  --dot-neutral: #6b6b74;
+  --algo-kw: #ff6b5b;
 
   /* ─── Épreuve (apprenant) ─── */
-  --exam-bg: #16171a;
-  --exam-panel: #1d1f23;
-  --exam-topbar: #1a1c1f;
-  --exam-card: #1d1f23;
-  --exam-border: #303338;
-  --exam-text: #f3f4f6;
-  --exam-muted: #9ba1aa;
-  --exam-done: #4ade80;
-  --exam-timer: #f87171;
-  --exam-timer-bg: #2e1717;
+  --exam-bg: #161618;
+  --exam-panel: #161618;
+  --exam-topbar: #161618;
+  --exam-card: #161618;
+  --exam-border: #2e2e33;
+  --exam-text: #ededef;
+  --exam-muted: #a1a1aa;
+  --exam-done: #57c078;
+  --exam-timer: #f2767b;
+  --exam-timer-bg: #2c1719;
 
   /* ─── Coloration du code (thème sombre) ─── */
-  --code-bg: #15161a;
+  --code-bg: #1c1c1f;
   --code-text: #d7dae0;
   --code-comment: #7d848f;
   --code-keyword: #ff7b8a;
@@ -191,18 +211,10 @@
   --encre-rouge-pale: #7a3b45;
 
   /* ─── Surfaces déjà sombres (code, IDE) ─── */
-  --surface-dark: #101114;
-  --surface-dark-elevated: #17181c;
+  --surface-dark: #111113;
+  --surface-dark-elevated: #18181b;
 
-  /* ─── Ombres : sur fond sombre, une ombre portée ne se voit pas.
-     On garde la profondeur par un halo noir plus dense. ─── */
-  --shadow-card:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-card-hover:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 8px 24px rgba(0, 0, 0, 0.38);
   --shadow-elevated:
-    0 2px 6px rgba(0, 0, 0, 0.45),
-    0 12px 36px rgba(0, 0, 0, 0.45);
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.5);
 }

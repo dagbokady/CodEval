@@ -14,7 +14,7 @@ import { typeFamilies } from '../exerciseTypes';
 import { blankQuestion, questionsOf } from '../questions';
 
 /**
- * Choix du type — première étape de toute création de question. Chaque type se
+ * Choix du type : première étape de toute création de question. Chaque type se
  * présente par une miniature de ce qu'il donne à l'écran : la forme d'un QCM ou
  * d'une correspondance se reconnaît plus vite qu'elle ne se lit.
  */
@@ -370,11 +370,11 @@ function questionSummary(kind, question) {
  *
  * Ces exercices n'ont pas d'énoncé unique : chaque question porte le sien, suivi
  * de ses propres réponses. Le barème de l'exercice se partage également entre
- * elles — un exercice de 6 points à trois questions en met 2 sur chacune.
+ * elles : un exercice de 6 points à trois questions en met 2 sur chacune.
  *
  * Chaque question se replie : passé trois ou quatre questions, la liste dépliée
  * devient plus longue que l'écran et l'on perd de vue l'exercice qu'on écrit.
- * Le repli est un état d'affichage local — il ne touche pas aux données.
+ * Le repli est un état d'affichage local : il ne touche pas aux données.
  */
 export function QuestionListEditor({ kind, settings, readOnly, onChange, name = 'q' }) {
   const questions = questionsOf(kind, settings);

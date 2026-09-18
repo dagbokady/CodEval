@@ -1,6 +1,6 @@
 """Jeu de données initial : python -m app.seed
 
-Une seule enseignante, une seule classe, deux matières — le langage C et
+Une seule enseignante, une seule classe, deux matières : le langage C et
 l'initiation à l'algorithmique, qui se répondent : la première se travaille avec
 l'éditeur de code, la seconde avec l'éditeur de blocs. Aucun exercice ni
 évaluation : l'enseignante crée les siens depuis l'interface.
@@ -25,7 +25,7 @@ from .models import (
 )
 from .security import hash_password
 
-ORG_NAME = "ESATIC — École Supérieure Africaine des TIC"
+ORG_NAME = "ESATIC (École Supérieure Africaine des TIC)"
 ORG_SLUG = "esatic"
 PASSWORD = "codeval2026"
 
@@ -126,7 +126,7 @@ def main() -> None:
 
         print(f"Établissement    : {ORG_NAME}")
         print(f"Enseignante      : {TEACHER[1]} <{TEACHER[0]}>")
-        print(f"Classe           : {CLASSROOM[0]} — {len(students)} étudiants")
+        print(f"Classe           : {CLASSROOM[0]} ({len(students)} étudiants)")
         print(f"Matières         : {' · '.join(SUBJECTS)}")
         print(f"Mot de passe     : {PASSWORD}")
     finally:

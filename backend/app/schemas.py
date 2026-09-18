@@ -376,6 +376,15 @@ class StudentEvaluationOut(ORMModel):
     subject_name: str | None = None
     classroom_name: str | None = None
     submitted_at: datetime | None = None
+    kind: EvaluationKind = EvaluationKind.DEVOIR
+    total_points: float = 20.0
+    # Le tableau de bord de l'apprenant : où il en est, et ce qu'il a obtenu.
+    exercises_count: int = 0
+    answered_count: int = 0
+    score: float | None = None
+    published: bool = False
+    solutions_available: bool = False
+    status_label: str = ""
 
 
 class StudentExamOut(BaseModel):
@@ -438,7 +447,7 @@ class ExerciseResultOut(BaseModel):
 class ScoreLineOut(BaseModel):
     """Une ligne de relevé : l'exercice et ce qu'il a rapporté.
 
-    C'est ce qu'on lit sur une copie sans l'ouvrir — « Exercice 1 : 0/4 » —
+    C'est ce qu'on lit sur une copie sans l'ouvrir (« Exercice 1 : 0/4 »)
     et c'est écrit sur les réglures de la vignette, comme sur un vrai paquet.
     """
 
@@ -532,6 +541,11 @@ class StudentCopyExercise(BaseModel):
     compile_log: str = ""
     tests: list = Field(default_factory=list)
     appreciation: str = ""
+    # Le corrigé, publié avec les notes si l'enseignant le propose : la solution
+    # type, ses explications, et ce que le programme devait produire.
+    solution: str = ""
+    solution_notes: str = ""
+    expected_tests: list[dict] = Field(default_factory=list)
 
 
 class StudentCopyOut(BaseModel):
@@ -549,4 +563,6 @@ class StudentCopyOut(BaseModel):
     score: float | None = None
     total_points: float
     appreciation: str = ""
+    # Le corrigé accompagne-t-il cette copie ? Publiée, et proposée par l'enseignant.
+    solutions_available: bool = False
     exercises: list[StudentCopyExercise]

@@ -1,6 +1,6 @@
 """Exercices à plusieurs questions : QCM, correspondance, question-réponse.
 
-Un même exercice porte plusieurs questions — un QCM en contient autant qu'on veut,
+Un même exercice porte plusieurs questions : un QCM en contient autant qu'on veut,
 une correspondance plusieurs grilles à relier, une question-réponse plusieurs
 définitions. Les paramètres les rangent sous ``settings["questions"]``, chaque
 question portant son propre intitulé et son propre corrigé.

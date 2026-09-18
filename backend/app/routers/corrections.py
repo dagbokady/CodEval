@@ -79,7 +79,7 @@ def _score_lines(exercises: list[Exercise], breakdown: dict) -> list[ScoreLineOu
     """Le relevé d'une copie, exercice par exercice, dans l'ordre du sujet.
 
     Un exercice que la correction n'a pas atteint garde sa place et son barème :
-    la ligne existe, la note manque — c'est ce que dit une copie non corrigée.
+    la ligne existe, la note manque : c'est ce que dit une copie non corrigée.
     """
     lines = []
     for rank, exercise in enumerate(exercises, start=1):
@@ -328,6 +328,8 @@ def adjust_score(
     evaluation = get_evaluation(db, evaluation_id, user)
     if evaluation.status is EvaluationStatus.VALIDATED:
         raise HTTPException(status.HTTP_409_CONFLICT, "Résultats déjà validés")
+    if evaluation.status is EvaluationStatus.CANCELLED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Évaluation annulée")
     run = latest_run(db, evaluation_id)
     if run is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Aucune campagne de correction")
@@ -420,6 +422,8 @@ def write_appreciation(
 @router.post("/validate", response_model=RunOut)
 def validate_results(evaluation_id: int, user: TeacherUser, db: DbSession) -> RunOut:
     evaluation = get_evaluation(db, evaluation_id, user)
+    if evaluation.status is EvaluationStatus.CANCELLED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Évaluation annulée : rien à publier")
     run = latest_run(db, evaluation_id)
     if run is None or run.status.value in {"pending", "running"}:
         raise HTTPException(status.HTTP_409_CONFLICT, "Correction non terminée")
@@ -433,7 +437,7 @@ def validate_results(evaluation_id: int, user: TeacherUser, db: DbSession) -> Ru
     ):
         notify(
             db, student_id,
-            f"Résultats publiés — {evaluation.title}",
+            f"Résultats publiés : {evaluation.title}",
             "Votre copie corrigée, votre note et les appréciations sont consultables.",
             f"/mes-resultats/{evaluation_id}",
         )

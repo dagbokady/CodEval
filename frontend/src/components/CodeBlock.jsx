@@ -24,9 +24,10 @@ function familleDe(text, language) {
 
 export default function CodeBlock({ code, language, className = '', ...rest }) {
   const text = code ?? '';
+  const famille = familleDe(text, language);
   return (
-    <pre className={`code-bloc ${className}`.trim()} {...rest}>
-      <code>{peindre(text, familleDe(text, language))}</code>
+    <pre className={`code-bloc code-bloc--${famille} ${className}`.trim()} {...rest}>
+      <code>{peindre(text, famille)}</code>
     </pre>
   );
 }
@@ -34,9 +35,10 @@ export default function CodeBlock({ code, language, className = '', ...rest }) {
 /** Code court dans une phrase, coloré de la même façon. */
 export function InlineCode({ code, language, className = '' }) {
   const text = code ?? '';
+  const famille = familleDe(text, language);
   return (
-    <code className={`code-inline ${className}`.trim()}>
-      {peindre(text, familleDe(text, language))}
+    <code className={`code-inline code-inline--${famille} ${className}`.trim()}>
+      {peindre(text, famille)}
     </code>
   );
 }

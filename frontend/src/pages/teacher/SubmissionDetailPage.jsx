@@ -30,7 +30,7 @@ const RESULT_LABELS = {
 /**
  * Détail d'une question corrigée automatiquement. Le cas qui compte : une
  * question-réponse sans corrigé n'est pas « échouée », elle attend la note de
- * l'enseignant — l'afficher en rouge lui ferait croire l'apprenant fautif.
+ * l'enseignant : l'afficher en rouge lui ferait croire l'apprenant fautif.
  */
 function AutoGradedDetail({ exercise }) {
   const rows = exercise.tests ?? [];
@@ -59,7 +59,7 @@ function AutoGradedDetail({ exercise }) {
  *
  * Ce que la correction a exécuté est déjà su : ce bouton ne relance pas la
  * machine, il rejoue devant l'enseignant ce qui a été passé sur cette copie. On
- * le dit tel quel plutôt que de laisser croire à une exécution en direct — et on
+ * le dit tel quel plutôt que de laisser croire à une exécution en direct : et on
  * garde le tableau replié, car une copie se lit d'abord, se vérifie ensuite.
  */
 function TestsPanel({ exercise, runNumber }) {
@@ -104,14 +104,14 @@ function TestsPanel({ exercise, runNumber }) {
                     {test.category === 'declaration' ? 'Déclaration' : 'Test'}
                   </td>
                   <td>
-                    <code style={{ fontSize: 12 }}>{test.input || '—'}</code>
+                    <code style={{ fontSize: 12 }}>{test.input || '-'}</code>
                   </td>
                   <td>
-                    <code style={{ fontSize: 12 }}>{test.expected || '—'}</code>
+                    <code style={{ fontSize: 12 }}>{test.expected || '-'}</code>
                   </td>
                   <td>
                     <code style={{ fontSize: 12 }}>
-                      {test.timed_out ? 'temps dépassé' : test.actual || '—'}
+                      {test.timed_out ? 'temps dépassé' : test.actual || '-'}
                     </code>
                   </td>
                   <td style={{ paddingRight: 0 }}>
@@ -228,7 +228,7 @@ export default function SubmissionDetailPage() {
 
         {/* Ce qu'on corrige d'abord se pose d'abord : la note de la copie et le
             mot qui l'accompagne. Les deux tiennent côte à côte, en tête de
-            page — on ne les cherche pas après trois exercices. */}
+            page : on ne les cherche pas après trois exercices. */}
         <section className="card copie-correction">
           <h2 className="copie-correction-titre">Correction de la copie</h2>
           <div className="copie-outils copie-outils--global">
@@ -279,7 +279,7 @@ export default function SubmissionDetailPage() {
         </section>
 
         {/* Une copie, une feuille : l'en-tête de l'épreuve, l'identité du
-            candidat, puis les exercices à la suite — comme le paquet de papier
+            candidat, puis les exercices à la suite : comme le paquet de papier
             qu'on annote, et exactement ce que l'apprenant recevra. */}
         <article className="card copie-feuille-corrigee sujet">
           <div className="copy-sheet-head">
@@ -305,7 +305,7 @@ export default function SubmissionDetailPage() {
             <dt>Candidat</dt>
             <dd>{data.full_name}</dd>
             <dt>Matricule</dt>
-            <dd>{data.matricule ?? '—'}</dd>
+            <dd>{data.matricule ?? '-'}</dd>
             <dt>Note retenue</dt>
             <dd>{formatScore(data.final_score, data.max_score)}</dd>
           </dl>
@@ -374,7 +374,7 @@ export default function SubmissionDetailPage() {
                 >
                   <AppreciationForm
                     key={exercise.appreciation ?? ''}
-                    label={`Appréciation — ${exercise.exercise_title}`}
+                    label={`Appréciation : ${exercise.exercise_title}`}
                     value={exercise.appreciation ?? ''}
                     pending={writeAppreciation.isPending}
                     onSave={(text) => commenter({ exercise_id: exercise.exercise_id, text })}
@@ -401,7 +401,7 @@ export default function SubmissionDetailPage() {
           ))}
 
           <footer className="copy-sheet-footer">
-            — Fin de la copie — {data.exercises.length} exercice
+            Fin de la copie · {data.exercises.length} exercice
             {data.exercises.length !== 1 ? 's' : ''}
           </footer>
         </article>
@@ -437,7 +437,7 @@ function ScoreForm({ max, current, onSubmit, pending, disabled, idPrefix }) {
   }
 
   if (disabled) {
-    return <p className="sub">Note retenue : {formatScore(current, max)} — résultats publiés.</p>;
+    return <p className="sub">Note retenue : {formatScore(current, max)}, résultats publiés.</p>;
   }
 
   return (

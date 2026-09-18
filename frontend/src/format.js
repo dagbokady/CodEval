@@ -3,27 +3,27 @@ const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short
 const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
 export function formatDateTime(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const date = new Date(value);
   return `${dateFmt.format(date)} · ${timeFmt.format(date)}`;
 }
 
 export function formatSchedule(evaluation) {
-  if (!evaluation.scheduled_start) return '—';
+  if (!evaluation.scheduled_start) return '-';
   const start = new Date(evaluation.scheduled_start);
   const end = new Date(start.getTime() + evaluation.duration_minutes * 60000);
-  return `${dateFmt.format(start)} · ${timeFmt.format(start)} — ${timeFmt.format(end)}`;
+  return `${dateFmt.format(start)} · ${timeFmt.format(start)} - ${timeFmt.format(end)}`;
 }
 
 export function formatDuration(seconds) {
-  if (seconds === null || seconds === undefined) return '—';
+  if (seconds === null || seconds === undefined) return '-';
   const s = Math.max(0, Math.floor(seconds));
   const pad = (n) => String(n).padStart(2, '0');
   return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
 export function formatRelative(value) {
-  if (!value) return '—';
+  if (!value) return '-';
   const diff = Math.round((Date.now() - new Date(value).getTime()) / 1000);
   if (diff < 60) return `il y a ${Math.max(1, diff)} s`;
   if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
@@ -31,9 +31,26 @@ export function formatRelative(value) {
 }
 
 export function formatScore(score, total) {
-  if (score === null || score === undefined) return '—';
+  if (score === null || score === undefined) return '-';
   const clean = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
   return `${clean(score)} / ${clean(total)}`;
+}
+
+/** Un pourcentage à la française : 15.7 → « 15,7 % ». */
+export function formatPercent(value) {
+  if (value === null || value === undefined) return '-';
+  return `${String(Math.round(value * 10) / 10).replace('.', ',')} %`;
+}
+
+/** L'action principale d'une épreuve dépend de son état : on ne la fait pas chercher. */
+export function primaryAction(evaluation) {
+  if (evaluation.status === 'running') {
+    return { label: 'Suivre la session', to: `/evaluations/${evaluation.id}/session` };
+  }
+  if (['closed', 'correcting', 'corrected', 'validated', 'cancelled'].includes(evaluation.status)) {
+    return { label: 'Résultats', to: `/evaluations/${evaluation.id}/resultats` };
+  }
+  return { label: 'Modifier', to: `/evaluations/${evaluation.id}` };
 }
 
 /** Nature d'une évaluation : ce que l'enseignante annonce à sa classe. */
@@ -51,17 +68,24 @@ export const STATUS_LABELS = {
   correcting: 'En correction',
   corrected: 'Corrigée',
   validated: 'Validée',
+  cancelled: 'Annulée',
 };
 
+/** Couleur du point d'état : vert pour ce qui se déroule ou est publié,
+    ambre pour ce qui attend un traitement, rouge pour l'annulation. */
 export const STATUS_TONES = {
   draft: 'neutral',
-  scheduled: 'warning',
-  running: 'solid',
+  scheduled: 'info',
+  running: 'live',
   closed: 'neutral',
-  correcting: 'purple',
-  corrected: 'success',
+  correcting: 'warning',
+  corrected: 'info',
   validated: 'success',
+  cancelled: 'danger',
 };
+
+/** Ce qui s'annule : une épreuve qui se déroule ou qui a eu lieu. Avant, elle se supprime. */
+export const CANCELLABLE_STATUSES = ['running', 'closed', 'correcting', 'corrected', 'validated'];
 
 export const RUN_LABELS = {
   pending: 'En attente',
@@ -99,8 +123,8 @@ export function formatExamDuration(minutes) {
 
 /**
  * Numérotation du sujet : ce qu'on crée est un exercice, et ce sont ses
- * questions qui portent les « Q1 », « Q2 ». Sans rang — un exercice regardé
- * seul, hors d'un sujet — il ne reste que le mot.
+ * questions qui portent les « Q1 », « Q2 ». Sans rang (un exercice regardé
+ * seul, hors d'un sujet) il ne reste que le mot.
  */
 export function exerciseLabel(number) {
   return number ? `Exercice ${number}` : 'Exercice';

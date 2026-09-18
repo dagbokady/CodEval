@@ -1,14 +1,14 @@
 /**
  * Saisie du barème d'un exercice de code.
  *
- * L'enseignant déclare d'abord **ce que la copie doit contenir** — une variable,
- * une fonction, une structure, avec leurs types — puis **ce que le programme doit
+ * L'enseignant déclare d'abord **ce que la copie doit contenir** (une variable,
+ * une fonction, une structure, avec leurs types) puis **ce que le programme doit
  * produire**, sous forme de tests dont les entrées et la sortie sont typées.
  * Chaque champ de valeur connaît son type : un entier se saisit dans un champ
  * numérique, un booléen dans une liste, un tableau dans un champ de nombres
  * séparés par des espaces. Aucune zone de texte à mettre en forme soi-même.
  *
- * Ce qu'on écrit ici, c'est ce que la copie doit contenir — jamais ce que cela
+ * Ce qu'on écrit ici, c'est ce que la copie doit contenir : jamais ce que cela
  * vaut : les points de chaque ligne se posent à la dernière étape, dans
  * `PointsEditor`, quand tout le barème est connu.
  */
@@ -42,7 +42,7 @@ const legendStyle = { fontSize: 11 };
 /**
  * Un tableau se saisit comme un tableau : une case par élément, numérotée de 0
  * comme en C, qu'on ajoute et qu'on retire au clic. La liste de nombres séparés
- * par des espaces qu'on tapait avant ne montrait ni la taille ni les indices —
+ * par des espaces qu'on tapait avant ne montrait ni la taille ni les indices :
  * or c'est exactement ce que l'exercice demande de compter.
  * La valeur reste stockée telle que le correcteur l'attend : les éléments
  * séparés par des espaces.
@@ -68,7 +68,7 @@ function TableauInput({ type, value, onChange, label }) {
               type={texteLibre ? 'text' : 'number'}
               step={texteLibre ? undefined : step}
               maxLength={texteLibre ? élément.maxLength : undefined}
-              aria-label={`${label} — case ${index}`}
+              aria-label={`${label} : case ${index}`}
               value={valeur}
               onChange={(e) =>
                 écrire(cases.map((v, i) => (i === index ? e.target.value : v)))
@@ -95,7 +95,7 @@ function TableauInput({ type, value, onChange, label }) {
       </div>
       <span className="sub tableau-legende">
         {cases.length === 0
-          ? `Tableau vide — ajoutez une case (${élément.label.toLowerCase()}).`
+          ? `Tableau vide : ajoutez une case (${élément.label.toLowerCase()}).`
           : `${cases.length} ${élément.label.toLowerCase()}${cases.length > 1 ? 's' : ''} · le programme reçoit ${'{'}${cases.join(', ')}${'}'} et n = ${cases.length}`}
       </span>
     </div>
@@ -113,7 +113,7 @@ export function ValueInput({ type, value, onChange, label, placeholder }) {
   };
 
   if (kind.input === 'none') {
-    return <span className="sub">—</span>;
+    return <span className="sub">-</span>;
   }
   if (kind.input === 'list') {
     return <TableauInput type={type} value={value} onChange={onChange} label={label} />;
@@ -178,7 +178,7 @@ export function ValueInput({ type, value, onChange, label, placeholder }) {
  *
  * « Tableau » est un choix à part entière : la liste ne répète plus une entrée
  * par combinaison (tableau d'entiers, de décimaux, de caractères…). Choisir
- * « Tableau » fait apparaître le type de ses éléments, à côté — c'est la
+ * « Tableau » fait apparaître le type de ses éléments, à côté : c'est la
  * question qu'on se pose ensuite, et la seule qui reste.
  */
 function TypeSelect({ value, onChange, label, types = PARAM_TYPES, disabled = false }) {
@@ -206,7 +206,7 @@ function TypeSelect({ value, onChange, label, types = PARAM_TYPES, disabled = fa
       </select>
       {tableau && (
         <select
-          aria-label={`${label} — type des éléments du tableau`}
+          aria-label={`${label} : type des éléments du tableau`}
           value={elementOf(value)}
           disabled={disabled}
           onChange={(e) => onChange(arrayOf(e.target.value))}
@@ -309,7 +309,7 @@ export function TestInputs({ test, criterion, onChange }) {
 }
 
 /**
- * Le résultat attendu, saisi dans son type — celui du critère visé, ou le sien.
+ * Le résultat attendu, saisi dans son type : celui du critère visé, ou le sien.
  *
  * Quand la copie est jugée sur ce qu'elle affiche, la saisie prend la forme d'un
  * écran : fond sombre, police à chasse fixe, plusieurs lignes. L'enseignant voit
@@ -519,7 +519,7 @@ function VariableFields({ criterion, update }) {
  * barème, se saisissent dans le tableau qui suit cette section.
  *
  * Un exercice algorithmique passe la main : ses exigences se disent dans les
- * mots du cours — une variable de type entier, une boucle POUR — et non dans
+ * mots du cours (une variable de type entier, une boucle POUR) et non dans
  * ceux du C, et c'est `AlgoBaremeEditor` qui les recueille.
  */
 export default function BaremeEditor({ exercise, criteria, onCriteriaChange }) {
@@ -544,7 +544,7 @@ function CodeBaremeEditor({ exercise, criteria, onCriteriaChange }) {
     <section className="bareme-editeur">
       <header className="tests-tete">
         <div>
-          <strong style={{ fontSize: 13 }}>Ce que le code doit contenir</strong>
+          <strong className="tests-tete-titre">Ce que le code doit contenir</strong>
           <p className="sub" style={{ margin: '2px 0 0', fontSize: 12 }}>
             {criteria.length === 0
               ? 'Rien d’exigé pour l’instant : seuls les tests noteront la copie.'
@@ -656,7 +656,7 @@ function CodeBaremeEditor({ exercise, criteria, onCriteriaChange }) {
           <p className="bareme-critere-code">
             {describeCriterion(criterion)}
             {criterion.kind === 'variable' && criterion.scope === 'local' &&
-              ' — cherchée dans le texte du programme'}
+              ', cherchée dans le texte du programme'}
           </p>
           {criterion.kind === 'function' && !criterion.name?.trim() && (
             <p className="sub" style={{ margin: 0, fontSize: 12 }}>

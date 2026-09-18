@@ -1,4 +1,4 @@
-# CodEval — backend
+# CodEval : backend
 
 API de la plateforme d'évaluation pratique en programmation : FastAPI, SQLAlchemy 2,
 PostgreSQL, et un worker de correction qui exécute les productions des apprenants
@@ -20,10 +20,10 @@ python3.12 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Renseigner ensuite `CODEVAL_SECRET_KEY` dans `.env` — par exemple avec une clé générée
+Renseigner ensuite `CODEVAL_SECRET_KEY` dans `.env` : par exemple avec une clé générée
 par `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 
-Base de données — soit un PostgreSQL local :
+Base de données : soit un PostgreSQL local :
 
 ```bash
 psql -d postgres -c "CREATE ROLE codeval LOGIN PASSWORD 'codeval'"
@@ -72,7 +72,7 @@ Toutes les variables sont préfixées `CODEVAL_` et lues depuis l'environnement 
 
 | Variable | Rôle | Défaut |
 | --- | --- | --- |
-| `SECRET_KEY` | signature des jetons JWT — **à changer en production** | `dev-secret-change-me` |
+| `SECRET_KEY` | signature des jetons JWT : **à changer en production** | `dev-secret-change-me` |
 | `DATABASE_URL` | connexion PostgreSQL | `postgresql+psycopg://codeval:codeval@localhost:5432/codeval` |
 | `TEST_DATABASE_URL` | base utilisée par la suite de tests | `…/codeval_test` |
 | `ACCESS_TOKEN_MINUTES` | durée de validité des jetons | `720` |
@@ -128,11 +128,11 @@ ni HTTP ni authentification.
 closed → correcting → corrected → validated`. À la clôture, chaque `Participation`
 reçoit un `frozen_at` : les `Submission` ne sont plus modifiables.
 
-`BankExercise` est un exercice réutilisable, visible de son auteur et — s'il est
-partagé — de tout l'établissement. L'importer dans une évaluation en fait une **copie** :
+`BankExercise` est un exercice réutilisable, visible de son auteur et (s'il est
+partagé) de tout l'établissement. L'importer dans une évaluation en fait une **copie** :
 modifier la banque ensuite ne touche ni une session en cours ni une production corrigée.
 
-`Appreciation` porte le commentaire de l'enseignant sur une copie — général ou attaché
+`Appreciation` porte le commentaire de l'enseignant sur une copie : général ou attaché
 à un exercice. Il n'est servi à l'apprenant qu'une fois l'évaluation `validated`.
 
 `CorrectionRun` matérialise une campagne de correction numérotée. Une relance crée une

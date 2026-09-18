@@ -1,8 +1,8 @@
 /**
  * L'écran « Outils autorisés » d'un exercice algorithmique.
  *
- * Un algorithme a toujours la forme du cours — un nom, une partie déclarative,
- * un corps entre Début et Fin — et cette forme n'est pas négociable : ni
+ * Un algorithme a toujours la forme du cours (un nom, une partie déclarative,
+ * un corps entre Début et Fin) et cette forme n'est pas négociable : ni
  * l'enseignant ni l'apprenant ne la défont. Elle est donc rappelée ici comme un
  * fait, pas comme une option. Ce qui se règle, exercice par exercice, c'est
  * l'outillage : quels éléments l'apprenant aura le droit de poser dans ce

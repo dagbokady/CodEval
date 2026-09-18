@@ -2,7 +2,7 @@
  * Barème d'un exercice de code : ce que l'enseignant contrôle, critère par critère.
  *
  * Créer un exercice de code, c'est écrire son barème. Celui-ci est une liste
- * plate de critères — plus de sous-questions — de deux familles :
+ * plate de critères (plus de sous-questions) de deux familles :
  *
  * - les **déclarations attendues**, rangées dans `settings.criteria` : « la copie
  *   doit contenir une variable `total` de type entier », « une fonction
@@ -12,8 +12,8 @@
  *   programme ;
  * - les **tests d'exécution**, rangés dans la table des tests : des valeurs
  *   d'entrée typées et une sortie attendue, elle aussi typée. Un test peut viser
- *   un critère « fonction attendue » — il l'appelle alors directement et hérite
- *   de ses types — ou faire tourner le programme entier, en déclarant lui-même
+ *   un critère « fonction attendue » (il l'appelle alors directement et hérite
+ *   de ses types) ou faire tourner le programme entier, en déclarant lui-même
  *   les types de ce qu'il lui envoie.
  *
  * Un exercice **algorithmique** a les mêmes deux familles, mais ses déclarations
@@ -256,7 +256,7 @@ export function describeCriterion(criterion) {
 /**
  * Le nom d'une ligne de barème.
  *
- * La plupart des critères en portent un — c'est ce qu'on exige de la copie. Une
+ * La plupart des critères en portent un : c'est ce qu'on exige de la copie. Une
  * structure attendue, elle, n'a rien à nommer : ce qu'on exige, c'est le bloc
  * lui-même, et c'est donc lui qui titre la ligne.
  */
@@ -310,7 +310,7 @@ export function isSimpleScoring(exercise) {
 }
 
 /**
- * Le total de l'exercice partagé à parts égales entre tout ce qui note — les
+ * Le total de l'exercice partagé à parts égales entre tout ce qui note : les
  * déclarations exigées comme les tests officiels. C'est le barème simplifié,
  * recalculé chaque fois que le total de l'exercice change.
  */
@@ -340,4 +340,30 @@ export function inputTypesOf(test, criterion) {
 export function expectedTypeOf(test, criterion) {
   if (criterion) return criterion.returns ?? 'int';
   return test?.expected_type ?? 'string';
+}
+
+/**
+ * Ce qui manque à un test pour qu'il juge quelque chose : une fonction visée
+ * qui n'est plus déclarée, une valeur numérique laissée vide, un résultat
+ * attendu vide. Les booléens n'y figurent pas : ils ont toujours une valeur
+ * affichée. Vide : le test est prêt.
+ */
+export function testIssues(test, callable) {
+  const issues = [];
+  const criterion = test?.target_id ? callable.find((c) => c.id === test.target_id) : null;
+  if (test?.target_id && !criterion) issues.push('la fonction visée n’est plus déclarée');
+
+  const args = Array.isArray(test?.args) ? test.args : [];
+  const missing = inputTypesOf(test, criterion).filter((entry, i) => {
+    const input = valueType(entry.type).input;
+    return (input === 'number' || entry.type === 'char') && String(args[i] ?? '').trim() === '';
+  }).length;
+  if (missing === 1) issues.push('une valeur d’entrée manquante');
+  if (missing > 1) issues.push(`${missing} valeurs d’entrée manquantes`);
+
+  const expected = valueType(expectedTypeOf(test, criterion));
+  if (expected.input !== 'bool' && String(test?.expected_stdout ?? '').trim() === '') {
+    issues.push('résultat attendu vide');
+  }
+  return issues;
 }

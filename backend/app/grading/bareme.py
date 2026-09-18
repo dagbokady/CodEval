@@ -3,16 +3,16 @@
 Un exercice de code ne se découpe plus en sous-questions. Son barème est une
 liste plate de **critères**, chacun avec ses points, de deux familles :
 
-- les **déclarations attendues** — « la copie doit contenir une variable
+- les **déclarations attendues** « la copie doit contenir une variable
   `compteur` de type entier », « une fonction `long factorielle(int)` »,
   « une structure `Point` avec les champs `x` et `y` » ;
-- les **tests d'exécution** — des valeurs d'entrée typées, une sortie attendue
+- les **tests d'exécution** des valeurs d'entrée typées, une sortie attendue
   typée (ils vivent dans la table `test_cases`, voir `engine.py`).
 
 Une déclaration se vérifie de deux façons, selon sa portée :
 
 - **par compilation** pour tout ce qui est visible du fichier entier (variable
-  globale, fonction, structure) : on engendre une *sonde* — un pointeur du type
+  globale, fonction, structure) : on engendre une *sonde* un pointeur du type
   exact attendu que l'on fait pointer sur ce que l'apprenant a écrit. Si le nom
   manque ou si le type ne correspond pas, la sonde ne compile pas. C'est une
   garantie, pas une approximation ;
@@ -114,7 +114,7 @@ def _scope_text(criterion: dict) -> str:
 
 
 # ----- Sondes de compilation -----
-PROBE_HEADER = """/* Sonde de barème engendrée par CodEval — ne pas modifier. */
+PROBE_HEADER = """/* Sonde de barème engendrée par CodEval : ne pas modifier. */
 #define main {student_main}
 #include "{student_file}"
 #undef main

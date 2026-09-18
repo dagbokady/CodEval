@@ -1,6 +1,6 @@
 """Traduction d'un algorithme en blocs vers du Python exécutable.
 
-L'algorithme a toujours la forme du cours — un nom, une partie déclarative
+L'algorithme a toujours la forme du cours : un nom, une partie déclarative
 (constantes, types, variables), puis un corps encadré par Début et Fin. Ce
 squelette est posé par l'éditeur ; l'apprenant le remplit avec le seul
 vocabulaire autorisé par l'enseignant (LIRE, ECRIRE, SI, POUR, TANT QUE…).
@@ -36,7 +36,8 @@ def LIRE():
 
 
 def ECRIRE(*valeurs):
-    print(*valeurs)
+    # ECRIRE("note numéro ", i) : les morceaux se suivent tels qu'écrits.
+    print(*valeurs, sep="")
 
 
 def TABLEAU(taille, valeur=0):
@@ -58,25 +59,30 @@ TYPES_DONNEES = {
     "caractere": '""',
     "chaine": '""',
     "booleen": "False",
-    "tableau_entier": "TABLEAU({taille}, 0)",
-    "tableau_reel": "TABLEAU({taille}, 0.0)",
-    "tableau_chaine": 'TABLEAU({taille}, "")',
+    # TABLEAU[1..taille] : une case de plus, pour que les indices 1 à taille
+    # existent tous (la case 0 reste disponible pour qui compte depuis 0).
+    "tableau_entier": "TABLEAU(({taille}) + 1, 0)",
+    "tableau_reel": "TABLEAU(({taille}) + 1, 0.0)",
+    "tableau_caractere": 'TABLEAU(({taille}) + 1, "")',
+    "tableau_chaine": 'TABLEAU(({taille}) + 1, "")',
+    "tableau_booleen": "TABLEAU(({taille}) + 1, False)",
+    "pointeur": "None",
 }
 
 # Vocabulaire du corps, groupé comme dans la maquette.
 ELEMENTS = {
     "lire": ("Entrées / sorties", "LIRE()"),
     "ecrire": ("Entrées / sorties", "ECRIRE()"),
-    "si": ("Conditions", "SI … ALORS"),
+    "si": ("Conditions", "SI … ALORS … FINSI"),
     "sinon": ("Conditions", "SINON"),
-    "pour": ("Boucles", "POUR … FAIRE"),
-    "tantque": ("Boucles", "TANT QUE … FAIRE"),
-    "repeter": ("Boucles", "RÉPÉTER … JUSQU'À"),
+    "pour": ("Boucles", "POUR … FINPOUR"),
+    "tantque": ("Boucles", "TANTQUE … FINTANTQUE"),
+    "repeter": ("Boucles", "REPETER … JUSQU'A"),
     "variable": ("Structures", "VARIABLE"),
     "tableau": ("Structures", "TABLEAU"),
-    "fonction": ("Structures", "FONCTION"),
+    "fonction": ("Structures", "FONCTION … FINFONCTION"),
     "affectation": ("Opérateurs", "← (affectation)"),
-    "retour": ("Opérateurs", "RETOUR()"),
+    "retour": ("Opérateurs", "RETOURNE()"),
 }
 
 DEFAULT_ELEMENTS = ["constante", "declaration", "lire", "ecrire", "si", "sinon", "pour",
@@ -99,14 +105,30 @@ class AlgoError(ValueError):
     """Algorithme impossible à traduire : élément interdit ou expression invalide."""
 
 
+_CHAINE = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'')
+
+
 def _expression(source: str, *, condition: bool = False) -> str:
     texte = (source or "").strip()
     if not texte:
         raise AlgoError("Une expression est vide.")
+    # Le texte entre guillemets est libre (accents, « : », « ? ») : on le met de
+    # côté le temps du contrôle, pour ne filtrer que le code autour.
+    chaines: list[str] = []
+
+    def _garde(match: re.Match) -> str:
+        chaines.append(match.group(0))
+        return f"_chaine{len(chaines) - 1}_"
+
+    texte = _CHAINE.sub(_garde, texte)
+    # Une chaîne collée à un nom (f"…", b"…", r"…") changerait de nature en Python :
+    # f"{…}" exécuterait du code. Le pseudo-code n'a pas de préfixe de chaîne.
+    if re.search(r"[A-Za-z0-9_]_chaine\d+_|_chaine\d+_[A-Za-z0-9_]", texte):
+        raise AlgoError("Expression non autorisée.")
     texte = texte.replace("≠", "!=").replace("≤", "<=").replace("≥", ">=")
     if not _ALLOWED_CHARS.match(texte):
         raise AlgoError(f"Caractère non autorisé dans l'expression « {source} ».")
-    if "__" in texte:
+    if "__" in re.sub(r"_chaine\d+_", "", texte):
         raise AlgoError("Expression non autorisée.")
     for nom in _IDENT.findall(texte):
         if nom.lower() in _FORBIDDEN_NAMES and nom not in ("LIRE", "ECRIRE", "TABLEAU"):
@@ -115,7 +137,7 @@ def _expression(source: str, *, condition: bool = False) -> str:
     if condition:
         # « = » signifie l'égalité dans une condition ; « ← » sert à l'affectation.
         texte = re.sub(r"(?<![=!<>])=(?!=)", "==", texte)
-    return texte
+    return re.sub(r"_chaine(\d+)_", lambda m: chaines[int(m.group(1))], texte)
 
 
 def _nom(source: str) -> str:
@@ -123,6 +145,17 @@ def _nom(source: str) -> str:
     if not _IDENT.fullmatch(nom) or "__" in nom or nom.lower() in _FORBIDDEN_NAMES:
         raise AlgoError(f"« {source} » n'est pas un nom de variable valide.")
     return nom
+
+
+def _cible(source: str) -> str:
+    """Ce qui reçoit une valeur : une variable, ou une case de tableau `t[i]`."""
+    cible = (source or "").strip()
+    if "[" not in cible:
+        return _nom(cible)
+    if not cible.endswith("]"):
+        raise AlgoError(f"« {source} » n'est pas une case de tableau valide.")
+    base = _nom(cible[: cible.index("[")])
+    return f"{base}[{_expression(cible[cible.index('[') + 1 : -1])}]"
 
 
 def _bloc(noeud: dict, niveau: int, autorises: set[str], lignes: list[str]) -> None:
@@ -134,7 +167,8 @@ def _bloc(noeud: dict, niveau: int, autorises: set[str], lignes: list[str]) -> N
         raise AlgoError(f"L'élément « {ELEMENTS[type_][1]} » n'est pas autorisé pour cette question.")
 
     if type_ == "lire":
-        lignes.append(f"{marge}{_nom(noeud.get('cible'))} = LIRE()")
+        # LIRE(notes[i]) range la valeur lue dans une case du tableau.
+        lignes.append(f"{marge}{_cible(noeud.get('cible'))} = LIRE()")
     elif type_ == "ecrire":
         lignes.append(f"{marge}ECRIRE({_expression(noeud.get('expression'))})")
     elif type_ == "variable":
@@ -143,12 +177,7 @@ def _bloc(noeud: dict, niveau: int, autorises: set[str], lignes: list[str]) -> N
     elif type_ == "tableau":
         lignes.append(f"{marge}{_nom(noeud.get('nom'))} = TABLEAU({_expression(noeud.get('taille'))})")
     elif type_ == "affectation":
-        cible = (noeud.get("cible") or "").strip()
-        base = _nom(cible.split("[")[0]) if "[" in cible else _nom(cible)
-        indice = ""
-        if "[" in cible:
-            indice = "[" + _expression(cible[cible.index("[") + 1 : cible.rindex("]")]) + "]"
-        lignes.append(f"{marge}{base}{indice} = {_expression(noeud.get('expression'))}")
+        lignes.append(f"{marge}{_cible(noeud.get('cible'))} = {_expression(noeud.get('expression'))}")
     elif type_ == "retour":
         lignes.append(f"{marge}return {_expression(noeud.get('expression'))}")
     elif type_ == "si":
@@ -164,7 +193,11 @@ def _bloc(noeud: dict, niveau: int, autorises: set[str], lignes: list[str]) -> N
         variable = _nom(noeud.get("variable"))
         debut = _expression(noeud.get("debut"))
         fin = _expression(noeud.get("fin"))
-        lignes.append(f"{marge}for {variable} in range(int({debut}), int({fin}) + 1):")
+        pas = _expression(str(noeud.get("pas") or "").strip() or "1")
+        # « par pas de » : la borne finale est incluse, dans un sens comme dans l'autre.
+        lignes.append(
+            f"{marge}for {variable} in range(int({debut}), int({fin}) + (1 if int({pas}) > 0 else -1), int({pas})):"
+        )
         _corps(noeud.get("corps"), niveau + 1, autorises, lignes)
     elif type_ == "tantque":
         lignes.append(f"{marge}while {_expression(noeud.get('condition'), condition=True)}:")

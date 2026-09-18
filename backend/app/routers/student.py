@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ..audit import log
 from ..deps import DbSession, StudentUser
@@ -21,6 +21,7 @@ from ..models import (
     RunStatus,
     Subject,
     Submission,
+    TestKind,
     utcnow,
 )
 from ..schemas import (
@@ -71,6 +72,9 @@ def _joined_part_starters(exercise: Exercise) -> str:
         body = starter or f"{prefix} (à compléter)"
         chunks.append(f"{header}\n{body}")
     return "\n\n".join(chunks) if any_filled else ""
+
+# Le corrigé rédigé par l'enseignant, rangé dans `Exercise.settings`.
+_SOLUTION_KEYS = ("solution", "solution_notes")
 
 _VISIBLE = (
     EvaluationStatus.SCHEDULED,
@@ -141,6 +145,10 @@ def _public_settings(exercise: Exercise, reveal: bool) -> dict:
     """
     settings = dict(exercise.settings or {})
     settings.pop(matching.SALT_KEY, None)  # secret de présentation, jamais publié
+    # Le corrigé rédigé voyage à part (`StudentCopyExercise.solution`) : jamais
+    # dans les réglages, qui sont envoyés tels quels pendant l'épreuve.
+    for key in _SOLUTION_KEYS:
+        settings.pop(key, None)
     if reveal or exercise.kind not in ("qcm", "matching", "truefalse", "short"):
         return settings
 
@@ -167,6 +175,50 @@ def _public_settings(exercise: Exercise, reveal: bool) -> dict:
         for field in ("choices", "multiple", "pairs", "accepted", "keywords_mode", "rows"):
             settings.pop(field, None)
     return settings
+
+
+def _solutions_shown(evaluation: Evaluation) -> bool:
+    """L'enseignant propose-t-il le corrigé avec les notes ? Oui, sauf refus."""
+    return (evaluation.rules or {}).get("show_solutions", True) is not False
+
+
+def _readable_value(value) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _expected_tests(exercise: Exercise) -> list[dict]:
+    """Ce que le programme devait produire, test officiel par test officiel.
+
+    Le détail de correction ne dit que « réussi » ou « échoué » ; une fois les
+    notes publiées, l'apprenant lit ce qui était attendu, et voit où son
+    programme s'en écartait. Les tests de diagnostic restent à l'enseignant.
+    """
+    if exercise.kind not in ("code", "algo"):
+        return []
+    functions = {
+        str(c.get("id")): str(c.get("name") or "").strip()
+        for c in (exercise.settings or {}).get("criteria") or []
+        if isinstance(c, dict)
+    }
+    expected = []
+    for test in exercise.tests:
+        if test.kind is not TestKind.OFFICIAL:
+            continue
+        if test.target_id:
+            name = functions.get(test.target_id) or "fonction"
+            given = f"{name}({', '.join(_readable_value(a) for a in test.args or [])})"
+        else:
+            given = test.stdin or ""
+        expected.append(
+            {
+                "test_id": test.id,
+                "name": test.name,
+                "call": bool(test.target_id),
+                "input": given,
+                "expected": test.expected_stdout or "",
+            }
+        )
+    return expected
 
 
 def _public_exercise(exercise: Exercise) -> ExercisePublicOut:
@@ -206,12 +258,26 @@ def my_evaluations(user: StudentUser, db: DbSession) -> list[StudentEvaluationOu
         close_if_expired(db, evaluation)
         # Une épreuve peut être préparée sans être annoncée : l'enseignant
         # choisit si sa classe sait qu'une interrogation l'attend. Tant qu'elle
-        # n'est pas ouverte, elle reste alors invisible — une fois la session
+        # n'est pas ouverte, elle reste alors invisible : une fois la session
         # lancée, l'apprenant doit évidemment la voir pour composer.
         if evaluation.status is EvaluationStatus.SCHEDULED and not _announced(evaluation):
             continue
         classroom = db.get(Classroom, evaluation.classroom_id) if evaluation.classroom_id else None
         subject = db.get(Subject, evaluation.subject_id) if evaluation.subject_id else None
+        exercises_count = db.scalar(
+            select(func.count(Exercise.id)).where(Exercise.evaluation_id == evaluation.id)
+        ) or 0
+        # La progression n'a de sens que pendant l'épreuve : même règle que les
+        # exercices « enregistrés » de l'éditeur, une production non vide.
+        answered_count = 0
+        if evaluation.status is EvaluationStatus.RUNNING:
+            answered_count = db.scalar(
+                select(func.count(Submission.id)).where(
+                    Submission.participation_id == participation.id,
+                    func.trim(Submission.code) != "",
+                )
+            ) or 0
+        score, total = _published_score(db, evaluation, participation)
         out.append(
             StudentEvaluationOut(
                 **{
@@ -219,6 +285,14 @@ def my_evaluations(user: StudentUser, db: DbSession) -> list[StudentEvaluationOu
                     "classroom_name": classroom.name if classroom else None,
                     "subject_name": subject.name if subject else None,
                     "submitted_at": participation.submitted_at,
+                    "exercises_count": exercises_count,
+                    "answered_count": answered_count,
+                    "score": score,
+                    "total_points": total or evaluation.total_points,
+                    "published": evaluation.status is EvaluationStatus.VALIDATED,
+                    "solutions_available": evaluation.status is EvaluationStatus.VALIDATED
+                    and _solutions_shown(evaluation),
+                    "status_label": _CORRECTION_LABELS.get(evaluation.status, ""),
                 }
             )
         )
@@ -374,7 +448,7 @@ def report_incident(
     if limit and participation.incidents >= limit:
         # On gèle la production sans la marquer « soumise » : l'apprenant n'a pas
         # rendu sa copie, et l'envoi final du client reste accepté pendant la
-        # fenêtre de tolérance — sinon le travail en cours serait perdu.
+        # fenêtre de tolérance : sinon le travail en cours serait perdu.
         participation.frozen_at = utcnow()
         locked = True
         log(db, user, user.organization_id, "integrity.locked", "participation", participation.id,
@@ -450,7 +524,7 @@ def submit(evaluation_id: int, user: StudentUser, db: DbSession) -> dict:
     if total > 0 and submitted == total:
         notify(
             db, evaluation.teacher_id,
-            f"Tous les étudiants ont soumis — {evaluation.title}",
+            f"Tous les étudiants ont soumis : {evaluation.title}",
             f"{submitted}/{total} productions reçues. Vous pouvez lancer la correction.",
             f"/evaluations/{evaluation_id}/resultats",
         )
@@ -501,7 +575,7 @@ def my_results(user: StudentUser, db: DbSession) -> list[StudentResultOut]:
 
 
 _CORRECTION_LABELS = {
-    EvaluationStatus.CLOSED: "Copie rendue — correction à venir",
+    EvaluationStatus.CLOSED: "Copie rendue : correction à venir",
     EvaluationStatus.CORRECTING: "Correction en cours",
     EvaluationStatus.CORRECTED: "En attente de validation",
     EvaluationStatus.VALIDATED: "Publié",
@@ -534,7 +608,7 @@ def _published_score(db, evaluation: Evaluation, participation: Participation):
 
 
 def _result_lines(db, evaluation: Evaluation, participation: Participation) -> list[ScoreLineOut]:
-    """Le relevé de la copie, exercice par exercice — « Exercice 1 : 0/4 ».
+    """Le relevé de la copie, exercice par exercice : « Exercice 1 : 0/4 ».
 
     C'est ce que l'apprenant cherche d'abord : non pas seulement combien il a,
     mais où il l'a perdu. La ligne existe même sans note automatique, avec son
@@ -580,8 +654,11 @@ def my_copy(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentCopy
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "La copie sera consultable après la clôture de l'épreuve"
         )
+    if evaluation.status is EvaluationStatus.CANCELLED:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Cette évaluation a été annulée")
 
     published = evaluation.status is EvaluationStatus.VALIDATED
+    show_solutions = published and _solutions_shown(evaluation)
     exercises = list(
         db.scalars(
             select(Exercise)
@@ -652,6 +729,13 @@ def my_copy(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentCopy
                 if result
                 else [],
                 appreciation=comments.get(exercise.id, ""),
+                solution=str((exercise.settings or {}).get("solution") or "")
+                if show_solutions
+                else "",
+                solution_notes=str((exercise.settings or {}).get("solution_notes") or "")
+                if show_solutions
+                else "",
+                expected_tests=_expected_tests(exercise) if show_solutions else [],
             )
         )
 
@@ -673,5 +757,6 @@ def my_copy(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentCopy
         score=score,
         total_points=total or evaluation.total_points,
         appreciation=comments.get(None, ""),
+        solutions_available=show_solutions,
         exercises=sheets,
     )

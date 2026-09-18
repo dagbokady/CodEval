@@ -35,7 +35,7 @@ export default function ResultsPage() {
   );
 
   /* Deux formats pour le même tableau : le CSV pour retraiter les notes, le
-     classeur Excel pour l'archive — synthèse, détail par exercice, ajustements
+     classeur Excel pour l'archive : synthèse, détail par exercice, ajustements
      et incidents, chacun sur sa feuille. */
   async function exportResults(format) {
     try {
@@ -65,6 +65,7 @@ export default function ResultsPage() {
   });
   const busy = run && ['pending', 'running'].includes(run.status);
   const publiee = evaluation.data.status === 'validated';
+  const annulee = evaluation.data.status === 'cancelled';
 
   function ouvrirCopie(participationId) {
     navigate(
@@ -91,7 +92,7 @@ export default function ResultsPage() {
     <>
       <PageHeader
         breadcrumb={`Évaluations / ${evaluation.data.title}`}
-        title={`Résultats — ${evaluation.data.title}`}
+        title={`Résultats : ${evaluation.data.title}`}
       >
         <Button variant="secondary" onClick={() => exportResults('csv')} disabled={!run}>
           Exporter CSV
@@ -103,6 +104,12 @@ export default function ResultsPage() {
 
       <div className="content">
         <Alert>{error ?? relaunch.error?.message ?? validate.error?.message}</Alert>
+        {annulee && (
+          <Alert tone="info">
+            Épreuve annulée : les copies et les corrections restent consultables ici, mais elle
+            ne compte plus dans les notes ni les moyennes des étudiants.
+          </Alert>
+        )}
 
         {!run && (
           <EmptyState
@@ -121,9 +128,9 @@ export default function ResultsPage() {
           <>
             <div className="cards" style={{ marginBottom: 16 }}>
               <Stat label="Participants" value={participants.length} />
-              <Stat label="Moyenne" value={average !== null ? formatScore(average, total) : '—'} />
-              <Stat label="Taux de réussite" value={successRate !== null ? `${successRate} %` : '—'} />
-              <Stat label="Meilleur score" value={best !== null ? formatScore(best, total) : '—'} />
+              <Stat label="Moyenne" value={average !== null ? formatScore(average, total) : '-'} />
+              <Stat label="Taux de réussite" value={successRate !== null ? `${successRate} %` : '-'} />
+              <Stat label="Meilleur score" value={best !== null ? formatScore(best, total) : '-'} />
             </div>
 
             <section className="card" style={{ marginBottom: 16 }}>
@@ -151,14 +158,14 @@ export default function ResultsPage() {
                   <Button
                     variant="secondary"
                     size="small"
-                    disabled={busy || relaunch.isPending}
+                    disabled={busy || annulee || relaunch.isPending}
                     onClick={() => relaunch.mutateAsync().catch((e) => setError(e.message))}
                   >
                     Relancer la correction
                   </Button>
                   <Button
                     size="small"
-                    disabled={busy || evaluation.data.status === 'validated' || validate.isPending}
+                    disabled={busy || annulee || evaluation.data.status === 'validated' || validate.isPending}
                     onClick={() => validate.mutateAsync().catch((e) => setError(e.message))}
                   >
                     {evaluation.data.status === 'validated'
@@ -262,7 +269,7 @@ export default function ResultsPage() {
                 {rows.map((p) => (
                   <tr key={p.participation_id}>
                     <td>{p.full_name}</td>
-                    <td className="sub">{p.matricule ?? '—'}</td>
+                    <td className="sub">{p.matricule ?? '-'}</td>
                     <td>
                       {formatScore(p.final_score, p.max_score)}
                       {p.adjusted && <span className="sub"> · ajustée</span>}

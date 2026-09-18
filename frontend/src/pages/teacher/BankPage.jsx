@@ -9,6 +9,7 @@ import BaremeEditor from '../../components/BaremeEditor';
 import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
 import TestsEditor, { ComparisonEditor } from '../../components/TestsEditor';
+import SolutionEditor from '../../components/SolutionEditor';
 import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
 import { SheetExercise } from '../../components/SubjectSheet';
 import {
@@ -54,8 +55,8 @@ const EMPTY = {
  * ce qu'on y écrit : ce qu'est l'exercice, l'environnement qu'on donne à
  * l'apprenant, ce que sa copie doit contenir, sur quoi on l'exécute, comment on
  * compare, et enfin ce que tout cela vaut. Seule la deuxième étape diffère : un
- * exercice de code se donne avec son squelette de départ — que l'enseignant
- * écrit comme il veut — là où un exercice algorithmique a une structure imposée
+ * exercice de code se donne avec son squelette de départ (que l'enseignant
+ * écrit comme il veut) là où un exercice algorithmique a une structure imposée
  * et se règle par les outils qu'on y autorise.
  *
  * Les points viennent toujours en dernier : on ne pèse un test qu'une fois tous
@@ -95,7 +96,7 @@ function stepLabel(kind, step) {
   return stepsOf(kind)[step];
 }
 
-/** La dernière étape — celle des points — dépend du type d'exercice. */
+/** La dernière étape (celle des points) dépend du type d'exercice. */
 function lastStep(kind) {
   return Object.keys(stepsOf(kind)).length;
 }
@@ -142,7 +143,7 @@ function withKind(form, kind) {
 /**
  * Aperçu du sujet, à droite de l'éditeur : la feuille telle que l'apprenant la
  * recevra, mise à jour à chaque frappe. Elle ne montre que ce qui est déjà
- * saisi — c'est le seul moyen de voir la mise en page d'un exercice avant de
+ * saisi : c'est le seul moyen de voir la mise en page d'un exercice avant de
  * l'enregistrer.
  */
 function ExercisePreview({ form }) {
@@ -271,6 +272,7 @@ export default function BankPage() {
 
       <Chips
         label="Portée :"
+        allLabel="Tous"
         value={scope}
         onChange={(value) => {
           setScope(value);
@@ -336,7 +338,7 @@ export default function BankPage() {
                     value={form.subject_id}
                     onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
                   >
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {(subjects.data ?? []).map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
@@ -378,10 +380,10 @@ export default function BankPage() {
               </>
             )}
 
-            {/* Étape 2 — l'environnement de travail donné à l'apprenant.
+            {/* Étape 2 : l'environnement de travail donné à l'apprenant.
                 Un exercice de code se donne avec son squelette de départ, que
                 l'enseignant écrit comme il l'entend ; un exercice algorithmique
-                n'en a pas — sa structure est imposée par le cours — et se règle
+                n'en a pas (sa structure est imposée par le cours) et se règle
                 par les outils qu'on y autorise. Les types sans exécution y
                 écrivent leurs questions. */}
             {step === 2 && (
@@ -431,6 +433,15 @@ export default function BankPage() {
                 </>
               )}
 
+              <div style={{ marginTop: 14 }}>
+                <SolutionEditor
+                  kind={form.kind}
+                  name="b-sol"
+                  settings={form.settings}
+                  onChange={(settings) => setForm({ ...form, settings })}
+                />
+              </div>
+
               {!needsTests(form.kind) && (
                 <p className="sub" style={{ margin: '12px 0' }}>
                   {exerciseType(form.kind).gradingNote}
@@ -448,7 +459,7 @@ export default function BankPage() {
               </>
             )}
 
-            {/* Étape 3 — ce que la copie doit contenir : les déclarations exigées.
+            {/* Étape 3 : ce que la copie doit contenir : les déclarations exigées.
                 Ce qu'elles valent se décidera à la dernière étape. */}
             {step === 3 && needsTests(form.kind) && (
               <>
@@ -620,7 +631,7 @@ export default function BankPage() {
                         )}
                       </td>
                       <td className="sub">{exercise.author_name}</td>
-                      <td>{exercise.uses > 0 ? `${exercise.uses}×` : '—'}</td>
+                      <td>{exercise.uses > 0 ? `${exercise.uses}×` : '-'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <Button variant="secondary" size="small" onClick={() => edit(exercise)}>

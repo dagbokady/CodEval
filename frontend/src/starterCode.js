@@ -37,7 +37,7 @@ if __name__ == "__main__":
 `,
 };
 
-/** Squelette d'un langage — vide pour les questions qui ne se programment pas. */
+/** Squelette d'un langage : vide pour les questions qui ne se programment pas. */
 export function defaultStarter(language, kind = 'code') {
   if (kind !== 'code') return '';
   return STARTER_CODE[language] ?? '';

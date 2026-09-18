@@ -78,7 +78,7 @@ def _widths(sheet, widths: list[int]) -> None:
 
 def _duration(seconds: int | None) -> str:
     if seconds is None:
-        return "—"
+        return "-"
     return f"{seconds // 3600:02d}:{(seconds % 3600) // 60:02d}:{seconds % 60:02d}"
 
 
@@ -120,7 +120,7 @@ def build_results_workbook(db: Session, evaluation: Evaluation, run: CorrectionR
 def _synthesis(sheet, evaluation, run, db, classroom, subject, teacher, rows, scores) -> None:
     sheet.title = "Synthèse"
     _widths(sheet, [34, 46])
-    sheet["A1"] = "CodEval — résultats d'évaluation"
+    sheet["A1"] = "CodEval : résultats d'évaluation"
     sheet["A1"].font = TITLE_FONT
 
     finals = [scores[p.id]["final"] for p, _ in rows if p.id in scores]
@@ -130,9 +130,9 @@ def _synthesis(sheet, evaluation, run, db, classroom, subject, teacher, rows, sc
 
     entries = [
         ("Évaluation", evaluation.title),
-        ("Classe", classroom.name if classroom else "—"),
-        ("Matière", subject.name if subject else "—"),
-        ("Enseignant", teacher.full_name if teacher else "—"),
+        ("Classe", classroom.name if classroom else "-"),
+        ("Matière", subject.name if subject else "-"),
+        ("Enseignant", teacher.full_name if teacher else "-"),
         ("Langage", evaluation.language),
         ("Durée (minutes)", evaluation.duration_minutes),
         ("Barème", barometer),
@@ -144,10 +144,10 @@ def _synthesis(sheet, evaluation, run, db, classroom, subject, teacher, rows, sc
         ("Inscrits", len(rows)),
         ("Ont soumis", sum(1 for p, _ in rows if p.submitted_at)),
         ("Corrigés", len(finals)),
-        ("Moyenne", round(sum(finals) / len(finals), 2) if finals else "—"),
-        ("Taux de réussite (%)", round(len(passed) / len(finals) * 100, 1) if finals else "—"),
-        ("Meilleure note", max(finals) if finals else "—"),
-        ("Note la plus basse", min(finals) if finals else "—"),
+        ("Moyenne", round(sum(finals) / len(finals), 2) if finals else "-"),
+        ("Taux de réussite (%)", round(len(passed) / len(finals) * 100, 1) if finals else "-"),
+        ("Meilleure note", max(finals) if finals else "-"),
+        ("Note la plus basse", min(finals) if finals else "-"),
         ("Notes ajustées manuellement", sum(1 for s in scores.values() if s["adjusted"])),
     ]
     if run:
@@ -156,7 +156,7 @@ def _synthesis(sheet, evaluation, run, db, classroom, subject, teacher, rows, sc
             ("Campagne de correction", f"#{run.number}"),
             ("Statut de la campagne", run.status.value),
             ("Lancée le", _local(run.created_at)),
-            ("Lancée par", (db.get(User, run.triggered_by).full_name if run.triggered_by else "—")),
+            ("Lancée par", (db.get(User, run.triggered_by).full_name if run.triggered_by else "-")),
             ("Terminée le", _local(run.finished_at)),
             ("Productions traitées", f"{run.processed} / {run.total}"),
             ("Erreurs de compilation", (run.stats or {}).get("compile_errors", 0)),
@@ -188,7 +188,7 @@ def _results(sheet, evaluation, exercises, rows, scores, results) -> None:
 
     for index, (participation, student) in enumerate(rows, start=2):
         entry = scores.get(participation.id)
-        line = [student.full_name, student.matricule or "—", student.email]
+        line = [student.full_name, student.matricule or "-", student.email]
         passed = total = 0
         for exercise in exercises:
             result = results.get((participation.id, exercise.id))
@@ -249,14 +249,14 @@ def _per_exercise(sheet, exercises, rows, results) -> None:
             failed = [t["name"] for t in result.tests if not t.get("passed")]
             values = [
                 student.full_name,
-                student.matricule or "—",
+                student.matricule or "-",
                 titles.get(exercise.id, ""),
                 result.auto_score,
                 result.max_score,
                 RESULT_LABELS.get(result.status.value, result.status.value),
                 sum(1 for t in official if t.get("passed")),
                 len(official),
-                ", ".join(failed) or "—",
+                ", ".join(failed) or "-",
                 (result.compile_log or "")[:500],
             ]
             for column, value in enumerate(values, start=1):
@@ -284,8 +284,8 @@ def _adjustments(sheet, db, run, rows) -> None:
         author = db.get(User, adjustment.teacher_id)
         values = [
             _local(adjustment.created_at),
-            names.get(adjustment.participation_id, "—"),
-            author.full_name if author else "—",
+            names.get(adjustment.participation_id, "-"),
+            author.full_name if author else "-",
             adjustment.previous_score,
             adjustment.new_score,
             adjustment.reason,
@@ -325,7 +325,7 @@ def _incidents(sheet, db, evaluation, rows) -> None:
     ):
         kind = (entry.meta or {}).get("type", "")
         for column, value in enumerate(
-            [_local(entry.created_at), names.get(entry.target_id, "—"), labels.get(kind, kind)],
+            [_local(entry.created_at), names.get(entry.target_id, "-"), labels.get(kind, kind)],
             start=1,
         ):
             cell = sheet.cell(row=line, column=column, value=value)

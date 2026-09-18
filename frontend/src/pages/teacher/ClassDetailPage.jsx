@@ -1,410 +1,489 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { Alert, Button, Loading, Tag } from '../../components/ui';
-import { STATUS_LABELS, STATUS_TONES, formatSchedule } from '../../format';
+import { useClassroomEvaluations } from '../../api/hooks';
 import {
-  IconBook,
-  IconCalendar,
-  IconChevronRight,
-  IconClasses,
-  IconCode,
-  IconEvaluations,
-  IconGraduation,
-  IconPlus,
-  IconResults,
-  IconStats,
-  IconTarget,
-  IconTrophy,
-  IconUsers,
-} from '../../components/icons';
+  Alert,
+  Button,
+  EmptyState,
+  Loading,
+  PageHeader,
+  Segmented,
+  Stat,
+  Status,
+  Tabs,
+} from '../../components/ui';
+import {
+  EVAL_KIND_LABELS,
+  STATUS_LABELS,
+  STATUS_TONES,
+  formatPercent,
+  formatSchedule,
+  primaryAction,
+} from '../../format';
+import { summarize } from '../../classroomSummary';
 
-const TABS = [
-  { value: 'overview', label: "Vue d'ensemble" },
-  { value: 'students', label: 'Apprenants' },
-  { value: 'evaluations', label: 'Évaluations' },
-  { value: 'stats', label: 'Statistiques' },
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+
+const EVAL_FILTERS = [
+  { value: 'upcoming', label: 'À venir' },
+  { value: 'running', label: 'En cours' },
+  { value: 'done', label: 'Terminées' },
 ];
 
-const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
-const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
-
-function fmtDateRange(evaluation) {
-  if (!evaluation.scheduled_start) return '—';
-  const s = new Date(evaluation.scheduled_start);
-  const e = new Date(s.getTime() + (evaluation.duration_minutes ?? 60) * 60000);
-  return `${dateFmt.format(s)}\n${timeFmt.format(s)} – ${timeFmt.format(e)}`;
-}
-
-function ProgressBar({ value }) {
-  return (
-    <div className="cd-progress">
-      <div className="cd-progress-fill" style={{ width: `${Math.min(100, value)}%` }} />
-    </div>
-  );
-}
-
-function StatCard({ icon, color, label, value, sub, onClick }) {
-  return (
-    <button type="button" className="cd-stat" onClick={onClick} disabled={!onClick}>
-      <div className="cd-stat-icon" style={{ background: `${color}14`, color }}>
-        {icon}
-      </div>
-      <div className="cd-stat-body">
-        <div className="cd-stat-label">{label}</div>
-        <div className="cd-stat-value">{value}</div>
-        {sub && <div className="cd-stat-sub">{sub}</div>}
-      </div>
-      {onClick && <span className="cd-stat-arrow">›</span>}
-    </button>
-  );
-}
-
-function QuickAction({ icon, label, onClick }) {
-  return (
-    <button type="button" className="cd-quick-action" onClick={onClick}>
-      <span className="cd-quick-action-icon">{icon}</span>
-      <span>{label}</span>
-      <span className="cd-quick-action-arrow">›</span>
-    </button>
-  );
-}
-
-function EvalIcon({ status }) {
-  const colors = {
-    draft: 'var(--text-muted)',
-    scheduled: 'var(--warning)',
-    running: 'var(--primary)',
-    closed: 'var(--text-muted)',
-    correcting: 'var(--primary)',
-    corrected: 'var(--success)',
-    validated: 'var(--success)',
-  };
-  return (
-    <div className="cd-eval-icon" style={{ background: `${colors[status] ?? 'var(--primary)'}14`, color: colors[status] ?? 'var(--primary)' }}>
-      <IconCode />
-    </div>
-  );
-}
-
+/**
+ * Une classe : ses chiffres, ses épreuves, ses apprenants. Tout ce qui s'affiche
+ * vient des données : pas de statistique inventée ni de bouton sans effet.
+ * L'onglet vit dans l'URL, pour que « Retour » y ramène.
+ */
 export default function ClassDetailPage() {
   const { classroomId } = useParams();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('onglet');
+  const tab = ['apprenants', 'evaluations'].includes(requested) ? requested : 'apercu';
+  const setTab = (value) =>
+    setSearchParams(value === 'apercu' ? {} : { onglet: value }, { replace: true });
 
   const classroom = useQuery({
     queryKey: ['classroom', classroomId],
     queryFn: () => api(`/api/classrooms/${classroomId}`),
     enabled: Boolean(classroomId),
   });
-
   const students = useQuery({
     queryKey: ['classroom-students', classroomId],
     queryFn: () => api(`/api/classrooms/${classroomId}/students`),
     enabled: Boolean(classroomId),
   });
-
-  const evaluations = useQuery({
-    queryKey: ['classroom-evaluations', classroomId],
-    queryFn: () => api(`/api/classrooms/${classroomId}/evaluations`),
-    enabled: Boolean(classroomId),
-  });
+  const evaluations = useClassroomEvaluations(classroomId);
 
   if (classroom.isPending) return <Loading />;
-  if (classroom.error) return <div className="content"><Alert>{classroom.error.message}</Alert></div>;
+  if (classroom.error) {
+    return (
+      <div className="content">
+        <Alert>{classroom.error.message}</Alert>
+      </div>
+    );
+  }
 
-  const cls = classroom.data ?? {};
+  const cls = classroom.data;
   const studentList = students.data ?? [];
-  const evalList = (evaluations.data?.items ?? evaluations.data) ?? [];
-  const recentEvals = evalList.slice(0, 5);
-
-  const upcoming = evalList.filter((e) => e.status === 'scheduled').length;
-  const avgScore = evalList.length > 0
-    ? evalList.reduce((sum, e) => sum + (e.success_rate ?? 0), 0) / Math.max(1, evalList.filter((e) => e.success_rate != null).length)
-    : null;
+  const evalList = evaluations.data?.items ?? [];
+  const summary = summarize(evalList);
+  const newEvaluation = () => navigate(`/evaluations/nouvelle?classe=${cls.id}`);
 
   return (
     <>
-      {/* Class header */}
-      <div className="cd-header">
-        <div className="cd-header-left">
-          <div className="cd-header-icon">
-            <IconGraduation />
-          </div>
-          <div>
-            <div className="cd-header-title-row">
-              <h1>{cls.name ?? 'Classe'}</h1>
-              <Tag tone="success">Active</Tag>
-            </div>
-            <div className="cd-header-meta">
-              {[cls.subject_name, cls.level, `${cls.students_count ?? studentList.length} apprenants`].filter(Boolean).join(' · ')}
-            </div>
-          </div>
-        </div>
-        <div className="cd-header-actions">
-          <Button variant="secondary">
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Actions <IconChevronRight /></span>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        breadcrumb={
+          <>
+            <Link to="/classes">Mes classes</Link>
+            {' · '}
+            {[cls.level, cls.subject_name].filter(Boolean).join(' · ') || 'Classe'}
+          </>
+        }
+        title={cls.name}
+      >
+        <Button onClick={newEvaluation}>+ Nouvelle évaluation</Button>
+      </PageHeader>
 
-      {/* Tabs */}
-      <div className="tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            className="tab"
-            role="tab"
-            aria-selected={tab === t.value}
-            onClick={() => setTab(t.value)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { value: 'apercu', label: "Vue d'ensemble" },
+          { value: 'apprenants', label: 'Apprenants', count: cls.students_count },
+          { value: 'evaluations', label: 'Évaluations', count: evalList.length },
+        ]}
+      />
 
-      {/* Content area with right sidebar */}
-      <div className="cd-layout">
-        <div className="cd-main">
-          {tab === 'overview' && (
-            <>
-              {/* Stat cards */}
-              <div className="cd-stats">
-                <StatCard
-                  icon={<IconUsers />}
-                  color="#0075de"
-                  label="Apprenants"
-                  value={cls.students_count ?? studentList.length}
-                  sub={`/ ${cls.students_count ?? studentList.length} inscrits`}
-                  onClick={() => setTab('students')}
-                />
-                <StatCard
-                  icon={<IconCalendar />}
-                  color="#16a34a"
-                  label="Prochaines évaluations"
-                  value={upcoming}
-                  sub="dans les 7 prochains jours"
-                />
-                <StatCard
-                  icon={<IconTarget />}
-                  color="#e5a100"
-                  label="Moyenne de la classe"
-                  value={avgScore != null ? `${Math.round(avgScore * 10) / 10} / 20` : '—'}
-                  sub={avgScore != null ? 'depuis le début' : ''}
-                />
-                <StatCard
-                  icon={<IconTrophy />}
-                  color="#8145b5"
-                  label="Taux de réussite"
-                  value={avgScore != null ? `${Math.round(avgScore)}%` : '—'}
-                  sub="des apprenants"
-                />
-              </div>
+      <div className="content">
+        {evaluations.error && <Alert>{evaluations.error.message}</Alert>}
 
-              {/* Recent evaluations */}
-              <div className="cd-section">
-                <div className="cd-section-header">
-                  <h2>Évaluations récentes</h2>
-                  <button type="button" className="cd-link" onClick={() => setTab('evaluations')}>
-                    Voir toutes les évaluations →
-                  </button>
-                </div>
+        {tab === 'apercu' && (
+          <Overview
+            classroom={cls}
+            students={studentList}
+            studentsPending={students.isPending}
+            summary={summary}
+            evaluationsCount={evalList.length}
+            evaluationsPending={evaluations.isPending}
+            onTab={setTab}
+            onNew={newEvaluation}
+          />
+        )}
 
-                {evaluations.isPending && <Loading />}
+        {tab === 'apprenants' && (
+          <StudentsTab
+            students={studentList}
+            pending={students.isPending}
+            error={students.error}
+          />
+        )}
 
-                {recentEvals.length > 0 && (
-                  <div className="table-wrap" style={{ margin: 0 }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Titre</th>
-                          <th>Matière</th>
-                          <th>Date</th>
-                          <th>Statut</th>
-                          <th>Taux de réussite</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recentEvals.map((ev) => (
-                          <tr key={ev.id}>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <EvalIcon status={ev.status} />
-                                <div>
-                                  <div style={{ fontWeight: 500 }}>{ev.title}</div>
-                                  <div className="sub">{cls.name}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>{ev.subject_name ?? '—'}</td>
-                            <td style={{ whiteSpace: 'pre-line', fontSize: 13 }}>
-                              {fmtDateRange(ev)}
-                            </td>
-                            <td>
-                              <Tag tone={STATUS_TONES[ev.status]}>{STATUS_LABELS[ev.status]}</Tag>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <ProgressBar value={ev.success_rate ?? 0} />
-                                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                                  {ev.success_rate != null ? `${ev.success_rate}%` : '—'}
-                                </span>
-                              </div>
-                            </td>
-                            <td>
-                              <button
-                                className="cd-more-btn"
-                                aria-label="Actions"
-                                onClick={() => navigate(`/evaluations/${ev.id}/resultats`)}
-                              >
-                                ⋮
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {!evaluations.isPending && recentEvals.length === 0 && (
-                  <div className="cd-empty">Aucune évaluation pour cette classe.</div>
-                )}
-              </div>
-            </>
-          )}
-
-          {tab === 'students' && (
-            <div className="cd-section">
-              <h2 style={{ marginBottom: 16 }}>Apprenants inscrits</h2>
-              {students.isPending && <Loading />}
-              {studentList.length > 0 && (
-                <div className="table-wrap" style={{ margin: 0 }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Apprenant</th>
-                        <th>Matricule</th>
-                        <th>E-mail</th>
-                        <th>État</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {studentList.map((s) => {
-                        const ini = s.full_name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-                        return (
-                          <tr key={s.id}>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <span className="avatar avatar--sm">{ini}</span>
-                                {s.full_name}
-                              </div>
-                            </td>
-                            <td className="sub">{s.matricule ?? '—'}</td>
-                            <td className="sub">{s.email}</td>
-                            <td>
-                              <Tag tone={s.is_active ? 'success' : 'neutral'}>
-                                {s.is_active ? 'Actif' : 'Inactif'}
-                              </Tag>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {!students.isPending && studentList.length === 0 && (
-                <div className="cd-empty">Aucun apprenant inscrit dans cette classe.</div>
-              )}
-            </div>
-          )}
-
-          {tab === 'evaluations' && (
-            <div className="cd-section">
-              <h2 style={{ marginBottom: 16 }}>Toutes les évaluations</h2>
-              {evaluations.isPending && <Loading />}
-              {evalList.length > 0 && (
-                <div className="table-wrap" style={{ margin: 0 }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Titre</th>
-                        <th>Matière</th>
-                        <th>Date</th>
-                        <th>Statut</th>
-                        <th>Taux de réussite</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {evalList.map((ev) => (
-                        <tr key={ev.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/evaluations/${ev.id}`)}>
-                          <td style={{ fontWeight: 500 }}>{ev.title}</td>
-                          <td>{ev.subject_name ?? '—'}</td>
-                          <td style={{ whiteSpace: 'pre-line', fontSize: 13 }}>{fmtDateRange(ev)}</td>
-                          <td><Tag tone={STATUS_TONES[ev.status]}>{STATUS_LABELS[ev.status]}</Tag></td>
-                          <td>{ev.success_rate != null ? `${ev.success_rate}%` : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab === 'stats' && (
-            <div className="cd-section">
-              <h2 style={{ marginBottom: 16 }}>Statistiques</h2>
-              <div className="cd-empty">Les statistiques détaillées de cette classe seront bientôt disponibles.</div>
-            </div>
-          )}
-        </div>
-
-        {/* Right sidebar */}
-        <aside className="cd-aside">
-          <div className="cd-aside-card cd-aside-info">
-            <div className="cd-aside-illustration">
-              <IconGraduation />
-            </div>
-            <h3>{cls.name}</h3>
-            <div className="cd-aside-subtitle">{cls.subject_name ?? 'Informatique'}</div>
-            <p className="cd-aside-desc">
-              {cls.description ?? `Cette classe regroupe les étudiants de ${cls.name}. Vous pouvez gérer les apprenants, les évaluations et suivre leur progression.`}
-            </p>
-            <div className="cd-aside-details">
-              <div><IconUsers /> {cls.students_count ?? studentList.length} apprenants</div>
-              <div><IconClasses /> Niveau {cls.level ?? '—'}</div>
-              <div><IconBook /> Matière {cls.subject_name ?? '—'}</div>
-              <div><IconCalendar /> Créée le {cls.created_at ? dateFmt.format(new Date(cls.created_at)) : '—'}</div>
-            </div>
-            <Button variant="secondary" size="large" onClick={() => setTab('students')}>
-              Gérer la classe
-            </Button>
-          </div>
-
-          <div className="cd-aside-card">
-            <h3 className="cd-aside-card-title">Actions rapides</h3>
-            <QuickAction
-              icon={<IconPlus />}
-              label="Créer une évaluation"
-              onClick={() => navigate('/evaluations/nouvelle')}
-            />
-            <QuickAction
-              icon={<IconUsers />}
-              label="Voir les apprenants"
-              onClick={() => setTab('students')}
-            />
-            <QuickAction
-              icon={<IconStats />}
-              label="Voir les statistiques"
-              onClick={() => setTab('stats')}
-            />
-          </div>
-        </aside>
+        {tab === 'evaluations' && (
+          <EvaluationsTab
+            evaluations={evalList}
+            summary={summary}
+            pending={evaluations.isPending}
+            onNew={newEvaluation}
+          />
+        )}
       </div>
     </>
+  );
+}
+
+function Overview({
+  classroom,
+  students,
+  studentsPending,
+  summary,
+  evaluationsCount,
+  evaluationsPending,
+  onTab,
+  onNew,
+}) {
+  const { running, upcoming, done, rated, successRate } = summary;
+  const drafts = upcoming.filter((e) => e.status === 'draft').length;
+  const roster = students.slice(0, 8);
+
+  let upcomingHint = 'rien de prévu';
+  if (drafts) upcomingHint = `dont ${plural(drafts, 'brouillon')} non publié${drafts > 1 ? 's' : ''}`;
+  else if (upcoming.length) upcomingHint = 'toutes publiées';
+
+  return (
+    <div className="classe-apercu">
+      <div className="stats">
+        <Stat
+          label="Apprenants"
+          value={classroom.students_count}
+          hint="Voir la liste"
+          onClick={() => onTab('apprenants')}
+        />
+        <Stat
+          label="Épreuves"
+          value={evaluationsPending ? '…' : evaluationsCount}
+          hint="Voir toutes les épreuves"
+          onClick={() => onTab('evaluations')}
+        />
+        <Stat
+          label="À venir"
+          value={upcoming.length}
+          hint={upcomingHint}
+          tone={drafts ? 'attention' : undefined}
+        />
+        <Stat
+          label="Réussite moyenne"
+          value={formatPercent(successRate)}
+          hint={
+            rated.length
+              ? `sur ${plural(rated.length, 'épreuve')} corrigée${rated.length > 1 ? 's' : ''}`
+              : 'aucune épreuve corrigée'
+          }
+        />
+      </div>
+
+      <div className="classe-grille">
+        <div className="classe-colonne">
+          {running.length > 0 && (
+            <section>
+              <header className="section-head">
+                <h2 className="section-title">En cours maintenant</h2>
+              </header>
+              <EvaluationList items={running} />
+            </section>
+          )}
+
+          <section>
+            <header className="section-head">
+              <h2 className="section-title">À venir</h2>
+              <button type="button" className="cd-link" onClick={onNew}>
+                Préparer une épreuve
+              </button>
+            </header>
+            {evaluationsPending ? (
+              <Loading />
+            ) : upcoming.length ? (
+              <EvaluationList items={upcoming.slice(0, 5)} />
+            ) : (
+              <p className="sub classe-vide">Aucune épreuve prévue pour cette classe.</p>
+            )}
+          </section>
+
+          <section>
+            <header className="section-head">
+              <h2 className="section-title">Derniers résultats</h2>
+              {done.length > 4 && (
+                <button type="button" className="cd-link" onClick={() => onTab('evaluations')}>
+                  Tout voir
+                </button>
+              )}
+            </header>
+            {evaluationsPending ? (
+              <Loading />
+            ) : done.length ? (
+              <EvaluationList items={done.slice(0, 4)} showRate />
+            ) : (
+              <p className="sub classe-vide">
+                Les résultats apparaîtront ici après la première épreuve terminée.
+              </p>
+            )}
+          </section>
+        </div>
+
+        <aside className="classe-aside">
+          <header className="section-head">
+            <h2 className="section-title">Apprenants</h2>
+            <span className="section-count">{classroom.students_count}</span>
+          </header>
+          {studentsPending && <Loading />}
+          {!studentsPending && students.length === 0 && (
+            <p className="sub classe-vide">Aucun apprenant inscrit.</p>
+          )}
+          <ul className="classe-roster">
+            {roster.map((student) => (
+              <li key={student.id}>
+                <span className="classe-roster-nom">{student.full_name}</span>
+                <span className="sub mono">{student.matricule ?? student.email}</span>
+              </li>
+            ))}
+          </ul>
+          {students.length > 0 && (
+            <button type="button" className="cd-link" onClick={() => onTab('apprenants')}>
+              {students.length > roster.length
+                ? `Voir les ${students.length} apprenants`
+                : 'Voir la liste détaillée'}
+            </button>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function SuccessMeter({ value }) {
+  if (value === null || value === undefined) return <span className="sub">-</span>;
+  return (
+    <span className="classe-meter" title={`${formatPercent(value)} des points obtenus`}>
+      <span className="classe-meter-barre" aria-hidden="true">
+        <span style={{ width: `${Math.min(100, value)}%` }} />
+      </span>
+      <span className="classe-meter-valeur">{formatPercent(value)}</span>
+    </span>
+  );
+}
+
+function EvaluationList({ items, showRate = false }) {
+  const navigate = useNavigate();
+  return (
+    <ul className="classe-evals">
+      {items.map((evaluation) => {
+        const action = primaryAction(evaluation);
+        const rated = evaluation.success_rate !== null && evaluation.success_rate !== undefined;
+        return (
+          <li key={evaluation.id}>
+            <div className="classe-evals-corps">
+              <Link to={action.to} className="classe-evals-titre">
+                {evaluation.title}
+              </Link>
+              <span className="sub">
+                {[
+                  EVAL_KIND_LABELS[evaluation.kind],
+                  evaluation.scheduled_start ? formatSchedule(evaluation) : 'sans date',
+                  evaluation.exercises_count
+                    ? plural(evaluation.exercises_count, 'exercice')
+                    : 'aucun exercice',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </div>
+            {showRate && rated ? (
+              <SuccessMeter value={evaluation.success_rate} />
+            ) : (
+              <Status tone={STATUS_TONES[evaluation.status]}>
+                {STATUS_LABELS[evaluation.status]}
+              </Status>
+            )}
+            <Button variant="secondary" size="small" onClick={() => navigate(action.to)}>
+              {action.label}
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function StudentsTab({ students, pending, error }) {
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLowerCase();
+  const shown = query
+    ? students.filter((s) =>
+        `${s.full_name} ${s.matricule ?? ''} ${s.email}`.toLowerCase().includes(query),
+      )
+    : students;
+
+  return (
+    <section>
+      <header className="section-head">
+        <h2 className="section-title">Apprenants inscrits</h2>
+        <span className="section-count">{students.length}</span>
+        {students.length > 0 && (
+          <input
+            type="search"
+            className="search-input"
+            aria-label="Rechercher un apprenant"
+            placeholder="Nom, matricule ou e-mail"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        )}
+      </header>
+
+      {error && <Alert>{error.message}</Alert>}
+      {pending && <Loading />}
+
+      {!pending && students.length === 0 && (
+        <p className="sub classe-table-vide">Aucun apprenant inscrit dans cette classe.</p>
+      )}
+      {!pending && students.length > 0 && shown.length === 0 && (
+        <p className="sub classe-table-vide">Aucun apprenant ne correspond à « {search} ».</p>
+      )}
+
+      {shown.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Matricule</th>
+                <th>E-mail</th>
+                <th>Compte</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((student) => (
+                <tr key={student.id}>
+                  <td>
+                    <span className="cell-title">{student.full_name}</span>
+                  </td>
+                  <td className="mono">{student.matricule ?? '-'}</td>
+                  <td className="cell-muted">{student.email}</td>
+                  <td>
+                    <Status tone={student.is_active ? 'success' : 'neutral'}>
+                      {student.is_active ? 'Actif' : 'Désactivé'}
+                    </Status>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EvaluationsTab({ evaluations, summary, pending, onNew }) {
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState(null);
+  const groups = { upcoming: summary.upcoming, running: summary.running, done: summary.done };
+  const rows = filter ? groups[filter] : evaluations;
+
+  if (pending) return <Loading />;
+
+  if (evaluations.length === 0) {
+    return (
+      <EmptyState
+        title="Aucune épreuve pour cette classe"
+        action={<Button onClick={onNew}>+ Nouvelle évaluation</Button>}
+      >
+        Préparez une évaluation : elle sera affectée d'office à cette classe.
+      </EmptyState>
+    );
+  }
+
+  return (
+    <section>
+      <header className="section-head">
+        <h2 className="section-title">Épreuves de la classe</h2>
+        <Segmented
+          label="Filtrer les épreuves"
+          allLabel="Toutes"
+          value={filter}
+          onChange={setFilter}
+          options={EVAL_FILTERS.map((option) => ({
+            ...option,
+            count: groups[option.value].length,
+          }))}
+        />
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="sub classe-table-vide">Aucune épreuve dans cette catégorie.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Épreuve</th>
+                <th>Date</th>
+                <th>Statut</th>
+                <th className="num">Participants</th>
+                <th>Réussite</th>
+                <th aria-label="Action" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((evaluation) => {
+                const action = primaryAction(evaluation);
+                return (
+                  <tr
+                    key={evaluation.id}
+                    className="row-link"
+                    onClick={() => navigate(action.to)}
+                  >
+                    <td>
+                      <span className="cell-title">{evaluation.title}</span>
+                      <span className="sub">
+                        {EVAL_KIND_LABELS[evaluation.kind]} ·{' '}
+                        {plural(evaluation.exercises_count, 'exercice')}
+                      </span>
+                    </td>
+                    <td className="cell-muted">
+                      {evaluation.scheduled_start ? formatSchedule(evaluation) : 'sans date'}
+                    </td>
+                    <td>
+                      <Status tone={STATUS_TONES[evaluation.status]}>
+                        {STATUS_LABELS[evaluation.status]}
+                      </Status>
+                    </td>
+                    <td className="num">{evaluation.participants_count}</td>
+                    <td>
+                      <SuccessMeter value={evaluation.success_rate} />
+                    </td>
+                    <td className="actions">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(action.to);
+                        }}
+                      >
+                        {action.label}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

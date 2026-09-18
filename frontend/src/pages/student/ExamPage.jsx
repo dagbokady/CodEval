@@ -152,8 +152,23 @@ function Exam({ evaluationId, data }) {
     data.submitted_at ? { reason: 'submitted', at: data.submitted_at } : null,
   );
 
+  // La confirmation de soumission s'affiche dans la page : une boîte native
+  // (`window.confirm`) fait sortir le navigateur du plein écran et masque la
+  // page un instant, ce que la surveillance comptait comme une sortie
+  // d'épreuve : la copie était figée avant d'avoir été envoyée.
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const versions = useRef({});
-  const dirty = useRef(new Set());
+  // Un brouillon restauré depuis le poste (page rechargée) n'a pas encore été
+  // transmis : il part avec le prochain envoi, comme une frappe.
+  const dirty = useRef(
+    new Set(
+      data.exercises
+        .filter((item) => edits[item.id] !== undefined)
+        .map((item) => item.id),
+    ),
+  );
   const localTimer = useRef(null);
   const lastReport = useRef(0);
   const leaveTimer = useRef(null);
@@ -182,7 +197,7 @@ function Exam({ evaluationId, data }) {
   const { secondsLeft, resync } = useServerCountdown(data.seconds_left, !submittedAt && !locked);
 
   const send = useCallback(
-    async (exerciseId, code) => {
+    async (exerciseId, code, { quiet = false } = {}) => {
       try {
         const res = await api(`/api/me/evaluations/${evaluationId}/exercises/${exerciseId}`, {
           method: 'PUT',
@@ -194,6 +209,9 @@ function Exam({ evaluationId, data }) {
         setError(null);
         return true;
       } catch (err) {
+        // En resynchronisation, un refus définitif (exercice disparu, copie déjà
+        // rendue, épreuve close) n'est pas une erreur à montrer ni à retenter.
+        if (quiet && (err.status === 404 || err.status === 409)) return true;
         setError(err.message);
         return false;
       }
@@ -224,11 +242,18 @@ function Exam({ evaluationId, data }) {
   const syncPending = useCallback(async () => {
     // 1. Snapshot final (timer expiré hors ligne) : envoyer chaque exercice
     const snapshot = readFinalSnapshot(evaluationId);
-    if (snapshot) {
+    if (snapshot && submittedAt) {
+      // Copie déjà rendue : le serveur refuserait chaque envoi.
+      clearFinalSnapshot(evaluationId);
+    } else if (snapshot) {
       let allSent = true;
-      for (const [exerciseId, code] of Object.entries(snapshot.edits)) {
+      // Un instantané peut dater d'une version antérieure de l'épreuve : ses
+      // exercices n'existent plus, et les renvoyer affichait « Exercice introuvable ».
+      const known = new Set(data.exercises.map((item) => String(item.id)));
+      for (const [exerciseId, code] of Object.entries(snapshot.edits ?? {})) {
+        if (!known.has(String(exerciseId))) continue;
         if (code == null || !code.trim()) continue;
-        const ok = await send(exerciseId, code);
+        const ok = await send(exerciseId, code, { quiet: true });
         if (!ok) allSent = false;
       }
       if (allSent) {
@@ -255,7 +280,7 @@ function Exam({ evaluationId, data }) {
       } catch { /* sera retenté au prochain retour en ligne */ }
     }
 
-  }, [evaluationId, data.exercises, send, flush]);
+  }, [evaluationId, data.exercises, send, submittedAt]);
 
   // Suivi de l'état de connexion et synchronisation au retour en ligne
   useEffect(() => {
@@ -455,6 +480,9 @@ function Exam({ evaluationId, data }) {
     });
     writeFinalSnapshot(evaluationId, allEdits);
 
+    // L'écran de fin reste affiché : il confirme la remise et, hors ligne, il
+    // demande de garder la page ouverte jusqu'à l'envoi.
+    guardSuspended.current = true;
     if (navigator.onLine) {
       flush().then((complete) => {
         if (complete) {
@@ -463,15 +491,13 @@ function Exam({ evaluationId, data }) {
         }
         if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
         setFinished({ reason: 'expired', at: new Date().toISOString() });
-        navigate('/mes-evaluations', { replace: true });
       });
     } else {
       // Hors ligne : le snapshot local est déjà écrit, il sera envoyé au retour
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
       setFinished({ reason: 'expired', at: new Date().toISOString() });
-      navigate('/mes-evaluations', { replace: true });
     }
-  }, [secondsLeft, submittedAt, locked, flush, evaluationId, data.exercises, codeOf, navigate]);
+  }, [secondsLeft, submittedAt, locked, flush, evaluationId, data.exercises, codeOf]);
 
   const onChange = useCallback(
     (value) => {
@@ -496,7 +522,7 @@ function Exam({ evaluationId, data }) {
     [exercise?.language],
   );
   /* L'éditeur suit le thème de l'application : figé en clair, il écrivait du
-     texte sombre sur un fond sombre — l'apprenant ne voyait plus sa frappe. */
+     texte sombre sur un fond sombre : l'apprenant ne voyait plus sa frappe. */
   const { theme } = useTheme();
   /* Le barème de l'épreuve ne change pas pendant qu'on compose : on le calcule
      une fois, sinon la feuille de gauche se refait à chaque frappe. */
@@ -531,34 +557,35 @@ function Exam({ evaluationId, data }) {
   }
 
   async function submit() {
+    // Pendant l'envoi, la surveillance se tait : la sortie du plein écran qui
+    // suit la remise de la copie n'est pas une sortie d'épreuve.
     guardSuspended.current = true;
-    const confirmed = window.confirm(
-      'Soumettre définitivement votre travail ? Vous ne pourrez plus le modifier.',
-    );
-    setTimeout(() => {
+    setSubmitting(true);
+    const resumeGuard = () => {
       guardSuspended.current = false;
-    }, LEAVE_GRACE_MS);
-    if (!confirmed) return;
+      setSubmitting(false);
+      setConfirmSubmit(false);
+    };
     const complete = await flush();
     if (!complete) {
       // Le brouillon local reste en place : rien n'est effacé tant que le serveur n'a pas reçu.
+      resumeGuard();
       setError("L'envoi de votre travail a échoué : vérifiez la connexion avant de soumettre.");
       return;
     }
     try {
       const res = await api(`/api/me/evaluations/${evaluationId}/submit`, { method: 'POST' });
-      setSubmittedAt(res.submitted_at);
       clearDrafts(evaluationId, data.exercises.map((item) => item.id));
-      leaveFullscreen();
+      setSubmittedAt(res.submitted_at);
       setFinished({ reason: 'submitted', at: res.submitted_at });
-      navigate('/mes-evaluations', { replace: true });
+      leaveFullscreen();
     } catch (err) {
       if (err.status === 409) {
-        leaveFullscreen();
         setFinished({ reason: 'submitted', at: new Date().toISOString() });
-        navigate('/mes-evaluations', { replace: true });
+        leaveFullscreen();
         return;
       }
+      resumeGuard();
       setError(err.message);
     }
   }
@@ -566,9 +593,10 @@ function Exam({ evaluationId, data }) {
   const [showSubject, setShowSubject] = useState(false);
 
   const remaining = maxIncidents ? Math.max(0, maxIncidents - incidents) : null;
+  const treatedCount = data.exercises.filter((item) => answered(item.id)).length;
 
   if (finished) {
-    const treated = data.exercises.filter((item) => answered(item.id)).length;
+    const treated = treatedCount;
     return (
       <div className="exam exam-done">
         <header className="exam-topbar">
@@ -642,7 +670,11 @@ function Exam({ evaluationId, data }) {
         >
           {formatDuration(secondsLeft)}
         </span>
-        {allowSubmit && !submittedAt && !locked && <Button onClick={submit}>Soumettre</Button>}
+        {allowSubmit && !submittedAt && !locked && (
+          <Button onClick={() => setConfirmSubmit(true)} disabled={submitting}>
+            Soumettre
+          </Button>
+        )}
       </header>
 
       {/* La navigation entre exercices tient sur une réglette : pendant
@@ -658,7 +690,7 @@ function Exam({ evaluationId, data }) {
               type="button"
               className={`exam-pastille ${answered(item.id) ? 'done' : ''}`}
               aria-current={item.id === current && !showSubject}
-              title={`Exercice ${index + 1} — ${item.points} pts`}
+              title={`Exercice ${index + 1} : ${item.points} pts`}
               onClick={() => { setCurrentId(item.id); setShowSubject(false); }}
             >
               {index + 1}
@@ -752,7 +784,7 @@ function Exam({ evaluationId, data }) {
                   </span>
                   {!online && (
                     <span style={{ color: 'var(--exam-timer, #c0392b)', fontWeight: 600 }} aria-live="assertive">
-                      Hors ligne — sauvegarde locale active
+                      Hors ligne : sauvegarde locale active
                     </span>
                   )}
                   <span aria-live="polite">
@@ -801,6 +833,40 @@ function Exam({ evaluationId, data }) {
         </div>
       )}
 
+      {confirmSubmit && !paused && !locked && !awaitingFullscreen && (
+        <div
+          className="exam-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-submit-title"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && !submitting) setConfirmSubmit(false);
+          }}
+        >
+          <div className="exam-overlay-card">
+            <h2 id="confirm-submit-title">Soumettre votre copie ?</h2>
+            <p>
+              {treatedCount} exercice{treatedCount > 1 ? 's' : ''} traité
+              {treatedCount > 1 ? 's' : ''} sur {data.exercises.length}. Une fois soumise, la
+              copie ne peut plus être modifiée.
+            </p>
+            <div className="exam-overlay-actions">
+              <Button
+                variant="secondary"
+                disabled={submitting}
+                onClick={() => setConfirmSubmit(false)}
+                autoFocus
+              >
+                Continuer l'épreuve
+              </Button>
+              <Button onClick={submit} disabled={submitting}>
+                {submitting ? 'Envoi…' : 'Soumettre définitivement'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {awaitingFullscreen && !paused && !locked && (
         <div className="exam-overlay" role="dialog" aria-modal="true">
           <div className="exam-overlay-card">
@@ -840,12 +906,12 @@ function Exam({ evaluationId, data }) {
 
 /**
  * La feuille de composition, à gauche de l'écran : le sujet tel qu'il est
- * distribué sur papier — en-tête de l'épreuve, énoncé de l'exercice en cours,
+ * distribué sur papier : en-tête de l'épreuve, énoncé de l'exercice en cours,
  * code de départ, exigences du barème.
  *
  * Elle est figée. L'apprenant écrit à droite, et rien de ce qu'il tape ne
  * touche à cette feuille : ni le code de départ, qui reste celui de l'énoncé,
- * ni sa position de lecture. D'où le `memo` — les props ne changent qu'en
+ * ni sa position de lecture. D'où le `memo` : les props ne changent qu'en
  * changeant d'exercice, jamais à la frappe.
  */
 const FeuilleDeComposition = memo(function FeuilleDeComposition({
@@ -1016,7 +1082,7 @@ function TrueFalseStudent({ exercise, value, onChange, readOnly }) {
 
 /**
  * Question-réponse : une zone de rédaction. La réponse est enregistrée telle
- * quelle, comme le code d'un exercice pratique — pas de JSON à relire.
+ * quelle, comme le code d'un exercice pratique : pas de JSON à relire.
  */
 function ShortAnswerQuestion({ value, onChange, readOnly }) {
   return (
@@ -1084,7 +1150,9 @@ function QuestionsStudent({ exercise, value, onChange, readOnly }) {
     <div style={{ padding: 20, display: 'grid', gap: 18, overflowY: 'auto' }}>
       {questions.map((question, rank) => (
         <section key={rank} style={{ display: 'grid', gap: 10 }}>
-          <p style={{ fontSize: 14, fontWeight: 600 }}>
+          {/* pre-wrap : une question peut citer un programme, ses retours à la
+              ligne et son indentation doivent survivre. */}
+          <p style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'pre-wrap' }}>
             {questions.length > 1 && `${rank + 1}. `}
             {question.text || <em className="sub">(question sans énoncé)</em>}
           </p>

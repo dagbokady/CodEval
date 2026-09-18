@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAction, useEvaluation, useSessionMonitor } from '../../api/hooks';
 import { Alert, Button, Chips, Loading, PageHeader, Stat, Tag } from '../../components/ui';
+import { SubjectSheet } from '../../components/SubjectSheet';
+import { useAuth } from '../../auth';
+import { evaluationUsesLanguage } from '../../exerciseTypes';
 import { STATUS_LABELS, STATUS_TONES, formatDuration, formatRelative } from '../../format';
 import { secondsUntil, useNow } from '../../useNow';
 
@@ -18,6 +21,10 @@ export default function SessionMonitorPage() {
   const evaluation = useEvaluation(evaluationId);
   const [filter, setFilter] = useState(null);
   const [error, setError] = useState(null);
+  // Le sujet reste consultable pendant l'épreuve : l'enseignant répond aux
+  // questions de la salle en ayant la feuille sous les yeux.
+  const [showSubject, setShowSubject] = useState(false);
+  const { organization } = useAuth();
   const running = evaluation.data?.status === 'running';
   const monitor = useSessionMonitor(evaluationId, true);
   // Décompte dérivé de l'échéance serveur : aucune horloge locale à resynchroniser.
@@ -55,6 +62,13 @@ export default function SessionMonitorPage() {
         title="Suivi de session"
       >
         <Tag tone={STATUS_TONES[data.status]}>{STATUS_LABELS[data.status]}</Tag>
+        <Button
+          variant="secondary"
+          aria-pressed={showSubject}
+          onClick={() => setShowSubject((shown) => !shown)}
+        >
+          {showSubject ? 'Masquer le sujet' : 'Voir le sujet'}
+        </Button>
         {running && (
           <>
             <Button
@@ -82,8 +96,30 @@ export default function SessionMonitorPage() {
 
       <div className="content">
         <Alert>{error}</Alert>
+        {showSubject && (
+          <div className="exam-subject-panel session-subject">
+            <div className="sheet-paper">
+              <SubjectSheet
+                organization={organization}
+                classroom={evaluation.data.classroom_name}
+                subject={evaluation.data.subject_name}
+                title={evaluation.data.title}
+                instructions={evaluation.data.instructions}
+                durationMinutes={evaluation.data.duration_minutes}
+                language={
+                  evaluationUsesLanguage(evaluation.data.exercises ?? [])
+                    ? evaluation.data.language
+                    : null
+                }
+                date={evaluation.data.scheduled_start}
+                exercises={evaluation.data.exercises ?? []}
+                emptyLabel="Cette épreuve ne contient aucun exercice."
+              />
+            </div>
+          </div>
+        )}
         <div className="cards" style={{ marginBottom: 16 }}>
-          <Stat label="Temps restant" value={running ? formatDuration(countdown) : '—'} />
+          <Stat label="Temps restant" value={running ? formatDuration(countdown) : '-'} />
           <Stat label="Connectés" value={`${data.connected} / ${data.total}`} />
           <Stat label="Ont soumis" value={data.submitted} />
           <Stat label="Dernière sauvegarde" value={formatRelative(data.last_save)} />
@@ -91,7 +127,7 @@ export default function SessionMonitorPage() {
         </div>
       </div>
 
-      <Chips label="Filtrer :" value={filter} onChange={setFilter} options={FILTERS} />
+      <Chips label="Filtrer :" allLabel="Tous" value={filter} onChange={setFilter} options={FILTERS} />
 
       <div className="table-wrap">
         <table>
@@ -110,7 +146,7 @@ export default function SessionMonitorPage() {
               <tr key={p.participation_id}>
                 <td>
                   <div>{p.full_name}</div>
-                  <div className="sub">{p.matricule ?? '—'}</div>
+                  <div className="sub">{p.matricule ?? '-'}</div>
                 </td>
                 <td>
                   <Tag tone={p.connected ? 'success' : 'neutral'}>
@@ -120,9 +156,9 @@ export default function SessionMonitorPage() {
                 <td>{p.exercises_done} / {evaluation.data.exercises_count}</td>
                 <td>{formatRelative(p.last_saved_at)}</td>
                 <td>
-                  {p.incidents > 0 ? <Tag tone="danger">{p.incidents}</Tag> : <span className="sub">—</span>}
+                  {p.incidents > 0 ? <Tag tone="danger">{p.incidents}</Tag> : <span className="sub">-</span>}
                 </td>
-                <td>{p.submitted_at ? `Soumis · ${formatRelative(p.submitted_at)}` : '—'}</td>
+                <td>{p.submitted_at ? `Soumis · ${formatRelative(p.submitted_at)}` : '-'}</td>
               </tr>
             ))}
             {participants.length === 0 && (

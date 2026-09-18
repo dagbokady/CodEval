@@ -15,8 +15,8 @@ import {
 import { EVAL_KIND_LABELS } from '../../format';
 
 /**
- * La banque d'évaluations : des épreuves entières — énoncés, jeux de tests,
- * barèmes — rangées pour resservir. On n'y travaille jamais directement sur un
+ * La banque d'évaluations : des épreuves entières (énoncés, jeux de tests,
+ * barèmes) rangées pour resservir. On n'y travaille jamais directement sur un
  * modèle : « Utiliser » en tire une copie, qui part en brouillon et vit ensuite
  * sa propre vie, sans que le modèle en soit affecté.
  */
@@ -47,6 +47,7 @@ export default function BankEvaluationsPage() {
 
       <Chips
         label="Matière :"
+        allLabel="Toutes"
         value={subjectId}
         onChange={(value) => {
           setSubjectId(value);

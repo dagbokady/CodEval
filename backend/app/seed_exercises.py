@@ -1,8 +1,8 @@
 """Deux exercices de TD prêts à l'emploi : python -m app.seed_exercises
 
 `seed.py` laisse volontairement la banque vide. Ce script y ajoute les exercices
-10 et 11 du TD de langage C — la calculatrice et le premier contact avec les
-pointeurs — pour qu'une banque fraîchement installée ait de quoi montrer un
+10 et 11 du TD de langage C (la calculatrice et le premier contact avec les
+pointeurs) pour qu'une banque fraîchement installée ait de quoi montrer un
 barème complet : des tests sur le programme entier d'un côté, une déclaration
 contrôlée de l'autre.
 
@@ -62,7 +62,7 @@ POINTEURS = {
         "1. déclarerez un entier i et un pointeur vers un entier, p ;\n"
         "2. initialiserez i à 5 et ferez pointer p sur i ;\n"
         "3. imprimerez la valeur de i ;\n"
-        "4. modifierez l'entier pointé par p pour qu'il vaille 42 — en utilisant p, "
+        "4. modifierez l'entier pointé par p pour qu'il vaille 42 : en utilisant p, "
         "et non pas i ;\n"
         "5. imprimerez la valeur de i une dernière fois.\n\n"
         "Le programme affiche donc deux lignes : 5, puis 42."
@@ -79,7 +79,7 @@ POINTEURS = {
         "}\n"
     ),
     # La déclaration exigée : l'entier i, local à main. Le pointeur, lui, se
-    # vérifie par le résultat — c'est tout l'objet de l'exercice.
+    # vérifie par le résultat : c'est tout l'objet de l'exercice.
     "criteria": [
         {
             "id": "c1",

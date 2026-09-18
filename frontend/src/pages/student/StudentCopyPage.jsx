@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMyCopy } from '../../api/hooks';
 import { Alert, Button, Loading, Tag } from '../../components/ui';
@@ -5,6 +6,7 @@ import { SheetHeader, SheetInstructions } from '../../components/SubjectSheet';
 import GradeMark, { MarginNote } from '../../components/GradeMark';
 import CodeBlock from '../../components/CodeBlock';
 import AnswerBlock from '../../components/CopyAnswer';
+import SolutionBlock from '../../components/SolutionBlock';
 import { useAuth } from '../../auth';
 import { exerciseLabel, formatDateTime, formatScore } from '../../format';
 
@@ -45,6 +47,8 @@ export default function StudentCopyPage() {
   const navigate = useNavigate();
   const { organization } = useAuth();
   const copy = useMyCopy(evaluationId);
+  // Déplier tous les corrigés d'un geste, pour relire la copie avec eux.
+  const [allOpen, setAllOpen] = useState(false);
 
   if (copy.isPending) return <Loading label="Ouverture de votre copie…" />;
   if (copy.error) {
@@ -72,10 +76,22 @@ export default function StudentCopyPage() {
             {formatScore(data.score, data.total_points)}
           </strong>
         )}
+        {data.solutions_available && (
+          <Button variant="secondary" size="small" onClick={() => setAllOpen((v) => !v)}>
+            {allOpen ? 'Masquer les corrigés' : 'Afficher tous les corrigés'}
+          </Button>
+        )}
         <Button variant="secondary" size="small" onClick={() => window.print()}>
           Imprimer
         </Button>
       </div>
+
+      {data.solutions_available && (
+        <Alert tone="info">
+          Le corrigé de chaque exercice est disponible sous votre travail. Comparez-le à votre
+          copie : c'est la meilleure façon de comprendre où les points se sont perdus.
+        </Alert>
+      )}
 
       {!data.published && (
         <Alert tone="info">
@@ -85,6 +101,9 @@ export default function StudentCopyPage() {
       )}
 
       <article className="copy-sheet sujet">
+        {!data.published && (
+          <MarginNote tone="sobre">En attente de publication de la correction.</MarginNote>
+        )}
         <div className="copy-sheet-head">
           <SheetHeader
             organization={organization}
@@ -108,10 +127,6 @@ export default function StudentCopyPage() {
             )}
           </div>
         </div>
-
-        {!data.published && (
-          <MarginNote tone="sobre">En attente de publication de la correction.</MarginNote>
-        )}
 
         <SheetInstructions>{data.instructions}</SheetInstructions>
 
@@ -144,7 +159,7 @@ export default function StudentCopyPage() {
             {sheet.statement && <p className="copy-statement">{sheet.statement}</p>}
 
             {/* Le squelette fourni par l'enseignant n'est pas le travail de
-                l'apprenant : replié, il ne prend pas la place de sa copie —
+                l'apprenant : replié, il ne prend pas la place de sa copie,
                 mais reste consultable pour comprendre l'énoncé. */}
             {sheet.kind === 'code' && sheet.starter_code && (
               <details className="copy-starter">
@@ -205,11 +220,19 @@ export default function StudentCopyPage() {
                 <p>{sheet.appreciation}</p>
               </div>
             )}
+
+            {data.solutions_available && (
+              <SolutionBlock
+                key={`${sheet.exercise_id}-${allOpen}`}
+                sheet={sheet}
+                defaultOpen={allOpen}
+              />
+            )}
           </section>
         ))}
 
         <footer className="copy-sheet-footer">
-          — Fin de la copie — {data.exercises.length} exercice
+          Fin de la copie · {data.exercises.length} exercice
           {data.exercises.length !== 1 ? 's' : ''}
           {data.submitted_at ? ` · rendue le ${formatDateTime(data.submitted_at)}` : ''}
         </footer>

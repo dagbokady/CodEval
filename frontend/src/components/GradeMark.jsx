@@ -1,5 +1,5 @@
 /**
- * La note portée sur la copie, à la main, au stylo rouge — comme une copie
+ * La note portée sur la copie, à la main, au stylo rouge : comme une copie
  * corrigée sur papier : le numérateur en haut, la barre en travers, le total en
  * bas. C'est la première chose qu'on cherche en ouvrant sa copie ; elle ne se
  * lit pas dans un bandeau gris parmi d'autres champs.
@@ -25,7 +25,7 @@ export default function GradeMark({ score, total, size = 'md', pending = false, 
       aria-label={label ?? text}
     >
       <span className="note-main-num" aria-hidden="true">
-        {written ? inked(score) : '—'}
+        {written ? inked(score) : '-'}
       </span>
       <span className="note-main-barre" aria-hidden="true" />
       <span className="note-main-den" aria-hidden="true">

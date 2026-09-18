@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { HOME_BY_ROLE, useAuth } from '../auth';
-import { Alert, Button, Field } from '../components/ui';
+import { Alert, Button, Field, PasswordInput } from '../components/ui';
+import { useDocumentTitle } from '../useDocumentTitle';
 
 export default function LoginPage() {
+  useDocumentTitle('Connexion');
   const { status, user, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +19,10 @@ export default function LoginPage() {
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (!form.email.trim() || !form.password) {
+      setError('Renseignez votre e-mail et votre mot de passe.');
+      return;
+    }
     setError(null);
     setPending(true);
     try {
@@ -31,17 +37,12 @@ export default function LoginPage() {
 
   return (
     <div className="auth">
-      <aside className="auth-brand">
+      <header className="auth-top">
         <div className="brand">
           <span className="brand-icon" aria-hidden="true">&lt;/&gt;</span>
           CodEval
         </div>
-        <h2>La plateforme d'évaluation du code pour l'enseignement supérieur</h2>
-        <p>
-          Créez des épreuves de programmation, corrigez automatiquement les productions et suivez
-          les résultats de vos classes.
-        </p>
-      </aside>
+      </header>
       <div className="auth-zone">
         <form className="auth-card" onSubmit={onSubmit} noValidate>
           <h1>Connexion</h1>
@@ -52,15 +53,16 @@ export default function LoginPage() {
               id="email"
               type="email"
               autoComplete="email"
+              inputMode="email"
+              autoFocus
               required
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
             />
           </Field>
           <Field label="Mot de passe" id="password">
-            <input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="current-password"
               required
               value={form.password}

@@ -1,15 +1,13 @@
-import { useAuth } from '../../auth';
 import { useEvaluations } from '../../api/hooks';
 import { EmptyState, Loading, PageHeader, Tag } from '../../components/ui';
 import { STATUS_LABELS, STATUS_TONES, formatSchedule } from '../../format';
 
 export default function StatsPage() {
-  const { organization } = useAuth();
   const evaluations = useEvaluations({ group: 'corrected', page: 1 });
 
   return (
     <>
-      <PageHeader breadcrumb={organization} title="Statistiques" />
+      <PageHeader breadcrumb="Espace enseignant" title="Statistiques" />
       <div className="content">
         <h2 style={{ fontSize: 15, marginBottom: 10 }}>Évaluations corrigées</h2>
         {evaluations.isPending && <Loading />}
@@ -35,10 +33,10 @@ export default function StatsPage() {
                 {evaluations.data.items.map((evaluation) => (
                   <tr key={evaluation.id}>
                     <td>{evaluation.title}</td>
-                    <td className="sub">{evaluation.classroom_name ?? '—'}</td>
+                    <td className="sub">{evaluation.classroom_name ?? '-'}</td>
                     <td>{evaluation.participants_count}</td>
                     <td className="sub">{formatSchedule(evaluation)}</td>
-                    <td>{evaluation.success_rate !== null ? `${evaluation.success_rate} %` : '—'}</td>
+                    <td>{evaluation.success_rate !== null ? `${evaluation.success_rate} %` : '-'}</td>
                     <td>
                       <Tag tone={STATUS_TONES[evaluation.status]}>
                         {STATUS_LABELS[evaluation.status]}

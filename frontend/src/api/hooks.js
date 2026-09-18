@@ -45,6 +45,19 @@ export function useClassrooms() {
   });
 }
 
+/**
+ * Les épreuves de l'enseignant pour une classe : ou pour toutes, afin de
+ * résumer chaque classe dans la liste. Cent suffisent largement à une année.
+ */
+export function useClassroomEvaluations(classroomId) {
+  const params = new URLSearchParams({ page: '1', page_size: '100' });
+  if (classroomId) params.set('classroom_id', String(classroomId));
+  return useQuery({
+    queryKey: key('evaluations', 'classroom', classroomId ?? 'toutes'),
+    queryFn: () => api(`/api/evaluations?${params}`),
+  });
+}
+
 export function useLanguages() {
   return useQuery({
     queryKey: ['languages'],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -29,6 +30,50 @@ def utcnow() -> datetime:
 
 # JSONB sur PostgreSQL (indexable, stockage binaire), JSON ailleurs.
 JSONColumn = JSON().with_variant(JSONB, "postgresql")
+
+
+class JSONList(TypeDecorator):
+    """Liste JSON, relue en liste quel que soit le type réel de la colonne.
+
+    Les colonnes ajoutées après coup à une base existante le sont en TEXT (voir
+    `db._ADDED_COLUMNS`) : le pilote rend alors la chaîne JSON brute, et un
+    `list(...)` la découpait caractère par caractère.
+    """
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
+
+    def process_result_value(self, value, _dialect):
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except ValueError:
+                return []
+        return _unsplit(value) if isinstance(value, list) else []
+
+
+def _unsplit(value: list) -> list:
+    """Répare une liste abîmée par l'ancien bogue : la chaîne JSON découpée
+    caractère par caractère, parfois plusieurs fois de suite (copie de copie)."""
+    while len(value) > 1 and all(isinstance(c, str) and len(c) == 1 for c in value):
+        try:
+            parsed = json.loads("".join(value))
+        except ValueError:
+            break
+        while isinstance(parsed, str):
+            try:
+                parsed = json.loads(parsed)
+            except ValueError:
+                break
+        if not isinstance(parsed, list):
+            break
+        value = parsed
+    return value
 
 
 class UTCDateTime(TypeDecorator):
@@ -69,6 +114,7 @@ class EvaluationStatus(str, enum.Enum):
     CORRECTING = "correcting"    # En correction
     CORRECTED = "corrected"      # Corrigée
     VALIDATED = "validated"      # Validée / Archivée
+    CANCELLED = "cancelled"      # Annulée : gardée dans l'historique, hors notes et moyennes
 
 
 class RunStatus(str, enum.Enum):
@@ -187,7 +233,7 @@ class Evaluation(Base, TimestampMixin):
     total_points: Mapped[float] = mapped_column(Float, default=20.0)
     rules: Mapped[dict] = mapped_column(JSONColumn, default=dict)  # fullscreen, block_paste, allow_submit
     # Modèle de la banque d'évaluations : une épreuve complète mise de côté pour
-    # être réutilisée. Elle n'est jamais passée par un apprenant — on en tire une
+    # être réutilisée. Elle n'est jamais passée par un apprenant : on en tire une
     # copie, qui vit ensuite sa propre vie.
     is_template: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -241,11 +287,11 @@ class TestCase(Base):
     target_id: Mapped[str | None] = mapped_column(String(24), nullable=True, default=None)
     # Types des valeurs d'entrée, pour un test de programme entier. Un test
     # d'appel les tient du critère qu'il vise.
-    input_types: Mapped[list] = mapped_column(JSONColumn, default=list)
+    input_types: Mapped[list] = mapped_column(JSONList, default=list)
     # Type de la valeur attendue : il décide du champ de saisie de l'enseignant.
     expected_type: Mapped[str] = mapped_column(String(20), default="string")
     # Valeurs d'entrée typées, dans l'ordre des types déclarés.
-    args: Mapped[list] = mapped_column(JSONColumn, default=list)
+    args: Mapped[list] = mapped_column(JSONList, default=list)
 
     exercise: Mapped[Exercise] = relationship(back_populates="tests")
 
@@ -292,9 +338,9 @@ class BankTestCase(Base):
     points: Mapped[float] = mapped_column(Float, default=1.0)
     timeout_ms: Mapped[int] = mapped_column(Integer, default=2000)
     target_id: Mapped[str | None] = mapped_column(String(24), nullable=True, default=None)
-    input_types: Mapped[list] = mapped_column(JSONColumn, default=list)
+    input_types: Mapped[list] = mapped_column(JSONList, default=list)
     expected_type: Mapped[str] = mapped_column(String(20), default="string")
-    args: Mapped[list] = mapped_column(JSONColumn, default=list)
+    args: Mapped[list] = mapped_column(JSONList, default=list)
 
     exercise: Mapped[BankExercise] = relationship(back_populates="tests")
 

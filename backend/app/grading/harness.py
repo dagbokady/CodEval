@@ -1,7 +1,7 @@
 """Types des valeurs de test, et harnais d'appel de fonction.
 
 Un test d'exécution porte des **valeurs**, pas du texte à mettre en forme : ses
-types sont déclarés une fois — dans le critère de barème pour un test qui appelle
+types sont déclarés une fois : dans le critère de barème pour un test qui appelle
 une fonction, sur le test lui-même pour un test qui fait tourner le programme
 entier. De ces types on tire deux choses :
 
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 
 
 class HarnessError(ValueError):
-    """Signature ou valeur de test inexploitable — faute de saisie, pas de l'apprenant."""
+    """Signature ou valeur de test inexploitable : faute de saisie, pas de l'apprenant."""
 
 
 @dataclass(frozen=True)
@@ -124,7 +124,7 @@ def literal(vtype: ValueType, value) -> str:
 def stdin_for(types: list, args: list) -> str:
     """Valeurs typées → entrée standard, pour un test du programme entier.
 
-    Un tableau descend sur deux lignes : sa taille, puis ses éléments — la forme
+    Un tableau descend sur deux lignes : sa taille, puis ses éléments : la forme
     que prennent les exercices « lisez n, puis n valeurs ».
     """
     lines: list[str] = []
@@ -142,7 +142,7 @@ def stdin_for(types: list, args: list) -> str:
 
 # ----- Génération du programme de test -----
 def declaration_of(sig: dict, variable: str) -> str:
-    """Déclaration du pointeur de fonction attendu — la sonde de signature."""
+    """Déclaration du pointeur de fonction attendu : la sonde de signature."""
     parts: list[str] = []
     for param in sig["params"]:
         vtype = get_type(param["type"])
@@ -177,7 +177,7 @@ def _call(sig: dict, args: list) -> tuple[list[str], str]:
     return setup, f"{sig['name']}({', '.join(passed)})"
 
 
-HARNESS_HEADER = """/* Programme de test engendré par CodEval — ne pas modifier. */
+HARNESS_HEADER = """/* Programme de test engendré par CodEval : ne pas modifier. */
 #define main {student_main}
 #include "{student_file}"
 #undef main

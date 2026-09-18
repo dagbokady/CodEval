@@ -43,6 +43,7 @@ from ..services import (
     close_if_expired,
     freeze,
     get_evaluation,
+    notify,
     require_status,
     resolve_names,
     seconds_left,
@@ -60,6 +61,7 @@ _STATUS_GROUPS = {
         EvaluationStatus.CORRECTING,
         EvaluationStatus.CORRECTED,
         EvaluationStatus.VALIDATED,
+        EvaluationStatus.CANCELLED,
     ],
 }
 
@@ -153,8 +155,12 @@ def list_evaluations(
             .where(CorrectionRun.evaluation_id.in_(ids), CorrectionRun.status == RunStatus.DONE)
             .group_by(CorrectionRun.evaluation_id)
         ).all()
+        # Une épreuve annulée ne compte plus : pas de taux de réussite affiché.
+        cancelled = {e.id for e in rows if e.status is EvaluationStatus.CANCELLED}
         rates = {
-            eid: round((auto or 0) / mx * 100, 1) for eid, auto, mx in rate_rows if mx
+            eid: round((auto or 0) / mx * 100, 1)
+            for eid, auto, mx in rate_rows
+            if mx and eid not in cancelled
         }
     return Page(
         items=[_to_out(db, e, counts, exercises, rates).model_dump() for e in rows],
@@ -232,7 +238,7 @@ def _clone(
     classroom_id: int | None = None,
     scheduled_start=None,
 ) -> Evaluation:
-    """Recopie une épreuve entière — énoncés, jeux de tests, barèmes — dans une
+    """Recopie une épreuve entière (énoncés, jeux de tests, barèmes) dans une
     nouvelle épreuve indépendante. La copie repart toujours en brouillon : rien
     de la session d'origine (dates, participants, corrections) ne la suit."""
     copy = Evaluation(
@@ -319,7 +325,7 @@ def list_templates(
 ) -> Page:
     """La banque d'évaluations : les épreuves mises de côté pour resservir.
 
-    Un modèle est partagé avec toute l'organisation — un enseignant en tire une
+    Un modèle est partagé avec toute l'organisation : un enseignant en tire une
     copie sans jamais toucher à l'original."""
     filters = [
         Evaluation.organization_id == user.organization_id,
@@ -546,6 +552,56 @@ def publish(evaluation_id: int, user: TeacherUser, db: DbSession) -> EvaluationD
     evaluation.status = EvaluationStatus.SCHEDULED
     log(db, user, user.organization_id, "evaluation.published", "evaluation", evaluation.id,
         participants=created)
+    db.commit()
+    db.refresh(evaluation)
+    return _detail(db, evaluation)
+
+
+# Ce qui peut s'annuler : une épreuve qui a eu lieu ou qui se déroule. Avant, on
+# la supprime simplement.
+_CANCELLABLE = (
+    EvaluationStatus.RUNNING,
+    EvaluationStatus.CLOSED,
+    EvaluationStatus.CORRECTING,
+    EvaluationStatus.CORRECTED,
+    EvaluationStatus.VALIDATED,
+)
+
+
+@router.post("/{evaluation_id}/cancel", response_model=EvaluationDetailOut)
+def cancel(evaluation_id: int, user: TeacherUser, db: DbSession) -> EvaluationDetailOut:
+    """Annuler une épreuve, même terminée ou publiée.
+
+    Rien n'est effacé : copies, corrections et notes restent en base et
+    l'épreuve reste dans l'historique de l'enseignant. Mais elle ne compte plus :
+    les apprenants ne la voient plus dans leurs résultats ni leurs moyennes, et
+    ils sont prévenus.
+    """
+    evaluation = get_evaluation(db, evaluation_id, user)
+    require_status(evaluation, *_CANCELLABLE)
+    previous = evaluation.status
+    now = utcnow()
+    if previous is EvaluationStatus.RUNNING:
+        # Une session en cours s'arrête net : plus aucune écriture acceptée.
+        evaluation.closed_at = now
+        db.execute(
+            Participation.__table__.update()
+            .where(Participation.evaluation_id == evaluation.id,
+                   Participation.frozen_at.is_(None))
+            .values(frozen_at=now)
+        )
+    evaluation.status = EvaluationStatus.CANCELLED
+    log(db, user, user.organization_id, "evaluation.cancelled", "evaluation", evaluation.id,
+        title=evaluation.title, previous=previous.value)
+    for student_id in db.scalars(
+        select(Participation.student_id).where(Participation.evaluation_id == evaluation.id)
+    ):
+        notify(
+            db, student_id,
+            f"Évaluation annulée : {evaluation.title}",
+            "Votre enseignant a annulé cette évaluation. Elle ne compte pas dans vos résultats.",
+            "/mes-evaluations",
+        )
     db.commit()
     db.refresh(evaluation)
     return _detail(db, evaluation)

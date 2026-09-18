@@ -318,7 +318,7 @@ def _check_criterion(
 
     Un algorithme se juge sur le document même de l'apprenant (`document`) : sa
     traduction en Python a perdu les types déclarés et le nom des structures.
-    Une variable locale d'un programme en C se cherche dans le texte — le
+    Une variable locale d'un programme en C se cherche dans le texte : le
     compilateur ne l'expose pas. Tout le reste passe par une sonde : si elle
     compile, la déclaration existe et a le type demandé.
     """
@@ -404,7 +404,7 @@ def _grade_code(
 
     # La syntaxe du fichier est vérifiée d'abord, sans édition de liens : une
     # copie qui ne contient que des fonctions n'a pas de `main`, et ce n'est pas
-    # une faute. En revanche un `;` manquant casse toute l'unité de compilation —
+    # une faute. En revanche un `;` manquant casse toute l'unité de compilation :
     # aucun critère n'est alors jugeable, et le dire une fois vaut mieux que de
     # le répéter à chaque ligne du barème.
     log = _syntax_check(sandbox, source, lang)
@@ -425,7 +425,7 @@ def _grade_code(
         if passed:
             score += share
         elif note:
-            logs.append(f"{describe(criterion)} — {note}")
+            logs.append(f"{describe(criterion)} : {note}")
         details.append(_criterion_detail(criterion, passed, share, note))
 
     functions = function_criteria(exercise)
@@ -489,7 +489,7 @@ def _run_group(
                 return {
                     "score": 0.0,
                     "details": [_failed_detail(t, str(erreur), signature) for t in cases],
-                    "log": f"{signature['name']} — {erreur}",
+                    "log": f"{signature['name']} : {erreur}",
                     "status": ResultStatus.COMPILE_ERROR,
                 }
             ws.write(lang.filename, program)

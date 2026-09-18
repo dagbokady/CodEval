@@ -1,5 +1,5 @@
 /**
- * Catalogue des types de question — source unique de vérité.
+ * Catalogue des types de question : source unique de vérité.
  *
  * Créer une question commence toujours par choisir son type : c'est lui qui
  * décide de l'éditeur proposé à l'enseignant, du rendu sur le sujet, de l'outil
@@ -87,7 +87,7 @@ export const EXERCISE_TYPES = [
   {
     key: 'code',
     badge: 'Code',
-    label: 'Exercice pratique — code',
+    label: 'Exercice pratique : code',
     tagline: 'Programme à écrire',
     description:
       "L'apprenant écrit un programme dans l'éditeur de code. Corrigé par jeux de tests.",
@@ -104,7 +104,7 @@ export const EXERCISE_TYPES = [
   {
     key: 'algo',
     badge: 'Algorithmique',
-    label: 'Exercice pratique — algorithmique',
+    label: 'Exercice pratique : algorithmique',
     tagline: 'Algorithme en blocs',
     description:
       "L'apprenant compose un algorithme avec les blocs que vous autorisez. Corrigé par jeux de tests.",
@@ -165,7 +165,7 @@ export function needsTests(kind) {
 }
 
 /**
- * Types composés dans un langage de programmation — c'est-à-dire l'exercice de
+ * Types composés dans un langage de programmation : c'est-à-dire l'exercice de
  * code, et lui seul. Un algorithme s'écrit en blocs de pseudo-code : demander
  * « quel langage ? » à une épreuve qui n'en contient aucun n'a pas de réponse.
  */
@@ -177,4 +177,22 @@ export function usesLanguage(kind) {
 export function evaluationUsesLanguage(exercises) {
   if (!exercises || exercises.length === 0) return true;
   return exercises.some((exercise) => usesLanguage(exercise.kind));
+}
+
+/**
+ * Le langage qu'impose la matière de l'épreuve.
+ *
+ * `null` : une matière d'algorithmique, où l'on compose en pseudo-code et où
+ * aucun langage n'est à choisir. Une clé (`'c'`, `'python'`…) : le cours de ce
+ * langage, qui le fixe d'office. `undefined` : la matière ne dit rien, le choix
+ * reste à l'enseignant.
+ */
+export function subjectLanguage(subjectName) {
+  const name = String(subjectName ?? '').toLowerCase();
+  if (!name) return undefined;
+  if (/algo/.test(name)) return null;
+  if (/c\+\+|\bcpp\b/.test(name)) return 'cpp';
+  if (/python/.test(name)) return 'python';
+  if (/(^|langage |programmation )c\b(?!\+)|^c$/.test(name)) return 'c';
+  return undefined;
 }

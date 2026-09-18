@@ -3,7 +3,7 @@
  *
  * Trois modes : « système », « clair », « sombre ». Le mode retenu est
  * conservé sur le poste ; c'est lui, et non le thème affiché, qui est
- * mémorisé — quelqu'un qui reste en « système » doit continuer à suivre son
+ * mémorisé : quelqu'un qui reste en « système » doit continuer à suivre son
  * système, y compris lorsque celui-ci bascule pendant que la page est ouverte.
  *
  * Le contrôleur résout le mode en un thème effectif et le pose sur <html>,

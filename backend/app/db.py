@@ -70,6 +70,25 @@ def _ensure_columns() -> None:
             conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
 
 
+# Valeurs ajoutées après coup aux types énumérés de PostgreSQL : `create_all` ne
+# modifie pas un type existant.
+_ADDED_ENUM_VALUES: list[tuple[str, str]] = [
+    ("evaluationstatus", "CANCELLED"),
+]
+
+
+def _ensure_enum_values() -> None:
+    if _is_sqlite:
+        return
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for type_name, value in _ADDED_ENUM_VALUES:
+            exists = conn.exec_driver_sql(
+                "SELECT 1 FROM pg_type WHERE typname = %s", (type_name,)
+            ).first()
+            if exists:
+                conn.exec_driver_sql(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{value}'")
+
+
 def init_db() -> None:
     from . import models  # noqa: F401
 
@@ -78,3 +97,4 @@ def init_db() -> None:
             conn.exec_driver_sql("PRAGMA journal_mode=WAL")
     Base.metadata.create_all(engine)
     _ensure_columns()
+    _ensure_enum_values()

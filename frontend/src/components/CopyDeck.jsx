@@ -1,7 +1,7 @@
 /**
  * La pile de copies corrigées : les feuilles sont posées côte à côte sur le
  * bureau, on les fait défiler au doigt ou à la souris, et on en ouvre une d'un
- * clic. C'est le geste réel d'un enseignant qui reprend son paquet — pas une
+ * clic. C'est le geste réel d'un enseignant qui reprend son paquet : pas une
  * ligne de tableau de plus.
  *
  * La note est écrite sur la feuille, au stylo rouge, comme elle le sera sur la
@@ -17,14 +17,14 @@ const LIGNES_MAX = 6;
 
 /** 3.5 → « 3,5 » : sur une copie française, la note s'écrit à la virgule. */
 function chiffre(valeur) {
-  if (valeur === null || valeur === undefined) return '—';
+  if (valeur === null || valeur === undefined) return '-';
   return String(Math.round(valeur * 100) / 100).replace('.', ',');
 }
 
 /**
  * Le relevé écrit sur les réglures : « Exercice 1 : 0/4 ».
  *
- * C'est ce qu'on cherche en reprenant une copie sans l'ouvrir — non pas
+ * C'est ce qu'on cherche en reprenant une copie sans l'ouvrir : non pas
  * seulement le total, mais où les points sont partis. Les lignes vides
  * complètent la feuille pour qu'elle garde sa hauteur dans le paquet.
  */
@@ -65,7 +65,7 @@ const SEUIL_GLISSE = 6;
 /**
  * Chaque copie se décrit ainsi :
  *   { id, heading, fields: [[intitulé, valeur], …], score, total, pending, meta }
- * — `heading` nomme la feuille (le nom du candidat pour l'enseignant, le titre
+ * `heading` nomme la feuille (le nom du candidat pour l'enseignant, le titre
  * de l'épreuve pour l'apprenant), `fields` porte les deux ou trois mentions
  * qu'on lit sans ouvrir la copie.
  */
@@ -225,7 +225,7 @@ export default function CopyDeck({
                 {(copie.fields ?? []).map(([intitule, valeur]) => (
                   <div key={intitule} className="copie-feuille-mention">
                     <dt>{intitule}</dt>
-                    <dd>{valeur ?? '—'}</dd>
+                    <dd>{valeur ?? '-'}</dd>
                   </div>
                 ))}
               </dl>
@@ -234,7 +234,7 @@ export default function CopyDeck({
                 total={copie.total}
                 size="sm"
                 pending={copie.pending || copie.score === null || copie.score === undefined}
-                label={`${copie.heading} — ${
+                label={`${copie.heading} : ${
                   !copie.pending && copie.score !== null && copie.score !== undefined
                     ? `${copie.score} sur ${copie.total}`
                     : 'non notée'

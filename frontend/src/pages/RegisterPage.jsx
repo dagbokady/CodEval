@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HOME_BY_ROLE, useAuth } from '../auth';
-import { Alert, Button, Field } from '../components/ui';
+import { Alert, Button, Field, PasswordInput } from '../components/ui';
+import { useDocumentTitle } from '../useDocumentTitle';
 
 export default function RegisterPage() {
+  useDocumentTitle('Inscription');
   const { register } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -37,35 +39,52 @@ export default function RegisterPage() {
 
   return (
     <div className="auth">
-      <aside className="auth-brand">
+      <header className="auth-top">
         <div className="brand">
           <span className="brand-icon" aria-hidden="true">&lt;/&gt;</span>
           CodEval
         </div>
-        <h2>Ouvrez l'espace de votre établissement</h2>
-        <p>
-          Les données de chaque établissement restent isolées. Ce compte enseignant pourra
-          créer les enseignants, les apprenants et les classes.
-        </p>
-      </aside>
+      </header>
       <div className="auth-zone">
         <form className="auth-card" onSubmit={onSubmit} noValidate>
           <h1>Inscription</h1>
           <p className="subtitle">Créez votre établissement et son compte enseignant</p>
           <Alert>{error}</Alert>
           <Field label="Établissement" id="org">
-            <input id="org" required value={form.organization_name} onChange={update('organization_name')} />
+            <input
+              id="org"
+              autoComplete="organization"
+              autoFocus
+              required
+              value={form.organization_name}
+              onChange={update('organization_name')}
+            />
           </Field>
           <Field label="Nom complet" id="name">
-            <input id="name" required value={form.full_name} onChange={update('full_name')} />
+            <input id="name" autoComplete="name" required value={form.full_name} onChange={update('full_name')} />
           </Field>
           <Field label="E-mail" id="email">
-            <input id="email" type="email" required value={form.email} onChange={update('email')} />
-          </Field>
-          <Field label="Mot de passe" id="password" hint="8 caractères minimum">
             <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              required
+              value={form.email}
+              onChange={update('email')}
+            />
+          </Field>
+          <Field
+            label="Mot de passe"
+            id="password"
+            hint={
+              form.password && form.password.length < 8
+                ? `Encore ${8 - form.password.length} caractère${8 - form.password.length > 1 ? 's' : ''}`
+                : '8 caractères minimum'
+            }
+          >
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete="new-password"
               required
               value={form.password}

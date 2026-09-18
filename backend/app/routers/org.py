@@ -329,7 +329,11 @@ def stats_overview(admin: TeacherUser, db: DbSession) -> dict:
     latest_runs = (
         select(func.max(CorrectionRun.id).label("run_id"))
         .join(Evaluation, Evaluation.id == CorrectionRun.evaluation_id)
-        .where(Evaluation.organization_id == org, CorrectionRun.status == RunStatus.DONE)
+        .where(
+            Evaluation.organization_id == org,
+            Evaluation.status != EvaluationStatus.CANCELLED,
+            CorrectionRun.status == RunStatus.DONE,
+        )
         .group_by(CorrectionRun.evaluation_id)
         .subquery()
     )
@@ -362,6 +366,12 @@ def stats_teacher(user: TeacherUser, db: DbSession) -> dict:
         return db.scalar(select(func.count(Evaluation.id)).where(*filters, *extra)) or 0
 
     evaluation_ids = list(db.scalars(select(Evaluation.id).where(*filters)))
+    # Les moyennes ignorent les épreuves annulées ; le nombre d'élèves, non.
+    counted_ids = list(
+        db.scalars(
+            select(Evaluation.id).where(*filters, Evaluation.status != EvaluationStatus.CANCELLED)
+        )
+    )
     students = 0
     if evaluation_ids:
         students = (
@@ -375,11 +385,11 @@ def stats_teacher(user: TeacherUser, db: DbSession) -> dict:
 
     # Moyenne de réussite sur la dernière campagne terminée de chaque évaluation.
     average = None
-    if evaluation_ids:
+    if counted_ids:
         latest_runs = (
             select(func.max(CorrectionRun.id).label("run_id"))
             .where(
-                CorrectionRun.evaluation_id.in_(evaluation_ids),
+                CorrectionRun.evaluation_id.in_(counted_ids),
                 CorrectionRun.status == RunStatus.DONE,
             )
             .group_by(CorrectionRun.evaluation_id)

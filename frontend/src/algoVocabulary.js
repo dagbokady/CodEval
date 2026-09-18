@@ -1,7 +1,7 @@
 /**
  * Vocabulaire de l'éditeur algorithmique.
  *
- * Un algorithme a toujours la même forme — celle du cours : un nom, une partie
+ * Un algorithme a toujours la même forme : celle du cours : un nom, une partie
  * déclarative (constantes, types, variables), puis un corps encadré par Début et
  * Fin. Ce squelette n'est pas un choix laissé à l'apprenant : il est posé par
  * l'éditeur et ne peut pas être défait. Ce que l'enseignant règle, exercice par
@@ -10,8 +10,8 @@
  */
 
 /**
- * Les éléments de la partie déclarative. Ils ne se posent qu'entre
- * « Déclaration » et « Début », chacun dans sa rubrique.
+ * Les éléments de la partie déclarative. Ils ne se posent qu'entre l'en-tête
+ * ALGORITHME et DEBUT, chacun dans sa rubrique (CONSTANTES, TYPES, VARIABLES).
  */
 export const DECLARATION_ELEMENTS = {
   constante: {
@@ -24,9 +24,13 @@ export const DECLARATION_ELEMENTS = {
   type: {
     group: 'Déclaration',
     section: 'types',
-    label: 'Type (enregistrement)',
+    label: 'Type (STRUCTURE)',
     rubrique: 'Type',
-    make: () => ({ nom: 'Etudiant', definition: 'nom : chaîne, age : entier' }),
+    make: () => ({
+      nom: 'Etudiant',
+      champs: [{ nom: 'nom', type: 'CHAINE' }, { nom: 'age', type: 'ENTIER' }],
+      definition: 'nom : CHAINE, age : ENTIER',
+    }),
   },
   declaration: {
     group: 'Déclaration',
@@ -46,10 +50,44 @@ export const DATA_TYPES = [
   { key: 'booleen', label: 'booléen' },
   { key: 'tableau_entier', label: "tableau d'entiers", sized: true },
   { key: 'tableau_reel', label: 'tableau de réels', sized: true },
+  { key: 'tableau_caractere', label: 'tableau de caractères', sized: true },
   { key: 'tableau_chaine', label: 'tableau de chaînes', sized: true },
+  { key: 'tableau_booleen', label: 'tableau de booléens', sized: true },
+  { key: 'pointeur', label: 'pointeur', pointer: true },
 ];
 
 export const SIZED_TYPES = new Set(DATA_TYPES.filter((t) => t.sized).map((t) => t.key));
+
+/** Les types de base tels qu'ils s'écrivent au cours, en capitales. */
+export const SCALAR_TYPES = [
+  { key: 'entier', label: 'ENTIER' },
+  { key: 'reel', label: 'REEL' },
+  { key: 'caractere', label: 'CARACTERE' },
+  { key: 'chaine', label: 'CHAINE' },
+  { key: 'booleen', label: 'BOOLEEN' },
+];
+
+const SCALAR_LABELS = Object.fromEntries(SCALAR_TYPES.map((t) => [t.key, t.label]));
+
+/** Le type de base des cases d'un tableau : `tableau_reel` → `reel`. */
+export function arrayElementType(type) {
+  return String(type ?? '').startsWith('tableau_') ? type.slice('tableau_'.length) : null;
+}
+
+/**
+ * Le type d'une variable tel qu'il s'écrit au cours : `ENTIER`,
+ * `TABLEAU[1..MAX] DE REEL`, `^Etudiant`.
+ */
+export function typeNotation(type = 'entier', { taille, debut, cible } = {}) {
+  const elements = arrayElementType(type);
+  if (elements) {
+    const fin = String(taille ?? '').trim();
+    const label = SCALAR_LABELS[elements] ?? elements.toUpperCase();
+    return fin ? `TABLEAU[${String(debut ?? '').trim() || '1'}..${fin}] DE ${label}` : `TABLEAU DE ${label}`;
+  }
+  if (type === 'pointeur') return `^${String(cible ?? '').trim()}`;
+  return SCALAR_LABELS[type] ?? String(type).toUpperCase();
+}
 
 /** Les éléments du corps : les actions, entre Début et Fin. */
 export const ELEMENTS = {
@@ -61,7 +99,7 @@ export const ELEMENTS = {
   },
   si: {
     group: 'Conditions',
-    label: 'SI … ALORS',
+    label: 'SI … ALORS … FINSI',
     make: () => ({ type: 'si', condition: '', alors: [], sinon: [] }),
   },
   // Le SINON ne s'insère pas seul : c'est la seconde branche du SI. Il reste
@@ -69,22 +107,22 @@ export const ELEMENTS = {
   sinon: { group: 'Conditions', label: 'SINON (branche du SI)', standalone: false },
   pour: {
     group: 'Boucles',
-    label: 'POUR … FAIRE',
-    make: () => ({ type: 'pour', variable: 'i', debut: '0', fin: '', corps: [] }),
+    label: 'POUR … FINPOUR',
+    make: () => ({ type: 'pour', variable: 'i', debut: '1', fin: '', pas: '1', corps: [] }),
   },
   tantque: {
     group: 'Boucles',
-    label: 'TANT QUE … FAIRE',
+    label: 'TANTQUE … FINTANTQUE',
     make: () => ({ type: 'tantque', condition: '', corps: [] }),
   },
   repeter: {
     group: 'Boucles',
-    label: "RÉPÉTER … JUSQU'À",
+    label: "REPETER … JUSQU'A",
     make: () => ({ type: 'repeter', condition: '', corps: [] }),
   },
   variable: {
     group: 'Structures',
-    label: 'VARIABLE (initialisation)',
+    label: 'variable ← valeur (initialisation)',
     make: () => ({ type: 'variable', nom: 'x', valeur: '0' }),
   },
   tableau: {
@@ -94,8 +132,8 @@ export const ELEMENTS = {
   },
   fonction: {
     group: 'Structures',
-    label: 'FONCTION',
-    make: () => ({ type: 'fonction', nom: 'f', parametres: [], corps: [] }),
+    label: 'FONCTION … FINFONCTION',
+    make: () => ({ type: 'fonction', nom: 'f', parametres: [], typeRetour: 'ENTIER', corps: [] }),
   },
   affectation: {
     group: 'Opérateurs',
@@ -104,7 +142,7 @@ export const ELEMENTS = {
   },
   retour: {
     group: 'Opérateurs',
-    label: 'RETOUR()',
+    label: 'RETOURNE()',
     make: () => ({ type: 'retour', expression: '' }),
   },
 };
@@ -158,6 +196,23 @@ export function parseAlgorithm(value) {
   };
 }
 
+/** Les champs d'un enregistrement ; les anciens types n'avaient qu'une définition en texte. */
+export function structFields(type) {
+  if (Array.isArray(type?.champs)) return type.champs;
+  return String(type?.definition ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [nom, ...reste] = part.split(':');
+      return { nom: nom.trim(), type: reste.join(':').trim() };
+    });
+}
+
+export function structDefinition(champs) {
+  return champs.map((c) => `${c.nom} : ${c.type}`).join(', ');
+}
+
 export function serializeAlgorithm(doc) {
   return JSON.stringify(doc);
 }
@@ -191,7 +246,7 @@ export const TOOL_GROUPS = [
  *
  * Tout ce que le vocabulaire connaît est autorisable, y compris ce qui ne se
  * pose pas seul : le SINON n'est pas un bloc qu'on insère, c'est la seconde
- * branche du SI — mais l'interdire a un sens (« traitez ce cas sans SINON »),
+ * branche du SI : mais l'interdire a un sens (« traitez ce cas sans SINON »),
  * et le correcteur sait le refuser.
  */
 export function toolGroups() {
@@ -207,11 +262,3 @@ export function toolGroups() {
 
 /** Toutes les clés autorisables, pour le bouton « tout autoriser ». */
 export const ALL_ELEMENT_KEYS = Object.keys(ALL_ELEMENTS);
-
-/** Les outils autorisés, dits en clair — pour la feuille de sujet et les résumés. */
-export function toolboxSummary(allowed) {
-  return (allowed?.length ? allowed : DEFAULT_ELEMENTS)
-    .map((key) => ALL_ELEMENTS[key]?.label)
-    .filter(Boolean)
-    .join(' · ');
-}

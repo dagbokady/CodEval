@@ -1,4 +1,4 @@
-# CodEval — Fonctionnalités existantes
+# CodEval : Fonctionnalités existantes
 
 État des lieux du code au 6 septembre 2026, après la simplification : **deux
 rôles** (enseignante, étudiant), **une classe** (SRIT 2A), **une matière**
@@ -55,7 +55,7 @@ jeton JWT et vérifié côté serveur à chaque requête ; côté client, le com
 
 ### 2.1 Enseignante (`teacher`)
 
-Elle conçoit, surveille, corrige et publie — et administre sa classe. Elle ne
+Elle conçoit, surveille, corrige et publie : et administre sa classe. Elle ne
 voit que **ses propres évaluations**, dans son établissement.
 
 - **Accueil** (`/accueil`, `GET /api/stats/teacher`) : nombre d'évaluations,
@@ -73,8 +73,8 @@ voit que **ses propres évaluations**, dans son établissement.
 - **Banque d'exercices** (`/banque`) : voir §5.
 - **Statistiques** (`/statistiques`).
 
-Les opérations d'établissement — créer un compte, une classe, une matière,
-inscrire un étudiant — restent servies par l'API (`/api/users`,
+Les opérations d'établissement (créer un compte, une classe, une matière,
+inscrire un étudiant) restent servies par l'API (`/api/users`,
 `/api/classrooms`, `/api/subjects`) et sont désormais ouvertes à l'enseignante.
 Elles ne sont plus exposées par une page dédiée : la classe et son effectif sont
 préparés par le jeu de données initial.
@@ -86,7 +86,7 @@ Il n'a accès qu'à ses épreuves et à ses copies. Il ne crée rien.
 - **Mes évaluations** (`/mes-evaluations`) : épreuves programmées, en cours et
   passées de sa classe, avec le temps restant.
 - **L'épreuve** (`/epreuve/:id`) : écran plein cadre, hors de la coquille
-  d'application — voir §7.
+  d'application : voir §7.
 - **Mes résultats** (`/mes-resultats`) : liste des copies rendues. La note
   n'apparaît **qu'une fois les résultats publiés** par l'enseignante.
 - **Ma copie** (`/mes-resultats/:id`) : copie corrigée, détail des tests, note
@@ -109,8 +109,8 @@ Il n'a accès qu'à ses épreuves et à ses copies. Il ne crée rien.
 
 | | |
 |---|---|
-| Établissement | ESATIC — École Supérieure Africaine des TIC |
-| Enseignante | **Dr Johnson** — `dr.johnson@esatic.ci` |
+| Établissement | ESATIC : École Supérieure Africaine des TIC |
+| Enseignante | **Dr Johnson** `dr.johnson@esatic.ci` |
 | Classe | **SRIT 2A** (2ᵉ année), 5 étudiants |
 | Matière | **Langage C** |
 | Étudiants | Coulibaly Moussa, Koné Aminata, Traoré Ibrahim, Bamba Fatou, Diallo Sékou |
@@ -121,12 +121,12 @@ l'interface.
 
 ## 3. Authentification et compte
 
-- `POST /api/auth/register` — crée une organisation + son premier compte
+- `POST /api/auth/register` : crée une organisation + son premier compte
   enseignant (le nom de l'organisation devient un `slug` unique).
-- `POST /api/auth/login` — e-mail + mot de passe, renvoie un JWT (`sub`,
+- `POST /api/auth/login` : e-mail + mot de passe, renvoie un JWT (`sub`,
   organisation, rôle). Les mots de passe sont hachés (`security.py`).
-- `GET /api/auth/me` — profil courant, rôle et nom de l'organisation.
-- **Paramètres** (`/parametres`) — écran accessible aux deux rôles : identité du
+- `GET /api/auth/me` : profil courant, rôle et nom de l'organisation.
+- **Paramètres** (`/parametres`) : écran accessible aux deux rôles : identité du
   compte, choix du thème (§13), déconnexion.
 
 ---
@@ -156,7 +156,7 @@ L'éditeur d'évaluation se traverse toujours dans le même ordre :
 | 2 | Exercices | type, intitulé, énoncé, questions |
 | 3 | **Outils & code de départ** | l'environnement donné à l'apprenant : la **boîte à outils** d'un exercice algorithmique, le **code de départ** d'un exercice de code |
 | 4 | Barème & tests | ce que la copie doit contenir, et sur quoi elle est exécutée |
-| 5 | **Points** | ce que vaut chaque exercice — et, au barème détaillé, chaque déclaration et chaque test |
+| 5 | **Points** | ce que vaut chaque exercice : et, au barème détaillé, chaque déclaration et chaque test |
 | 6 | **Modalités de passage** | surveillance, sorties autorisées, annonce à la classe |
 | 7 | Affectation & publication | classe, publication, lancement |
 
@@ -168,10 +168,10 @@ Trois principes tiennent cet ordre :
   barème complet sous les yeux ;
 - **les modalités se règlent juste avant la publication.** On ne décide pas du
   plein écran ni du nombre de sorties tolérées en saisissant un titre : on en
-  décide une fois le sujet écrit, au moment de choisir comment il sera composé —
+  décide une fois le sujet écrit, au moment de choisir comment il sera composé :
   et c'est là qu'on dit si la classe doit savoir qu'une épreuve l'attend ;
 - **l'environnement se règle avant la correction**, et de la même façon pour les
-  deux exercices pratiques — c'est la même question posée deux fois : que
+  deux exercices pratiques : c'est la même question posée deux fois : que
   trouve l'apprenant devant lui en ouvrant l'exercice ?
 
 La banque d'exercices (§5) suit la même trame, exercice par exercice.
@@ -180,7 +180,7 @@ La banque d'exercices (§5) suit la même trame, exercice par exercice.
 
 Une évaluation contient une liste ordonnée d'exercices. Chaque exercice a un
 titre, un énoncé, un barème en points, un langage et un **type**. Le type est le
-**premier choix** de toute création d'exercice — dans l'éditeur d'évaluation comme
+**premier choix** de toute création d'exercice : dans l'éditeur d'évaluation comme
 dans la banque, un sélecteur présente les types groupés par famille avant que le
 formulaire n'apparaisse : c'est lui qui décide de l'outil de réponse de
 l'apprenant et du mode de correction.
@@ -199,27 +199,27 @@ d'évaluation, banque, feuille de sujet et copie corrigée le lisent tous, pour
 qu'un type ajouté là apparaisse partout du même coup.
 
 Pour les exercices de code, si l'enseignante ne fournit pas de code de départ, le
-serveur propose un squelette compilable du langage — personne ne perd du temps
+serveur propose un squelette compilable du langage : personne ne perd du temps
 d'épreuve à retaper l'ossature.
 
 Le corrigé ne quitte jamais le serveur avant publication : le drapeau `correct`
 d'un choix de QCM, la véracité d'une affirmation Vrai/Faux et la liste des
 réponses acceptées d'une question-réponse sont retirés de ce qui descend sur le
 poste de l'apprenant. Pour une correspondance le
-**rang d'une paire est sa réponse** — le serveur n'envoie donc que les éléments
+**rang d'une paire est sa réponse** le serveur n'envoie donc que les éléments
 de gauche et une liste mélangée d'éléments de droite désignés par des **jetons
 opaques**, que lui seul sait rattacher.
 
 ### 4.4 La structure imposée et les outils autorisés (exercices algorithmiques)
 
-Un algorithme rendu sur CodEval a **toujours** la forme du cours — un nom, une
+Un algorithme rendu sur CodEval a **toujours** la forme du cours : un nom, une
 partie déclarative (Constante, Type, Variable), un corps entre Début et Fin.
 Cette structure est posée par l'éditeur et l'apprenant ne peut pas la défaire :
 elle n'est ni une option de l'exercice ni un choix de l'enseignante.
 
 Ce qui se règle exercice par exercice, à l'étape 3, c'est l'**outillage** :
 quels éléments l'apprenant a le droit de poser dans ce squelette. La liste est
-celle de `frontend/src/algoVocabulary.js` — les trois rubriques déclaratives, les
+celle de `frontend/src/algoVocabulary.js` : les trois rubriques déclaratives, les
 entrées/sorties, les conditions (SI, et le SINON qu'on peut interdire à part),
 les boucles, les structures, les opérateurs. Un élément décoché n'apparaît pas
 dans la palette de l'apprenant **et** est refusé à la correction
@@ -233,7 +233,7 @@ l'enseignante écrit librement, dans le champ « code de départ » de la même 
 
 Chaque exercice de code ou d'algorithme porte une liste de cas de test :
 
-- **nom**, **entrée standard**, **sortie attendue**, **délai** (ms) — les
+- **nom**, **entrée standard**, **sortie attendue**, **délai** (ms) : les
   **points**, eux, se posent à la dernière étape (§4.2) ;
 - **mode de comparaison** : `trim` (à l'espacement de fin près), `exact`
   (au caractère près) ou `numeric` (tolérance 1e-6 sur les nombres).
@@ -307,7 +307,7 @@ traversent trois : configuration, questions, points.
   partir du journal d'audit : qui, quel type, quand.
 
 L'enseignante peut **prolonger** la durée ou **clôturer** la session à tout
-moment. À la clôture — manuelle ou par expiration — toutes les productions sont
+moment. À la clôture (manuelle ou par expiration) toutes les productions sont
 figées (`frozen_at`) et l'API refuse toute écriture ultérieure.
 
 ---
@@ -321,7 +321,7 @@ d'application. Il propose :
   exercices ;
 - l'**éditeur de code** avec coloration selon le langage, ou l'**éditeur
   d'algorithme en blocs** (`AlgoEditor`) avec la palette de vocabulaire
-  autorisée par l'enseignant, ou l'interface propre au type de la question —
+  autorisée par l'enseignant, ou l'interface propre au type de la question :
   **QCM**, **correspondance**, **Vrai/Faux** ou **question-réponse** ;
 - un **compte à rebours synchronisé sur l'horloge du serveur** (`useNow`), non
   sur celle du poste ;
@@ -349,7 +349,7 @@ en lot au retour de la connexion (`/incidents/batch`).
 
 Au-delà du seuil `max_incidents`, la production est **gelée sans être marquée
 comme rendue** : l'étudiant n'a pas rendu sa copie, mais l'envoi final du
-client reste accepté pendant la fenêtre de tolérance — sinon le travail en cours
+client reste accepté pendant la fenêtre de tolérance : sinon le travail en cours
 serait perdu.
 
 ### 7.3 Rendu
@@ -366,8 +366,8 @@ notification part vers l'enseignante : la correction peut être lancée.
 
 `POST /api/evaluations/{id}/corrections` crée une **campagne**
 (`CorrectionRun`) numérotée et la met en attente. Le **worker** (processus
-séparé, `python -m app.worker`) la réclame — sous `FOR UPDATE SKIP LOCKED` sur
-PostgreSQL, donc plusieurs workers peuvent tourner en parallèle — puis, pour
+séparé, `python -m app.worker`) la réclame (sous `FOR UPDATE SKIP LOCKED` sur
+PostgreSQL, donc plusieurs workers peuvent tourner en parallèle) puis, pour
 chaque copie et chaque exercice :
 
 1. compile la production si le langage l'exige (gcc, g++ ; Python est
@@ -388,13 +388,13 @@ nouvelle. L'historique complet reste consultable, campagne par campagne.
 ### 8.2 Relecture
 
 - **Tableau des résultats** (`GET /api/evaluations/{id}/results`) : note, barème,
-  tests réussis, statut, note ajustée ou non, pour chaque étudiant — les
+  tests réussis, statut, note ajustée ou non, pour chaque étudiant : les
   inscrits sans production compris.
 - **Détail d'une copie** (`.../results/{participationId}`) : code rendu,
   journal de compilation, résultat de chaque test,
   note par exercice.
 - **Réajustement manuel** (`.../adjust`) : l'enseignante corrige une note. Le
-  réajustement est **systématiquement tracé** — note précédente, nouvelle note,
+  réajustement est **systématiquement tracé** note précédente, nouvelle note,
   auteur, motif, horodatage.
 - **Appréciations** (`.../appreciation`) : commentaire général sur la copie ou
   commentaire attaché à un exercice précis, visible par l'étudiant une fois les
@@ -408,10 +408,10 @@ sont consultables. Avant cela, l'étudiant voit sa copie rendue mais aucune note
 
 ### 8.4 Exports
 
-- **`export.xlsx`** — classeur complet : feuille de synthèse (contexte,
+- **`export.xlsx`** classeur complet : feuille de synthèse (contexte,
   effectifs, moyennes), notes par exercice, détail des tests, réajustements et
   incidents. Les inscrits sans production y figurent.
-- **`export.csv`** — tableau simple, séparateur `;` et virgule décimale, pour
+- **`export.csv`** tableau simple, séparateur `;` et virgule décimale, pour
   reprise directe dans un tableur francophone.
 
 Chaque export est journalisé.
@@ -470,7 +470,7 @@ Documentation interactive : <http://localhost:8000/docs>.
 
 Toute l'interface est peinte à partir des jetons de `frontend/src/styles/tokens.css` :
 un jeu clair sur `:root`, un jeu sombre sur `:root[data-theme='dark']`. Aucun
-composant ne connaît le thème — seules les valeurs changent.
+composant ne connaît le thème : seules les valeurs changent.
 
 Trois modes, proposés par le bouton de la barre supérieure (clair → sombre →
 système) et par la section « Apparence » des paramètres :
@@ -484,7 +484,7 @@ C'est le **mode** qui est mémorisé, pas le thème affiché : quelqu'un resté 
 « système » continue de suivre son système d'une session à l'autre. Un script
 inline dans `index.html` pose le thème avant le premier rendu, pour qu'un
 appareil en sombre n'ait pas d'éclair blanc au chargement. L'attribut vit sur
-`<html>`, donc l'écran d'épreuve — rendu hors de la coquille d'application —
+`<html>`, donc l'écran d'épreuve (rendu hors de la coquille d'application)
 en hérite comme le reste.
 
 ---

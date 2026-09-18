@@ -2,13 +2,13 @@
  * Ce qu'un **algorithme** doit contenir : le barème déclaratif, dit dans le
  * vocabulaire du cours.
  *
- * Un exercice de code se contrôle avec les mots du C — `int total;`,
+ * Un exercice de code se contrôle avec les mots du C : `int total;`,
  * `long factorielle(int)`, `struct Point`. Un algorithme n'a rien de tout cela :
  * il a une partie déclarative (constantes, types, variables typées en entier,
  * réel, chaîne…), un corps fait de blocs (SI, POUR, TANT QUE, LIRE, ECRIRE), et
  * des fonctions dont on ne connaît que le nom et le nombre de paramètres. Le
  * barème d'un exercice algorithmique se saisit donc avec ces mots-là, et se
- * vérifie sur le document de l'apprenant — pas sur un fichier compilé.
+ * vérifie sur le document de l'apprenant : pas sur un fichier compilé.
  *
  * Les clés de critère sont préfixées `algo_` : une même liste `settings.criteria`
  * porte les deux familles sans qu'on puisse les confondre, ici comme au serveur.
@@ -17,7 +17,7 @@
  * ici doit l'être là aussi.
  */
 
-import { DATA_TYPES, ELEMENTS, SIZED_TYPES } from './algoVocabulary';
+import { DATA_TYPES, ELEMENTS, SIZED_TYPES, typeNotation } from './algoVocabulary';
 
 /** Les familles de critères algorithmiques, dans l'ordre du sélecteur. */
 export const ALGO_CRITERION_KINDS = [
@@ -67,7 +67,7 @@ export function algoCriterionKind(key) {
 /**
  * Les blocs qu'un critère « structure attendue » peut exiger.
  *
- * Tout le vocabulaire du corps est exigible — y compris le SINON, qui n'est pas
+ * Tout le vocabulaire du corps est exigible : y compris le SINON, qui n'est pas
  * un bloc qu'on pose mais la seconde branche du SI : « traitez le cas contraire »
  * est une consigne courante, et le correcteur sait la voir.
  */
@@ -132,9 +132,7 @@ export function describeAlgoCriterion(criterion) {
   if (criterion?.kind === 'algo_structure') {
     const bloc = ELEMENTS[criterion.element]?.label ?? criterion.element ?? '?';
     const fois = Number(criterion.min) || 1;
-    return fois > 1 ? `${bloc} — ${fois} fois` : bloc;
+    return fois > 1 ? `${bloc} (${fois} fois)` : bloc;
   }
-  const type = dataTypeLabel(criterion?.vtype ?? 'entier');
-  const taille = String(criterion?.taille ?? '').trim();
-  return taille ? `${nom} : ${type}[${taille}]` : `${nom} : ${type}`;
+  return `${nom} :${typeNotation(criterion?.vtype ?? 'entier', { taille: criterion?.taille })}`;
 }

@@ -2,7 +2,7 @@
  * La correspondance telle qu'elle se fait sur papier : deux blocs face à face,
  * un point au bout de chaque élément, et un trait tiré de l'un à l'autre.
  *
- * L'apprenant ne choisit pas dans une liste déroulante — il relie. C'est le
+ * L'apprenant ne choisit pas dans une liste déroulante : il relie. C'est le
  * geste de l'épreuve, et c'est aussi la seule lecture qui montre d'un coup
  * d'œil ce qui est relié, ce qui ne l'est pas, et ce qui l'est de travers.
  *

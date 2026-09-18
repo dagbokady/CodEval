@@ -85,7 +85,7 @@ def resolve(answer, salt: str, count: int, question: int = 0) -> int | None:
 
 def readable_matches(exercise, answer: str, published: bool) -> list[dict]:
     """Relit les correspondances rendues : l'apprenant a répondu par jetons, seul
-    le serveur peut dire quel élément il a relié — et si c'était le bon.
+    le serveur peut dire quel élément il a relié : et si c'était le bon.
 
     Un exercice porte plusieurs grilles : chaque ligne rappelle le rang de sa
     question, pour que la copie les rende séparément. `published` faux tait le

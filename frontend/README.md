@@ -1,7 +1,7 @@
-# CodEval — frontend
+# CodEval : frontend
 
 Interface web de la plateforme d'évaluation : React 19, Vite, React Router et TanStack
-Query. Trois espaces distincts — enseignant, apprenant, établissement — servis par la
+Query. Trois espaces distincts (enseignant, apprenant, établissement) servis par la
 même application.
 
 ## Prérequis
@@ -99,13 +99,13 @@ version qui empêche une réponse tardive d'écraser une saisie plus récente.
 en-tête établissement et session, cartouche « ÉPREUVE / Durée », filet, consignes en
 italique, puis les questions regroupées par type (« QUESTIONS À CHOIX MULTIPLES (QCM) »,
 « EXERCICES DE PROGRAMMATION »…), numérotées Q1, Q2… avec leurs propositions en
-a) b) c) d). Les trois écrans qui montrent le sujet — aperçu de l'enseignant, « Sujet
-complet » de l'apprenant, copie corrigée — passent par ce composant pour ne jamais
+a) b) c) d). Les trois écrans qui montrent le sujet (aperçu de l'enseignant, « Sujet
+complet » de l'apprenant, copie corrigée) passent par ce composant pour ne jamais
 diverger ; les tailles étant en `em`, l'aperçu n'est que la même feuille en plus petit.
 
 **Copies.** `/mes-resultats/:evaluationId` présente la copie de l'apprenant comme une
-feuille : énoncés, production rendue, puis — une fois la correction validée et publiée
-par l'enseignant — la note et les appréciations. Avant publication, la copie reste
+feuille : énoncés, production rendue, puis (une fois la correction validée et publiée
+par l'enseignant) la note et les appréciations. Avant publication, la copie reste
 consultable sans note ni corrigé.
 
 ## Rôles et navigation

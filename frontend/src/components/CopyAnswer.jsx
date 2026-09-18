@@ -2,9 +2,9 @@
  * La production de l'apprenant, relue.
  *
  * La même copie est lue deux fois : par l'apprenant sur sa feuille rendue, par
- * l'enseignant sur la feuille corrigée. C'est la même lecture — un QCM se relit
+ * l'enseignant sur la feuille corrigée. C'est la même lecture : un QCM se relit
  * par ses choix cochés, une correspondance par ses paires, un algorithme par son
- * pseudo-code — et elle est écrite ici une seule fois. `published` dit si le
+ * pseudo-code : et elle est écrite ici une seule fois. `published` dit si le
  * corrigé peut apparaître à côté de la réponse.
  */
 
@@ -12,63 +12,110 @@ import CodeBlock from './CodeBlock';
 import MatchingBoard from './MatchingBoard';
 import { hasQuestions } from '../exerciseTypes';
 import { answersOf, questionsOf } from '../questions';
+import { structFields, typeNotation } from '../algoVocabulary';
 
-function isAlgoJson(code) {
+function algoDocument(code) {
   const trimmed = (code ?? '').trim();
-  if (!trimmed.startsWith('[')) return false;
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null;
   try {
     const parsed = JSON.parse(trimmed);
-    return Array.isArray(parsed) && parsed.length > 0 && parsed[0].type;
+    if (Array.isArray(parsed)) return parsed.length > 0 && parsed[0]?.type ? { corps: parsed } : null;
+    if (parsed && typeof parsed === 'object' && ('corps' in parsed || 'blocs' in parsed)) {
+      return { ...parsed, corps: parsed.corps ?? parsed.blocs ?? [] };
+    }
   } catch {
-    return false;
+    /* pas un algorithme en blocs */
   }
+  return null;
 }
 
+function commentaire(ligne) {
+  const texte = String(ligne?.commentaire ?? '').trim();
+  return texte ? ` /* ${texte} */` : '';
+}
+
+/** Le corps, relu comme sur le polycopié : mots-clés en capitales, sans point-virgule. */
 function algoToText(blocs, indent = 0) {
   const pad = '    '.repeat(indent);
   const lines = [];
-  for (const b of blocs) {
-    if (b.type === 'variable') lines.push(`${pad}VARIABLE ${b.nom} ← ${b.valeur || '0'}`);
-    else if (b.type === 'lire') lines.push(`${pad}LIRE() → ${b.cible}`);
-    else if (b.type === 'ecrire') lines.push(`${pad}ECRIRE( ${b.expression} )`);
+  const body = (list) => {
+    if (list?.length) lines.push(algoToText(list, indent + 1));
+  };
+  for (const b of blocs ?? []) {
+    if (b.type === 'variable') lines.push(`${pad}${b.nom} ← ${b.valeur || '0'}`);
+    else if (b.type === 'lire') lines.push(`${pad}LIRE(${b.cible})`);
+    else if (b.type === 'ecrire') lines.push(`${pad}ECRIRE(${b.expression})`);
     else if (b.type === 'affectation') lines.push(`${pad}${b.cible} ← ${b.expression}`);
-    else if (b.type === 'retour') lines.push(`${pad}RETOUR( ${b.expression} )`);
+    else if (b.type === 'retour') lines.push(`${pad}RETOURNE(${b.expression})`);
     else if (b.type === 'tableau') lines.push(`${pad}TABLEAU ${b.nom} DE TAILLE ${b.taille}`);
     else if (b.type === 'pour') {
-      lines.push(`${pad}POUR ${b.variable} DE ${b.debut} À ${b.fin} FAIRE`);
-      if (b.corps?.length) lines.push(algoToText(b.corps, indent + 1));
-      lines.push(`${pad}FIN POUR`);
+      lines.push(`${pad}POUR ${b.variable} de ${b.debut} à ${b.fin} par pas de ${b.pas || '1'}`);
+      body(b.corps);
+      lines.push(`${pad}FINPOUR`);
     } else if (b.type === 'tantque') {
-      lines.push(`${pad}TANT QUE ${b.condition} FAIRE`);
-      if (b.corps?.length) lines.push(algoToText(b.corps, indent + 1));
-      lines.push(`${pad}FIN TANT QUE`);
+      lines.push(`${pad}TANTQUE ${b.condition} FAIRE`);
+      body(b.corps);
+      lines.push(`${pad}FINTANTQUE`);
+    } else if (b.type === 'repeter') {
+      lines.push(`${pad}REPETER`);
+      body(b.corps);
+      lines.push(`${pad}JUSQU'A ${b.condition}`);
     } else if (b.type === 'si') {
       lines.push(`${pad}SI ${b.condition} ALORS`);
-      if (b.alors?.length) lines.push(algoToText(b.alors, indent + 1));
+      body(b.alors);
       if (b.sinon?.length) {
         lines.push(`${pad}SINON`);
-        lines.push(algoToText(b.sinon, indent + 1));
+        body(b.sinon);
       }
-      lines.push(`${pad}FIN SI`);
+      lines.push(`${pad}FINSI`);
     } else if (b.type === 'fonction') {
-      lines.push(`${pad}FONCTION ${b.nom}(${(b.parametres || []).join(', ')})`);
-      if (b.corps?.length) lines.push(algoToText(b.corps, indent + 1));
-      lines.push(`${pad}FIN FONCTION`);
+      const retour = b.typeRetour ? ` :${String(b.typeRetour).toUpperCase()}` : '';
+      lines.push(`${pad}FONCTION ${b.nom}(${(b.parametres || []).join(', ')})${retour}`);
+      lines.push(`${pad}DEBUT`);
+      body(b.corps);
+      lines.push(`${pad}FIN`);
+      lines.push(`${pad}FINFONCTION`);
     }
   }
   return lines.join('\n');
 }
 
+function algoDocumentToText(doc) {
+  const lines = [`ALGORITHME ${doc.nom || ''}`.trimEnd()];
+  if (doc.constantes?.length) {
+    lines.push('    CONSTANTES');
+    doc.constantes.forEach((c) => lines.push(`        ${c.nom} = ${c.valeur}${commentaire(c)}`));
+  }
+  if (doc.types?.length) {
+    lines.push('    TYPES');
+    doc.types.forEach((t) => {
+      lines.push(`        ${t.nom} = STRUCTURE${commentaire(t)}`);
+      structFields(t).forEach((c) => lines.push(`            ${c.nom} :${String(c.type).toUpperCase()}`));
+      lines.push('        FINSTRUCTURE');
+    });
+  }
+  if (doc.variables?.length) {
+    lines.push('    VARIABLES');
+    doc.variables.forEach((v) => {
+      lines.push(`        ${v.nom} :${typeNotation(v.type ?? 'entier', v)}${commentaire(v)}`);
+    });
+  }
+  lines.push('DEBUT');
+  const corps = algoToText(doc.corps, 1);
+  if (corps) lines.push(corps);
+  lines.push('FIN');
+  return lines.join('\n');
+}
+
 /** L'algorithme en blocs est stocké en JSON : on le relit en pseudo-code. */
 function readableAnswer(code) {
-  if (isAlgoJson(code)) {
-    try {
-      return algoToText(JSON.parse(code));
-    } catch {
-      return code;
-    }
+  const doc = algoDocument(code);
+  if (!doc) return code;
+  try {
+    return algoDocumentToText(doc);
+  } catch {
+    return code;
   }
-  return code;
 }
 
 function parseJson(value, fallback) {
@@ -112,7 +159,7 @@ function QcmAnswer({ question, given, published }) {
  * publication.
  *
  * On relit la copie comme elle a été composée : deux blocs, et les traits que
- * l'apprenant a tirés — vert quand la paire tient, rouge barré sinon. La liste
+ * l'apprenant a tirés : vert quand la paire tient, rouge barré sinon. La liste
  * détaillée reste dessous pour ce qu'un trait ne dit pas : ce qui était attendu.
  */
 function MatchingAnswer({ rows }) {
@@ -247,7 +294,7 @@ function QuestionsAnswer({ sheet, published }) {
 
 /**
  * `sheet` : { kind, settings, answer, language, matches }. La même forme des
- * deux côtés — l'appelant compose l'objet, ce composant ne connaît que la copie.
+ * deux côtés : l'appelant compose l'objet, ce composant ne connaît que la copie.
  */
 export default function AnswerBlock({ sheet, published }) {
   if (hasQuestions(sheet.kind)) return <QuestionsAnswer sheet={sheet} published={published} />;

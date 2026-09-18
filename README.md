@@ -13,7 +13,7 @@ frontend/   Interface React (Vite)                            → frontend/READM
 
 ## Démarrage rapide
 
-**1. Base de données** — PostgreSQL local (voir `backend/README.md`) ou, à défaut :
+**1. Base de données** PostgreSQL local (voir `backend/README.md`) ou, à défaut :
 
 ```bash
 cd backend && docker compose up -d db
@@ -70,7 +70,7 @@ Fonctionnalités détaillées : [FONCTIONNALITES.md](FONCTIONNALITES.md).
   la précédente ; les réajustements manuels et les opérations sensibles sont journalisés.
 - **Intégrité** : à la clôture d'une session, les productions sont figées et toute
   écriture ultérieure est refusée par l'API.
-- **Sobriété** : aucun composant d'infrastructure au-delà de PostgreSQL — la file de
+- **Sobriété** : aucun composant d'infrastructure au-delà de PostgreSQL : la file de
   correction est une table.
 
 ## Tests

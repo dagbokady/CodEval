@@ -1,0 +1,22 @@
+17:40:47 9.2 décomposition par étape (échantillon)
+17:41:23   syntaxe med=100ms compile med=48ms exec med=385ms
+17:41:23 9.9 idempotence (arrêt brutal d'un correcteur)
+17:41:47   done avant crash=4 final=60/60 double-comptage=False
+17:41:47 9.3/9.5 correcteurs x granularité (H1,H2,H3)
+17:43:50   A N= 1 thr=98.1/min wall=122s occ=1.00
+17:45:50   A N= 2 thr=100.1/min wall=120s occ=0.50
+17:47:52   A N= 4 thr=97.9/min wall=123s occ=0.25
+17:49:56   A N= 8 thr=97.1/min wall=124s occ=0.12
+17:52:01   A N=16 thr=96.0/min wall=125s occ=0.06
+17:56:09   B N= 1 thr=96.8/min wall=124s occ=0.99
+17:58:48   B N= 2 thr=151.2/min wall=79s occ=0.99
+18:01:31   B N= 4 thr=146.7/min wall=82s occ=0.99
+18:04:15   B N= 8 thr=146.8/min wall=82s occ=0.98
+18:06:36   B N=16 thr=175.3/min wall=71s occ=0.96
+18:06:38   USL sigma=0.584 kappa=0.0000 r2=0.766 Npeak=inf
+18:06:38 9.1 débit/latence par charge (arch A, 1 correcteur, profil rafale)
+18:06:56   load=40 med=9.47s p95=17.64s thr=129.3/min wall=19s
+18:08:30   load=200 med=47.28s p95=88.75s thr=128.4/min wall=93s
+18:11:37   load=400 med=93.88s p95=177.15s thr=128.8/min wall=186s
+18:19:18   load=1000 med=232.34s p95=438.16s thr=130.2/min wall=461s
+18:19:18 TERMINÉ

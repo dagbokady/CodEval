@@ -2,9 +2,9 @@
  * Saisie du barème déclaratif d'un exercice **algorithmique**.
  *
  * Le pendant de `BaremeEditor` pour les exercices en blocs. L'enseignant y dit
- * ce que l'algorithme doit contenir avec les mots du cours — une variable
+ * ce que l'algorithme doit contenir avec les mots du cours : une variable
  * `moyenne` de type réel, une constante `MAX`, un enregistrement `Etudiant`, une
- * fonction à deux paramètres, une boucle POUR — et non avec ceux du C. Chaque
+ * fonction à deux paramètres, une boucle POUR : et non avec ceux du C. Chaque
  * ligne se vérifie sur le document de l'apprenant : sa partie déclarative pour
  * les trois premières familles, son corps pour les deux autres.
  *
@@ -83,7 +83,7 @@ function ConstanteFields({ criterion, update }) {
 /**
  * Un enregistrement. Sa définition est écrite librement par l'apprenant : on ne
  * contrôle donc pas des types champ par champ, mais la présence des champs
- * demandés — ce que l'énoncé exige réellement.
+ * demandés : ce que l'énoncé exige réellement.
  */
 function TypeFields({ criterion, update }) {
   const champs = algoFieldsOf(criterion);
@@ -144,8 +144,8 @@ function FonctionFields({ criterion, update }) {
 }
 
 /**
- * Une structure du corps. On la choisit dans le vocabulaire même de l'éditeur —
- * ce sont les blocs que l'apprenant a sous la main — et l'on dit combien de fois
+ * Une structure du corps. On la choisit dans le vocabulaire même de l'éditeur (
+ * ce sont les blocs que l'apprenant a sous la main) et l'on dit combien de fois
  * elle doit apparaître : « deux boucles imbriquées » se demande ainsi.
  */
 function StructureFields({ criterion, update }) {
@@ -210,7 +210,7 @@ export default function AlgoBaremeEditor({ criteria, onCriteriaChange }) {
     <section className="bareme-editeur">
       <header className="tests-tete">
         <div>
-          <strong style={{ fontSize: 13 }}>Ce que l'algorithme doit contenir</strong>
+          <strong className="tests-tete-titre">Ce que l'algorithme doit contenir</strong>
           <p className="sub" style={{ margin: '2px 0 0', fontSize: 12 }}>
             {criteria.length === 0
               ? 'Rien d’exigé pour l’instant : seuls les tests noteront la copie.'

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import {
   useAction,
@@ -13,9 +13,23 @@ import { Alert, Button, Field, Loading, PageHeader, Tag } from '../../components
 import { SubjectSheet } from '../../components/SubjectSheet';
 import { useAuth } from '../../auth';
 import { DEFAULT_ELEMENTS } from '../../algoVocabulary';
-import { KIND_LABELS, STATUS_LABELS, STATUS_TONES } from '../../format';
+import {
+  EVAL_KIND_LABELS,
+  KIND_LABELS,
+  STATUS_LABELS,
+  STATUS_TONES,
+  formatExamDuration,
+} from '../../format';
+import {
+  DURATION_PRESETS,
+  EVALUATION_KINDS,
+  FACTORY_DEFAULTS,
+  RULE_SWITCHES,
+  readEvaluationDefaults,
+} from '../../evaluationDefaults';
 import {
   evaluationUsesLanguage,
+  subjectLanguage,
   exerciseType,
   hasQuestions,
   needsTests,
@@ -25,7 +39,14 @@ import BaremeEditor from '../../components/BaremeEditor';
 import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
 import TestsEditor from '../../components/TestsEditor';
-import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
+import SolutionEditor from '../../components/SolutionEditor';
+import {
+  autoDistribute,
+  callableCriteria,
+  criteriaOf,
+  isSimpleScoring,
+  testIssues,
+} from '../../bareme';
 import {
   QuestionListEditor,
   TrueFalseEditor,
@@ -38,8 +59,8 @@ import { defaultStarter, isUntouchedStarter } from '../../starterCode';
  *
  * Elles suivent la même ligne que la banque d'exercices : on dit d'abord ce
  * qu'est l'évaluation, puis ce qu'elle demande, puis avec quoi l'apprenant y
- * répondra — sa boîte à outils s'il compose un algorithme, son code de départ
- * s'il programme —, puis comment la copie est vérifiée, et seulement à la fin ce
+ * répondra (sa boîte à outils s'il compose un algorithme, son code de départ
+ * s'il programme), puis comment la copie est vérifiée, et seulement à la fin ce
  * que tout cela vaut.
  */
 const STEPS = [
@@ -109,33 +130,29 @@ function toLocalInput(value) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-const DEFAULT_FORM = {
-  title: '',
-  kind: 'devoir',
-  description: '',
-  instructions: '',
-  language: 'c',
-  duration_minutes: 90,
-  scheduled_start: '',
-  classroom_id: '',
-  subject_id: '',
-  total_points: 20,
-  rules: {
-    fullscreen: true,
-    block_paste: true,
-    allow_early_submit: true,
-    track_focus: true,
-    // Une sortie d'épreuve, et la copie se ferme : c'est la règle par défaut,
-    // celle qu'un surveillant applique en salle. L'enseignant peut l'assouplir.
-    max_incidents: 1,
-    // La classe voit qu'une épreuve l'attend. L'enseignant peut préparer une
-    // interrogation sans l'annoncer : elle n'apparaîtra qu'à son ouverture.
-    announce_to_students: true,
-  },
-};
+/**
+ * Une nouvelle évaluation part des valeurs réglées dans les paramètres : et de
+ * la classe d'où l'on vient, quand on la crée depuis la page d'une classe.
+ */
+function defaultForm(classroomId) {
+  const defaults = readEvaluationDefaults();
+  return {
+    title: '',
+    kind: defaults.kind,
+    description: '',
+    instructions: '',
+    language: defaults.language,
+    duration_minutes: defaults.duration_minutes,
+    scheduled_start: '',
+    classroom_id: classroomId ?? '',
+    subject_id: '',
+    total_points: defaults.total_points,
+    rules: { ...defaults.rules },
+  };
+}
 
-function formFrom(data) {
-  if (!data) return DEFAULT_FORM;
+function formFrom(data, classroomId) {
+  if (!data) return defaultForm(classroomId);
   return {
     title: data.title,
     kind: data.kind ?? 'devoir',
@@ -147,7 +164,7 @@ function formFrom(data) {
     classroom_id: data.classroom_id ?? '',
     subject_id: data.subject_id ?? '',
     total_points: data.total_points,
-    rules: { ...DEFAULT_FORM.rules, ...data.rules },
+    rules: { ...FACTORY_DEFAULTS.rules, ...data.rules },
   };
 }
 
@@ -175,15 +192,17 @@ export default function EvaluationEditorPage() {
 
 function Editor({ evaluationId, evaluation }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(0);
   const [error, setError] = useState(null);
+  const [titleError, setTitleError] = useState(null);
   const [notice, setNotice] = useState(null);
 
   const classrooms = useClassrooms();
   const subjects = useSubjects();
   const languages = useLanguages();
 
-  const [form, setForm] = useState(() => formFrom(evaluation));
+  const [form, setForm] = useState(() => formFrom(evaluation, searchParams.get('classe')));
   const [exercises, setExercises] = useState(() =>
     (evaluation?.exercises ?? []).map((e) => ({ ...e, tests: e.tests ?? [] })),
   );
@@ -231,7 +250,8 @@ function Editor({ evaluationId, evaluation }) {
   async function handleSaveStep1(next = true) {
     setError(null);
     if (form.title.trim().length < 2) {
-      setError('Le titre est obligatoire.');
+      setTitleError('Donnez un titre d’au moins deux caractères : il figure en tête du sujet.');
+      document.getElementById('title')?.focus();
       return;
     }
     try {
@@ -246,7 +266,7 @@ function Editor({ evaluationId, evaluation }) {
 
   /* Le récapitulatif est le point d'arrivée de l'assistant : on y publie
      l'évaluation sans attendre un clic de plus. Sans cela, un devoir daté
-     restait en brouillon — invisible pour les étudiants, et jamais ouvert par
+     restait en brouillon : invisible pour les étudiants, et jamais ouvert par
      le planificateur, qui ne réveille que les évaluations publiées. */
   async function publishIfReady() {
     if (!evaluationId) return;
@@ -266,7 +286,7 @@ function Editor({ evaluationId, evaluation }) {
 
   /* Les modalités vivent dans les paramètres de l'épreuve, pas dans ses
      exercices : elles s'enregistrent par le même appel que l'étape 1, puis on
-     passe à la publication — c'est le dernier réglage avant que la classe voie
+     passe à la publication : c'est le dernier réglage avant que la classe voie
      quoi que ce soit. */
   async function handleSaveModalities() {
     setError(null);
@@ -287,7 +307,7 @@ function Editor({ evaluationId, evaluation }) {
       return;
     }
     // Le barème simplifié se recalcule ici : un test ajouté à l'étape précédente
-    // doit peser sa part avant qu'on l'envoie — et l'écran des points doit
+    // doit peser sa part avant qu'on l'envoie : et l'écran des points doit
     // montrer cette part, pas la valeur héritée du modèle de test.
     const prepared = exercises.map((ex) => (isSimpleScoring(ex) ? autoDistribute(ex) : ex));
     setExercises(prepared);
@@ -315,27 +335,13 @@ function Editor({ evaluationId, evaluation }) {
   return (
     <>
       <PageHeader
-        breadcrumb="Évaluations · Nouvelle"
+        breadcrumb={evaluationId ? 'Évaluations · Modifier' : 'Évaluations · Nouvelle'}
         title={form.title || 'Nouvelle évaluation'}
       >
         {status && <Tag tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</Tag>}
       </PageHeader>
 
-      <div className="stepper">
-        {STEPS.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            className="step"
-            aria-current={step === index ? 'step' : undefined}
-            onClick={() => (evaluationId || index === 0) && setStep(index)}
-          >
-            <span className="num">{index + 1}</span>
-            Étape {index + 1} · {label}
-            {index < STEPS.length - 1 && <span className="sep">———</span>}
-          </button>
-        ))}
-      </div>
+      <WizardSteps step={step} onSelect={setStep} canNavigate={Boolean(evaluationId)} />
 
       <div className="content">
         <Alert>{error}</Alert>
@@ -348,139 +354,22 @@ function Editor({ evaluationId, evaluation }) {
         )}
 
         {step === 0 && (
-          <section className="card">
-            <h2 style={{ fontSize: 15, marginBottom: 16 }}>Informations générales</h2>
-            <div className="row">
-              <Field label="Titre de l'évaluation" id="title">
-                <input
-                  id="title"
-                  value={form.title}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                />
-              </Field>
-              <Field label="Type" id="kind">
-                <select
-                  id="kind"
-                  value={form.kind}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, kind: e.target.value })}
-                >
-                  <option value="devoir">Devoir</option>
-                  <option value="interro">Interrogation</option>
-                  <option value="examen">Examen</option>
-                </select>
-              </Field>
-            </div>
-            <div className="row">
-              <Field label="Classe" id="classroom">
-                <select
-                  id="classroom"
-                  value={form.classroom_id}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, classroom_id: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {(classrooms.data ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.students_count})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Matière" id="subject">
-                <select
-                  id="subject"
-                  value={form.subject_id}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                >
-                  <option value="">—</option>
-                  {(subjects.data ?? []).map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <div className="row">
-              {langageUtile ? (
-                <Field
-                  label="Langage autorisé"
-                  id="language"
-                  hint="S'applique aux exercices de code. Les exercices algorithmiques s'écrivent en blocs."
-                >
-                  <select
-                    id="language"
-                    value={form.language}
-                    disabled={readOnly}
-                    onChange={(e) => setForm({ ...form, language: e.target.value })}
-                  >
-                    {(languages.data ?? []).map((l) => (
-                      <option key={l.key} value={l.key}>
-                        {l.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ) : (
-                <Field label="Langage autorisé">
-                  <p className="sub" style={{ margin: 0 }}>
-                    Épreuve algorithmique : la copie se compose en blocs de pseudo-code, aucun
-                    langage de programmation n'est à choisir.
-                  </p>
-                </Field>
-              )}
-              <Field label="Durée (minutes)" id="duration">
-                <input
-                  id="duration"
-                  type="number"
-                  min="5"
-                  max="600"
-                  value={form.duration_minutes}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })}
-                />
-              </Field>
-              <Field label="Date de début" id="start">
-                <input
-                  id="start"
-                  type="datetime-local"
-                  value={form.scheduled_start}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
-                />
-              </Field>
-              <Field label="Barème total (points)" id="points">
-                <input
-                  id="points"
-                  type="number"
-                  min="1"
-                  value={form.total_points}
-                  disabled={readOnly}
-                  onChange={(e) => setForm({ ...form, total_points: e.target.value })}
-                />
-              </Field>
-            </div>
-            <Field label="Consignes affichées à l'apprenant" id="instructions">
-              <textarea
-                id="instructions"
-                value={form.instructions}
-                disabled={readOnly}
-                onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-              />
-            </Field>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <Button variant="secondary" onClick={() => navigate('/evaluations')}>
-                Annuler
-              </Button>
-              <Button disabled={readOnly || saveParams.isPending} onClick={() => handleSaveStep1(true)}>
-                Continuer → Exercices
-              </Button>
-            </div>
-          </section>
+          <SetupStep
+            form={form}
+            setForm={(next) => {
+              setForm(next);
+              if (titleError && next.title.trim().length >= 2) setTitleError(null);
+            }}
+            readOnly={readOnly}
+            titleError={titleError}
+            langageUtile={langageUtile}
+            languages={languages.data ?? []}
+            classrooms={classrooms.data ?? []}
+            subjects={subjects.data ?? []}
+            pending={saveParams.isPending}
+            onCancel={() => navigate('/evaluations')}
+            onNext={() => handleSaveStep1(true)}
+          />
         )}
 
         {step === 1 && (
@@ -516,7 +405,6 @@ function Editor({ evaluationId, evaluation }) {
           <TestsStep
             exercises={exercises}
             setExercises={setExercises}
-            barème={barème}
             onBack={() => setStep(2)}
             onNext={() => handleSaveExercises(4)}
             pending={saveExercises.isPending}
@@ -565,17 +453,23 @@ function Editor({ evaluationId, evaluation }) {
                 Programmation :{' '}
                 {form.scheduled_start
                   ? new Date(form.scheduled_start).toLocaleString('fr-FR')
-                  : 'aucune date — lancement manuel'}
+                  : 'aucune date : lancement manuel'}
               </li>
               <li className="sub">
                 Annonce :{' '}
                 {form.rules.announce_to_students !== false
                   ? 'les étudiants voient l’épreuve dès la publication'
-                  : 'non annoncée — visible seulement au lancement de la session'}
+                  : 'non annoncée : visible seulement au lancement de la session'}
               </li>
               <li className="sub">
                 Sorties autorisées : {form.rules.max_incidents ?? 1}
-                {form.rules.max_incidents ? ' avant verrouillage' : ' — aucun verrouillage'}
+                {form.rules.max_incidents ? ' avant verrouillage' : ', aucun verrouillage'}
+              </li>
+              <li className="sub">
+                Corrigé :{' '}
+                {form.rules.show_solutions !== false
+                  ? 'proposé aux étudiants avec les notes publiées'
+                  : 'non proposé'}
               </li>
             </ul>
 
@@ -592,10 +486,7 @@ function Editor({ evaluationId, evaluation }) {
               </Alert>
             )}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <Button variant="secondary" onClick={() => setStep(5)}>
-                Étape précédente
-              </Button>
+            <WizardNav step={6} onBack={() => setStep(5)}>
               <Button
                 variant="secondary"
                 disabled={status !== 'draft' || publish.isPending}
@@ -614,10 +505,378 @@ function Editor({ evaluationId, evaluation }) {
               >
                 Lancer la session
               </Button>
-            </div>
+            </WizardNav>
           </section>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * Le fil des étapes. Une étape franchie porte une coche ; tant que
+ * l'évaluation n'est pas enregistrée, seules les paramètres sont accessibles :
+ * les exercices n'ont nulle part où être rangés.
+ */
+function WizardSteps({ step, onSelect, canNavigate }) {
+  return (
+    <nav className="wizard-steps" aria-label="Étapes de création">
+      <ol>
+        {STEPS.map((label, index) => {
+          const locked = !canNavigate && index > 0;
+          const done = canNavigate && index < step;
+          return (
+            <li key={label}>
+              <button
+                type="button"
+                className={`wizard-step ${done ? 'is-done' : ''}`.trim()}
+                aria-current={step === index ? 'step' : undefined}
+                disabled={locked}
+                title={locked ? 'Enregistrez d’abord les paramètres' : undefined}
+                onClick={() => onSelect(index)}
+              >
+                <span className="wizard-step-num" aria-hidden="true">
+                  {done ? '✓' : index + 1}
+                </span>
+                <span className="wizard-step-label">{label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="wizard-progress" aria-hidden="true">
+        <span style={{ width: `${(step / (STEPS.length - 1)) * 100}%` }} />
+      </div>
+    </nav>
+  );
+}
+
+/**
+ * La barre d'actions de chaque étape, collée au bas de l'écran : on avance sans
+ * redescendre sous une longue liste d'exercices ou de tests pour trouver le
+ * bouton.
+ */
+function WizardNav({
+  step,
+  onBack,
+  backLabel = 'Étape précédente',
+  onNext,
+  nextLabel = 'Étape suivante',
+  pending = false,
+  disabled = false,
+  children,
+}) {
+  return (
+    <div className="wizard-nav">
+      {onBack ? (
+        <Button variant="secondary" onClick={onBack}>
+          {step > 0 ? `← ${backLabel}` : backLabel}
+        </Button>
+      ) : (
+        <span />
+      )}
+      <span className="sub wizard-nav-count">
+        Étape {step + 1} sur {STEPS.length} · {STEPS[step]}
+      </span>
+      <div className="wizard-nav-actions">
+        {children}
+        {onNext && (
+          <Button disabled={pending || disabled} onClick={onNext}>
+            {pending ? 'Enregistrement…' : `${nextLabel} →`}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const startFmt = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/**
+ * Étape 1 : ce qu'est l'épreuve, pour qui, et comment elle se déroule. Le
+ * récapitulatif à droite relit les choix en langage courant (« 1h30, jeudi à
+ * 8 h, SRIT 2A ») là où le formulaire ne montre que des champs.
+ */
+function SetupStep({
+  form,
+  setForm,
+  readOnly,
+  titleError,
+  langageUtile,
+  languages,
+  classrooms,
+  subjects,
+  pending,
+  onCancel,
+  onNext,
+}) {
+  const set = (patch) => setForm({ ...form, ...patch });
+  const classroom = classrooms.find((c) => String(c.id) === String(form.classroom_id));
+  const subject = subjects.find((s) => String(s.id) === String(form.subject_id));
+  const missing = (text) => <span className="is-missing">{text}</span>;
+  // La matière décide du langage : aucun en algorithmique, le sien pour un cours
+  // de langage. Le choix ne reste ouvert que si la matière ne dit rien.
+  const imposed = subjectLanguage(subject?.name);
+  const imposedLabel = languages.find((l) => l.key === imposed)?.label ?? imposed?.toUpperCase();
+  const chooseSubject = (subjectId) => {
+    const name = subjects.find((s) => String(s.id) === String(subjectId))?.name;
+    const language = subjectLanguage(name);
+    set({ subject_id: subjectId, ...(language ? { language } : {}) });
+  };
+
+  return (
+    <>
+      <div className="setup-layout">
+        <section className="card setup-form">
+          <div className="form-section">
+            <h2 className="form-section-title">L'épreuve</h2>
+            <Field
+              label={<>Titre <span className="required-mark" aria-hidden="true">*</span></>}
+              id="title"
+              error={titleError}
+              hint="Il figure en tête du sujet et dans l'espace des étudiants."
+            >
+              <input
+                id="title"
+                value={form.title}
+                disabled={readOnly}
+                required
+                autoFocus={!form.title}
+                placeholder="Ex. Interrogation n° 2 : Les boucles"
+                onChange={(e) => set({ title: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && !readOnly && onNext()}
+              />
+            </Field>
+            <div className="field">
+              <span className="field-label" id="kind-label">Type</span>
+              <div className="choice-cards" role="radiogroup" aria-labelledby="kind-label">
+                {EVALUATION_KINDS.map((k) => (
+                  <button
+                    key={k.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.kind === k.value}
+                    className="choice-card"
+                    disabled={readOnly}
+                    onClick={() => set({ kind: k.value })}
+                  >
+                    <strong>{k.label}</strong>
+                    <span className="sub">{k.hint}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2 className="form-section-title">Pour qui</h2>
+            <div className="row">
+              <Field
+                label="Classe"
+                id="classroom"
+                hint={
+                  classrooms.length === 0
+                    ? 'Aucune classe pour l’instant : créez-en une dans « Mes classes ».'
+                    : 'Sans classe, l’épreuve reste un brouillon que personne ne voit.'
+                }
+              >
+                <select
+                  id="classroom"
+                  value={form.classroom_id}
+                  disabled={readOnly}
+                  onChange={(e) => set({ classroom_id: e.target.value })}
+                >
+                  <option value="">Choisir plus tard</option>
+                  {classrooms.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.students_count} étudiant{c.students_count > 1 ? 's' : ''})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Matière" id="subject">
+                <select
+                  id="subject"
+                  value={form.subject_id}
+                  disabled={readOnly}
+                  onChange={(e) => chooseSubject(e.target.value)}
+                >
+                  <option value="">Aucune</option>
+                  {subjects.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <h2 className="form-section-title">Déroulement</h2>
+            <div className="row">
+              <Field label="Durée (minutes)" id="duration" hint={formatExamDuration(form.duration_minutes)}>
+                <input
+                  id="duration"
+                  type="number"
+                  min="5"
+                  max="600"
+                  value={form.duration_minutes}
+                  disabled={readOnly}
+                  onChange={(e) => set({ duration_minutes: e.target.value })}
+                />
+              </Field>
+              <Field
+                label="Ouverture"
+                id="start"
+                hint="Vide : vous lancerez la session vous-même."
+              >
+                <input
+                  id="start"
+                  type="datetime-local"
+                  value={form.scheduled_start}
+                  disabled={readOnly}
+                  onChange={(e) => set({ scheduled_start: e.target.value })}
+                />
+              </Field>
+              <Field label="Barème total (points)" id="points">
+                <input
+                  id="points"
+                  type="number"
+                  min="1"
+                  value={form.total_points}
+                  disabled={readOnly}
+                  onChange={(e) => set({ total_points: e.target.value })}
+                />
+              </Field>
+            </div>
+            {!readOnly && (
+              <div className="duration-presets" role="group" aria-label="Durées courantes">
+                {DURATION_PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className="chip"
+                    aria-pressed={Number(form.duration_minutes) === m}
+                    onClick={() => set({ duration_minutes: m })}
+                  >
+                    {formatExamDuration(m)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {imposed === null || !langageUtile ? (
+              <p className="sub" style={{ margin: '0 0 18px' }}>
+                Épreuve algorithmique : la copie se compose en blocs de pseudo-code, aucun
+                langage de programmation n'est à choisir.
+              </p>
+            ) : imposed ? (
+              <p className="sub" style={{ margin: '0 0 18px' }}>
+                Langage des exercices de code : <b>{imposedLabel}</b>, fixé par la matière.
+              </p>
+            ) : (
+              <Field
+                label="Langage des exercices de code"
+                id="language"
+                hint="Les exercices algorithmiques, eux, se composent en blocs de pseudo-code."
+              >
+                <select
+                  id="language"
+                  value={form.language}
+                  disabled={readOnly}
+                  onChange={(e) => set({ language: e.target.value })}
+                >
+                  {languages.map((l) => (
+                    <option key={l.key} value={l.key}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+          </div>
+
+          <div className="form-section">
+            <h2 className="form-section-title">Consignes</h2>
+            <Field
+              label="Affichées à l'apprenant avant de commencer"
+              id="instructions"
+              hint="Facultatif. Documents autorisés, rappel des règles, conseils de gestion du temps…"
+            >
+              <textarea
+                id="instructions"
+                rows={4}
+                value={form.instructions}
+                disabled={readOnly}
+                placeholder="Ex. Aucun document autorisé. Lisez tout le sujet avant de commencer."
+                onChange={(e) => set({ instructions: e.target.value })}
+              />
+            </Field>
+          </div>
+        </section>
+
+        <aside className="card setup-recap" aria-label="Récapitulatif">
+          <h2>Récapitulatif</h2>
+          <dl className="recap-list">
+            <div>
+              <dt>Type</dt>
+              <dd>{EVAL_KIND_LABELS[form.kind]}</dd>
+            </div>
+            <div>
+              <dt>Classe</dt>
+              <dd>
+                {classroom
+                  ? `${classroom.name} · ${classroom.students_count} ét.`
+                  : missing('non affectée')}
+              </dd>
+            </div>
+            <div>
+              <dt>Matière</dt>
+              <dd>{subject?.name ?? missing('aucune')}</dd>
+            </div>
+            <div>
+              <dt>Durée</dt>
+              <dd>{formatExamDuration(form.duration_minutes)}</dd>
+            </div>
+            <div>
+              <dt>Ouverture</dt>
+              <dd>
+                {form.scheduled_start
+                  ? startFmt.format(new Date(form.scheduled_start))
+                  : missing('lancement manuel')}
+              </dd>
+            </div>
+            <div>
+              <dt>Barème</dt>
+              <dd>{Number(form.total_points) || 0} points</dd>
+            </div>
+            <div>
+              <dt>Annonce</dt>
+              <dd>{form.rules.announce_to_students !== false ? 'Annoncée' : 'Surprise'}</dd>
+            </div>
+          </dl>
+          <p className="sub" style={{ margin: 0, fontSize: 12 }}>
+            Tout reste modifiable jusqu'à l'ouverture de la session. Les valeurs de départ se
+            règlent dans Paramètres.
+          </p>
+        </aside>
+      </div>
+
+      <WizardNav
+        step={0}
+        onBack={onCancel}
+        backLabel="Annuler"
+        onNext={onNext}
+        nextLabel="Enregistrer et continuer"
+        pending={pending}
+        disabled={readOnly}
+      />
     </>
   );
 }
@@ -628,7 +887,7 @@ function Editor({ evaluationId, evaluation }) {
  *
  * Elles ont leur propre étape parce qu'on ne les règle pas au moment où l'on
  * saisit un titre : on les règle une fois le sujet écrit, juste avant de le
- * publier — c'est là qu'on décide comment il sera composé.
+ * publier : c'est là qu'on décide comment il sera composé.
  */
 function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
   const rules = form.rules;
@@ -641,12 +900,7 @@ function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
         Ce que l'apprenant peut faire pendant l'épreuve, et ce que la surveillance retient.
       </p>
 
-      {[
-        ['fullscreen', 'Mode plein écran obligatoire', "L'apprenant ne peut pas quitter l'onglet pendant l'épreuve."],
-        ['block_paste', 'Bloquer le copier-coller', 'Désactive le collage de code externe dans l’éditeur.'],
-        ['allow_early_submit', 'Autoriser la soumission anticipée', 'L’apprenant peut rendre sa copie avant la fin.'],
-        ['track_focus', 'Détecter les sorties d’épreuve', 'Changement d’onglet, perte de focus et sortie du plein écran sont journalisés.'],
-      ].map(([key, title, hint]) => (
+      {RULE_SWITCHES.map(([key, title, hint]) => (
         <label className="switch" key={key}>
           <input
             type="checkbox"
@@ -681,6 +935,23 @@ function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
         </span>
       </label>
 
+      <label className="switch">
+        <input
+          type="checkbox"
+          checked={rules.show_solutions !== false}
+          disabled={readOnly}
+          onChange={(e) => setRule('show_solutions', e.target.checked)}
+        />
+        <span>
+          <strong>Proposer le corrigé après publication</strong>
+          <span className="sub">
+            {rules.show_solutions !== false
+              ? 'Avec les notes, chaque exercice montre son corrigé : réponses attendues, solution type et résultats des tests.'
+              : 'Les étudiants voient leur note et vos appréciations, sans corrigé.'}
+          </span>
+        </span>
+      </label>
+
       <Field
         label="Nombre de sorties autorisées"
         id="max-incidents"
@@ -697,14 +968,13 @@ function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
         />
       </Field>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onBack}>
-          Étape précédente
-        </Button>
-        <Button disabled={pending} onClick={onNext}>
-          Continuer → Affectation & publication
-        </Button>
-      </div>
+      <WizardNav
+        step={5}
+        onBack={onBack}
+        onNext={onNext}
+        nextLabel="Publication"
+        pending={pending}
+      />
     </section>
   );
 }
@@ -765,8 +1035,9 @@ function ExercisesStep({
   function changeKind(index, exercise, kind) {
     if (kind === (exercise.kind ?? 'code')) return;
     const patch = { kind, settings: exerciseType(kind).defaults() };
-    if (exercise.settings?.scoring_mode) {
-      patch.settings.scoring_mode = exercise.settings.scoring_mode;
+    // Le barème par tests et le corrigé sont l'œuvre de l'enseignant : ils suivent.
+    for (const key of ['scoring_mode', 'solution', 'solution_notes']) {
+      if (exercise.settings?.[key]) patch.settings[key] = exercise.settings[key];
     }
     if (kind === 'code') {
       if (isUntouchedStarter(exercise.starter_code)) {
@@ -859,7 +1130,7 @@ function ExercisesStep({
             {exercises.map((exercise, index) => (
               <article className="card" key={exercise.id ?? `new-${index}`}>
                 <div className="row">
-                  <Field label={`Exercice ${index + 1} — intitulé`} id={`t-${index}`}>
+                  <Field label={`Exercice ${index + 1} : intitulé`} id={`t-${index}`}>
                     <input
                       id={`t-${index}`}
                       value={exercise.title}
@@ -880,7 +1151,7 @@ function ExercisesStep({
                         <optgroup key={family.name} label={family.name}>
                           {family.types.map((type) => (
                             <option key={type.key} value={type.key}>
-                              {type.label} — {type.tagline}
+                              {type.label} : {type.tagline}
                             </option>
                           ))}
                         </optgroup>
@@ -917,6 +1188,14 @@ function ExercisesStep({
                     onChange={(s) => update(index, { settings: { ...exercise.settings, ...s } })}
                   />
                 )}
+
+                <SolutionEditor
+                  kind={exercise.kind ?? 'code'}
+                  name={`sol-${index}`}
+                  settings={exercise.settings ?? {}}
+                  readOnly={readOnly}
+                  onChange={(settings) => update(index, { settings })}
+                />
 
                 {!readOnly && (
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -967,14 +1246,7 @@ function ExercisesStep({
         />
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onBack}>
-          Étape précédente
-        </Button>
-        <Button disabled={pending} onClick={onNext}>
-          Étape suivante →
-        </Button>
-      </div>
+      <WizardNav step={1} onBack={onBack} onNext={onNext} pending={pending} />
     </section>
   );
 }
@@ -983,7 +1255,7 @@ function ExercisesStep({
  * L'étape « Outils & code de départ » : avec quoi l'apprenant compose sa copie.
  *
  * Les deux exercices pratiques se règlent au même endroit, parce que c'est la
- * même question posée deux fois — que trouve l'apprenant devant lui en ouvrant
+ * même question posée deux fois : que trouve l'apprenant devant lui en ouvrant
  * l'exercice ? Un exercice algorithmique répond par sa boîte à outils : la
  * structure de l'algorithme, elle, est celle du cours et ne se discute pas. Un
  * exercice de code répond par son squelette de départ, que l'enseignant écrit
@@ -1059,14 +1331,7 @@ function EnvironmentStep({ exercises, setExercises, readOnly, onBack, onNext, pe
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onBack}>
-          Étape précédente
-        </Button>
-        <Button disabled={pending} onClick={onNext}>
-          Étape suivante →
-        </Button>
-      </div>
+      <WizardNav step={2} onBack={onBack} onNext={onNext} pending={pending} />
     </section>
   );
 }
@@ -1180,15 +1445,15 @@ function BankPicker({ language, onPick }) {
 }
 
 /**
- * L'étape des points — la dernière avant la publication, et la seule où l'on
+ * L'étape des points : la dernière avant la publication, et la seule où l'on
  * parle de notes.
  *
  * Les points ne se saisissent nulle part ailleurs : ni à côté de l'intitulé, où
  * ils étaient décidés avant même de savoir ce que l'exercice demanderait, ni sur
  * la carte d'un test, où l'on pesait un test sans connaître les suivants. On les
- * alloue ici, une fois les énoncés écrits et les barèmes posés — d'abord ce que
+ * alloue ici, une fois les énoncés écrits et les barèmes posés : d'abord ce que
  * vaut chaque exercice, puis, si l'enseignant le veut, ce que vaut chaque ligne
- * de son barème — avec sous les yeux le total annoncé de l'évaluation et l'écart
+ * de son barème : avec sous les yeux le total annoncé de l'évaluation et l'écart
  * qui reste à combler.
  */
 function PointsStep({ exercises, setExercises, barème, total, readOnly, onBack, onNext, pending }) {
@@ -1309,91 +1574,210 @@ function PointsStep({ exercises, setExercises, barème, total, readOnly, onBack,
         </>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onBack}>
-          Étape précédente
-        </Button>
-        <Button disabled={pending} onClick={onNext}>
-          Étape suivante →
-        </Button>
-      </div>
+      <WizardNav step={4} onBack={onBack} onNext={onNext} pending={pending} />
     </section>
   );
+}
+
+/** Où en est la correction automatique d'un exercice pratique. */
+function exerciseStatus(exercise) {
+  const callable = callableCriteria(exercise);
+  const tests = exercise.tests ?? [];
+  const incomplets = tests.filter((t) => testIssues(t, callable).length > 0).length;
+  if (tests.length === 0) return { ready: false, tone: 'warning', label: 'Aucun test' };
+  if (incomplets > 0) return { ready: false, tone: 'warning', label: `${incomplets} à compléter` };
+  return { ready: true, tone: 'success', label: 'Prêt' };
 }
 
 /**
  * L'étape « Barème & tests » : ce que la copie doit contenir et sur quoi elle
  * est exécutée. Ce que chaque ligne vaut se décide à l'étape suivante.
+ *
+ * Un bandeau dit d'emblée où l'on en est : combien d'exercices sont prêts à
+ * être corrigés. La colonne de gauche liste les exercices pratiques avec leur
+ * état ; l'exercice ouvert se lit en deux temps numérotés : ce que la copie
+ * doit déclarer, puis ce qu'elle doit produire. Un exercice à la fois : les
+ * empiler tous faisait défiler des mètres de formulaires. Les questions
+ * fermées n'ont rien à régler ici, elles ne font que s'y compter.
  */
-function TestsStep({ exercises, setExercises, barème, onBack, onNext, pending }) {
+function TestsStep({ exercises, setExercises, onBack, onNext, pending }) {
+  const pratiques = exercises
+    .map((exercise, index) => ({ exercise, index }))
+    .filter(({ exercise }) => needsTests(exercise.kind));
+  const fermées = exercises.length - pratiques.length;
+
+  const [current, setCurrent] = useState(() => {
+    const first = pratiques.findIndex(({ exercise }) => !exerciseStatus(exercise).ready);
+    return first === -1 ? 0 : first;
+  });
+  const position = Math.min(current, Math.max(pratiques.length - 1, 0));
+  const selected = pratiques[position];
+  const selectedStatus = selected ? exerciseStatus(selected.exercise) : null;
+  const prêts = pratiques.filter(({ exercise }) => exerciseStatus(exercise).ready).length;
+  const toutPrêt = pratiques.length > 0 && prêts === pratiques.length;
+
+  const update = (index, patch) =>
+    setExercises(exercises.map((ex, i) => (i === index ? { ...ex, ...patch } : ex)));
+
+  // Depuis le bas du panneau, on remonte en tête de l'exercice suivant : on ne
+  // commence pas un exercice par sa fin.
+  const open = (i, scroll = false) => {
+    setCurrent(i);
+    if (scroll) {
+      document.getElementById('tests-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <section>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-        <h2 style={{ fontSize: 15 }}>Barème & jeux de tests</h2>
-        <span className="sub" style={{ marginLeft: 12 }}>{barème} points répartis à l'étape suivante</span>
-      </div>
+      <header className="card step-intro">
+        <div className="step-intro-text">
+          <h2>Barème & jeux de tests</h2>
+          <p className="sub">
+            Pour chaque exercice pratique, dites ce que la copie doit contenir, puis ce
+            qu'elle doit produire. Les points se répartissent à l'étape suivante.
+          </p>
+        </div>
+        {pratiques.length > 0 && (
+          <div className="step-intro-progress">
+            <span className="step-intro-count">
+              <span>Prêts à être corrigés</span>
+              <span>
+                <strong>{prêts}</strong> / {pratiques.length}
+              </span>
+            </span>
+            <span
+              className={`step-meter ${toutPrêt ? 'is-full' : ''}`.trim()}
+              role="progressbar"
+              aria-label="Exercices prêts à être corrigés"
+              aria-valuemin={0}
+              aria-valuemax={pratiques.length}
+              aria-valuenow={prêts}
+            >
+              <span style={{ width: `${(prêts / pratiques.length) * 100}%` }} />
+            </span>
+            <span className="sub step-intro-note">
+              {toutPrêt
+                ? 'Tout est prêt : vous pouvez passer aux points.'
+                : 'Vous pouvez continuer et y revenir, mais un test incomplet peut mettre en échec toutes les copies.'}
+            </span>
+          </div>
+        )}
+      </header>
 
-      <div style={{ display: 'grid', gap: 12 }}>
-        {exercises.map((exercise, exIndex) => {
-          const withTests = needsTests(exercise.kind);
-
-          return (
-          <article className="card" key={exercise.id ?? `new-${exIndex}`}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 10 }}>
-              <strong style={{ fontSize: 14 }}>
-                Exercice {exIndex + 1} · {exercise.title || 'sans titre'}
-              </strong>
-              <span className="sub">{exerciseType(exercise.kind ?? 'code').label}</span>
-            </div>
-
-            {!withTests && (
-              <p className="sub" style={{ marginBottom: 8 }}>
-                {exerciseType(exercise.kind).gradingNote}
+      {pratiques.length === 0 ? (
+        <div className="card">
+          <p className="sub" style={{ margin: 0 }}>
+            Aucun exercice pratique : les questions fermées se corrigent sur les réponses
+            attendues saisies à l'étape 2, il n'y a ni déclaration ni test à écrire.
+          </p>
+        </div>
+      ) : (
+        <div className="tests-step">
+          <nav className="tests-rail" aria-label="Exercices à corriger par tests">
+            <span className="tests-rail-label">Exercices pratiques</span>
+            {pratiques.map(({ exercise, index }, i) => {
+              const statut = exerciseStatus(exercise);
+              const nbTests = exercise.tests?.length ?? 0;
+              const nbCriteres = criteriaOf(exercise).length;
+              return (
+                <button
+                  key={exercise.id ?? `new-${index}`}
+                  type="button"
+                  className="tests-rail-item"
+                  aria-current={i === position ? 'true' : undefined}
+                  onClick={() => open(i)}
+                >
+                  <span className="tests-rail-num">{index + 1}</span>
+                  <span className="tests-rail-corps">
+                    <span className="tests-rail-titre">{exercise.title || 'Sans intitulé'}</span>
+                    <span className="tests-rail-meta">
+                      {exerciseType(exercise.kind).badge} · {nbTests} test{nbTests > 1 ? 's' : ''}
+                      {nbCriteres > 0 ? ` · ${nbCriteres} décl.` : ''}
+                    </span>
+                  </span>
+                  <span className={`tests-rail-etat is-${statut.tone}`} title={statut.label}>
+                    <span aria-hidden="true">{statut.ready ? '✓' : '!'}</span>
+                    <span className="sr-only">{statut.label}</span>
+                  </span>
+                </button>
+              );
+            })}
+            {fermées > 0 && (
+              <p className="tests-rail-note sub">
+                {fermées === 1 ? 'Une question fermée' : `${fermées} questions fermées`} :
+                corrigée{fermées > 1 ? 's' : ''} sur les réponses attendues, rien à régler ici.
               </p>
             )}
+          </nav>
 
-            {withTests && (
-              <div style={{ marginBottom: 12 }}>
+          {selected && (
+            <article
+              className="card tests-panel"
+              id="tests-panel"
+              key={selected.exercise.id ?? `new-${selected.index}`}
+            >
+              <header className="tests-panel-head">
+                <div style={{ minWidth: 0 }}>
+                  <span className="tests-panel-eyebrow">
+                    Exercice {selected.index + 1} · {exerciseType(selected.exercise.kind).badge}
+                  </span>
+                  <h3>{selected.exercise.title || 'Sans intitulé'}</h3>
+                  <p className="sub">{exerciseType(selected.exercise.kind).gradingNote}</p>
+                </div>
+                <Tag tone={selectedStatus.tone}>{selectedStatus.label}</Tag>
+              </header>
+
+              <div className="tests-panel-section">
                 <BaremeEditor
-                  exercise={exercise}
-                  criteria={criteriaOf(exercise)}
+                  exercise={selected.exercise}
+                  criteria={criteriaOf(selected.exercise)}
                   onCriteriaChange={(next) =>
-                    setExercises(
-                      exercises.map((ex, i) =>
-                        i === exIndex
-                          ? { ...ex, settings: { ...ex.settings, criteria: next } }
-                          : ex,
-                      ),
-                    )
+                    update(selected.index, {
+                      settings: { ...selected.exercise.settings, criteria: next },
+                    })
                   }
                 />
               </div>
-            )}
 
-            {withTests && (
-              <TestsEditor
-                exercise={exercise}
-                tests={exercise.tests}
-                showComparison
-                template={EMPTY_TEST}
-                onChange={(tests) =>
-                  setExercises(exercises.map((ex, i) => (i === exIndex ? { ...ex, tests } : ex)))
-                }
-              />
-            )}
-          </article>
-          );
-        })}
-      </div>
+              <div className="tests-panel-section">
+                <TestsEditor
+                  exercise={selected.exercise}
+                  tests={selected.exercise.tests}
+                  showComparison
+                  template={EMPTY_TEST}
+                  onChange={(tests) => update(selected.index, { tests })}
+                />
+              </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-        <Button variant="secondary" onClick={onBack}>
-          Étape précédente
-        </Button>
-        <Button disabled={pending} onClick={onNext}>
-          Étape suivante →
-        </Button>
-      </div>
+              {pratiques.length > 1 && (
+                <footer className="tests-panel-foot">
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    disabled={position === 0}
+                    onClick={() => open(position - 1, true)}
+                  >
+                    ← Exercice précédent
+                  </Button>
+                  <span className="sub">
+                    {position + 1} sur {pratiques.length}
+                  </span>
+                  {position < pratiques.length - 1 ? (
+                    <Button size="small" onClick={() => open(position + 1, true)}>
+                      Exercice suivant →
+                    </Button>
+                  ) : (
+                    <span className="sub tests-panel-fin">Dernier exercice pratique</span>
+                  )}
+                </footer>
+              )}
+            </article>
+          )}
+        </div>
+      )}
+
+      <WizardNav step={3} onBack={onBack} onNext={onNext} pending={pending} />
     </section>
   );
 }

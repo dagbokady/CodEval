@@ -13,7 +13,7 @@ export default function StudentResultsPage() {
   const { organization } = useAuth();
   const results = useMyResults();
   /* Un apprenant ne relit pas « toutes ses copies » : il relit celles d'une
-     matière — l'algorithmique avant le partiel d'algorithmique. */
+     matière : l'algorithmique avant le partiel d'algorithmique. */
   const [matiere, setMatiere] = useState(TOUTES);
 
   const items = useMemo(() => results.data ?? [], [results.data]);

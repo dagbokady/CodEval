@@ -4,8 +4,8 @@
  * « ÉPREUVE / Durée », filet, puis les questions numérotées Q1, Q2… avec leurs
  * propositions en a) b) c) d).
  *
- * Un seul composant sert les trois écrans qui montrent le sujet — aperçu de
- * l'enseignant, « Sujet complet » de l'apprenant, copie corrigée — pour qu'ils ne
+ * Un seul composant sert les trois écrans qui montrent le sujet (aperçu de
+ * l'enseignant, « Sujet complet » de l'apprenant, copie corrigée) pour qu'ils ne
  * divergent jamais. Toutes les tailles sont en `em` : le contexte fixe la taille
  * de base sur `.sujet` (petite dans l'aperçu, pleine dans l'épreuve).
  */
@@ -20,8 +20,7 @@ import {
   inputTypesOf,
   valueType,
 } from '../bareme';
-import { CLOSED_KINDS, exerciseType, hasQuestions } from '../exerciseTypes';
-import { toolboxSummary } from '../algoVocabulary';
+import { exerciseType, hasQuestions } from '../exerciseTypes';
 import { questionsOf } from '../questions';
 
 function sessionYear(date) {
@@ -111,9 +110,9 @@ function QcmChoices({ question }) {
 
 /**
  * Correspondance : deux colonnes que l'apprenant relie au crayon. Pas de numéro
- * ni de lettre — un point derrière chaque élément de gauche, un point devant
+ * ni de lettre : un point derrière chaque élément de gauche, un point devant
  * chaque élément de droite : les attaches se font face, le trait passe entre elles.
- * Pendant l'épreuve le serveur n'envoie que `right_options`, déjà mélangée — la
+ * Pendant l'épreuve le serveur n'envoie que `right_options`, déjà mélangée : la
  * disposition des colonnes ne révèle donc rien.
  */
 function MatchingColumns({ question }) {
@@ -211,7 +210,7 @@ const DEMANDE = {
 /**
  * Les jeux de tests montrés comme des exemples d'exécution : « on entre ceci,
  * il doit sortir cela ». C'est la forme sous laquelle l'enseignant relit son
- * barème pendant qu'il le saisit — et celle qu'un énoncé de TD donne toujours.
+ * barème pendant qu'il le saisit : et celle qu'un énoncé de TD donne toujours.
  */
 function SheetExamples({ exercise }) {
   const tests = exercise.tests ?? [];
@@ -307,24 +306,9 @@ export function SheetExercise({ exercise, number, showAnswerZone = true, showTes
           language={exercise.language}
         />
       )}
-      {/* L'apprenant doit savoir, avant d'ouvrir l'éditeur, avec quoi il a le
-          droit de composer : la palette qu'il trouvera est exactement celle-ci. */}
-      {kind === 'algo' && (
-        <div className="sujet-etiquette">
-          Réponse en blocs algorithmiques — structure imposée (Algorithme, Déclaration, Début,
-          Fin). Outils autorisés : {toolboxSummary(exercise.settings?.allowed_elements)}.
-        </div>
-      )}
-
       {/* Réservé à l'aperçu de l'enseignant : sur la feuille de l'apprenant, les
           sorties attendues donneraient la réponse. */}
       {showTests && <SheetExamples exercise={exercise} />}
-
-      {showAnswerZone && !CLOSED_KINDS.has(kind) && kind !== 'short' && (
-        <div className="sujet-reponse">
-          {kind === 'algo' ? 'Zone de réponse algorithmique' : 'Zone de réponse (éditeur de code)'}
-        </div>
-      )}
     </article>
   );
 }
@@ -380,7 +364,7 @@ export function SubjectSheet({
       )}
 
       <div className="sujet-pied">
-        — Fin du sujet — {exercises.length} exercice{exercises.length !== 1 ? 's' : ''} · {points}{' '}
+        Fin du sujet · {exercises.length} exercice{exercises.length !== 1 ? 's' : ''} · {points}{' '}
         points
       </div>
     </div>

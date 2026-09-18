@@ -6,8 +6,8 @@
  * largeur. On ne voyait plus ce qu'un test *fait*. Les points n'y sont même
  * plus : ce qu'un test vaut se décide à la dernière étape, une fois tous les
  * tests écrits (voir `PointsEditor`). Chaque test est désormais une
- * carte qui se lit dans l'ordre où on la remplit — ce qui est exécuté, ce qu'on
- * lui donne, ce qu'on attend — et se conclut par la phrase que le correcteur
+ * carte qui se lit dans l'ordre où on la remplit (ce qui est exécuté, ce qu'on
+ * lui donne, ce qu'on attend) et se conclut par la phrase que le correcteur
  * appliquera. Le choix de la cible reprend les cartes du choix de type, à
  * l'ouverture de l'éditeur : la même façon de choisir, au même endroit du geste.
  *
@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react';
-import { Button } from './ui';
+import { Button, Disclosure, Tag } from './ui';
 import { TestExpected, TestInputs } from './BaremeEditor';
 import {
   COMPARISONS,
@@ -25,6 +25,7 @@ import {
   expectedTypeOf,
   formatValue,
   inputTypesOf,
+  testIssues,
   valueType,
 } from '../bareme';
 
@@ -36,7 +37,7 @@ function comparesText(criterion) {
 /**
  * La phrase que le correcteur appliquera, en clair : c'est elle qui dit à
  * l'enseignant s'il a rempli le test comme il le croyait. Les valeurs y sont
- * écrites comme en C — {3, 1, 4}, 'A', "bonjour" — pour qu'on reconnaisse le
+ * écrites comme en C : {3, 1, 4}, 'A', "bonjour" : pour qu'on reconnaisse le
  * type d'un coup d'œil.
  */
 function testSummary(test, criterion) {
@@ -56,7 +57,7 @@ function testSummary(test, criterion) {
 }
 
 /**
- * Le récapitulatif des jeux de tests : une ligne par test, quatre colonnes — le
+ * Le récapitulatif des jeux de tests : une ligne par test, quatre colonnes : le
  * type de ce qu'on donne et sa valeur, le type de ce qui doit sortir et sa
  * valeur.
  *
@@ -70,7 +71,6 @@ function TestsRecap({ tests, callable }) {
 
   return (
     <div className="tests-recap">
-      <span className="tests-recap-titre">Récapitulatif — ce qui entre, ce qui doit sortir</span>
       <table className="tests-recap-table">
         <thead>
           <tr>
@@ -174,12 +174,65 @@ function Etape({ numero, titre, aide, children }) {
   );
 }
 
-function TestCard({ test, index, callable, showComparison, onChange, onRemove }) {
+/**
+ * Un test, ouvert ou replié. Replié, il se réduit à sa phrase de correction :
+ * dix tests se relisent d'un coup d'œil, et l'on ouvre celui qu'on veut
+ * reprendre au lieu de faire défiler dix formulaires.
+ */
+function TestCard({
+  test,
+  index,
+  callable,
+  showComparison,
+  open,
+  onToggle,
+  onChange,
+  onDuplicate,
+  onRemove,
+}) {
   const criterion = callable.find((c) => c.id === test.target_id);
   const texte = comparesText(criterion);
+  const issues = testIssues(test, callable);
+  const incomplet = issues.length > 0 ? 'test-carte--incomplet' : '';
+
+  const actions = (
+    <div className="test-carte-actions">
+      <Button
+        variant="ghost"
+        size="small"
+        title="Même forme, d'autres valeurs : copiez le test puis changez-les"
+        onClick={onDuplicate}
+      >
+        Dupliquer
+      </Button>
+      <Button variant="danger-ghost" size="small" onClick={onRemove}>
+        Retirer
+      </Button>
+    </div>
+  );
+
+  if (!open) {
+    return (
+      <article className={`test-carte test-carte--repliee ${incomplet}`.trim()}>
+        <button
+          type="button"
+          className="test-carte-ligne"
+          aria-expanded="false"
+          title="Modifier ce test"
+          onClick={onToggle}
+        >
+          <span className="test-carte-numero">{index + 1}</span>
+          <span className="test-carte-ligne-nom">{test.name || `Test ${index + 1}`}</span>
+          <code className="test-carte-ligne-resume">{testSummary(test, criterion)}</code>
+          {issues.length > 0 && <Tag tone="warning">À compléter</Tag>}
+        </button>
+        {actions}
+      </article>
+    );
+  }
 
   return (
-    <article className="test-carte">
+    <article className={`test-carte ${incomplet}`.trim()}>
       <header className="test-carte-tete">
         <span className="test-carte-numero">{index + 1}</span>
         <input
@@ -189,8 +242,9 @@ function TestCard({ test, index, callable, showComparison, onChange, onRemove })
           placeholder={`Test ${index + 1}`}
           onChange={(e) => onChange({ name: e.target.value })}
         />
-        <Button variant="secondary" size="small" onClick={onRemove}>
-          Retirer
+        {actions}
+        <Button variant="secondary" size="small" aria-expanded="true" onClick={onToggle}>
+          Replier
         </Button>
       </header>
 
@@ -251,7 +305,7 @@ function TestCard({ test, index, callable, showComparison, onChange, onRemove })
             >
               {COMPARISONS.map((mode) => (
                 <option key={mode.key} value={mode.key}>
-                  {mode.label} — {mode.hint}
+                  {mode.label} : {mode.hint}
                 </option>
               ))}
             </select>
@@ -260,6 +314,7 @@ function TestCard({ test, index, callable, showComparison, onChange, onRemove })
       </Etape>
 
       <p className="test-resume">{testSummary(test, criterion)}</p>
+      {issues.length > 0 && <p className="test-alerte">À compléter : {issues.join(' · ')}.</p>}
     </article>
   );
 }
@@ -267,7 +322,7 @@ function TestCard({ test, index, callable, showComparison, onChange, onRemove })
 /**
  * L'étape des comparaisons : une ligne par test, où l'on choisit la sévérité de
  * la correction. Séparée de la saisie des tests parce qu'elle ne se règle
- * qu'une fois les sorties écrites — et qu'on la règle souvent d'un bloc.
+ * qu'une fois les sorties écrites : et qu'on la règle souvent d'un bloc.
  */
 export function ComparisonEditor({ exercise, tests, onChange }) {
   const callable = callableCriteria(exercise);
@@ -354,38 +409,77 @@ export default function TestsEditor({
   showComparison = false,
 }) {
   const callable = callableCriteria(exercise);
-  const [picking, setPicking] = useState(false);
+  // Où s'ouvre le choix de la cible : en haut, ou sous le dernier test quand on
+  // a cliqué le bouton du bas : pas à l'autre bout d'une longue liste.
+  const [picking, setPicking] = useState(null);
+  // Un seul test ouvert à la fois. On ouvre d'emblée le premier qui reste à
+  // compléter : c'est là que l'enseignant a quelque chose à faire.
+  const [open, setOpen] = useState(() => {
+    const incomplet = tests.findIndex((t) => testIssues(t, callable).length > 0);
+    if (incomplet !== -1) return incomplet;
+    return tests.length === 1 ? 0 : null;
+  });
 
   const add = (target_id) => {
     onChange([
       ...tests,
       { ...template, name: `Test ${tests.length + 1}`, target_id, args: [], input_types: [] },
     ]);
-    setPicking(false);
+    setOpen(tests.length);
+    setPicking(null);
   };
   // Sans fonction déclarée, il n'y a rien à choisir : le test porte sur le programme.
-  const startAdd = () => (callable.length > 0 ? setPicking(true) : add(null));
+  const startAdd = (where) => (callable.length > 0 ? setPicking(where) : add(null));
+
+  /* La copie perd son identité serveur : c'est un nouveau test, rangé juste
+     après son modèle et ouvert pour qu'on en change les valeurs. */
+  const duplicate = (index) => {
+    const source = tests[index];
+    const copy = { ...source, name: `${source.name || `Test ${index + 1}`} (copie)` };
+    delete copy.id;
+    delete copy.position;
+    onChange([...tests.slice(0, index + 1), copy, ...tests.slice(index + 1)]);
+    setOpen(index + 1);
+  };
+
+  const remove = (index) => {
+    onChange(tests.filter((_, i) => i !== index));
+    setOpen((o) => (o === null || o === index ? null : o > index ? o - 1 : o));
+  };
+
+  const picker = (
+    <CiblePicker callable={callable} onPick={add} onCancel={() => setPicking(null)} />
+  );
+  const incomplets = tests.filter((t) => testIssues(t, callable).length > 0).length;
 
   return (
     <section className="tests-editeur">
       <header className="tests-tete">
         <div>
-          <strong style={{ fontSize: 13 }}>Jeux de tests</strong>
+          <strong className="tests-tete-titre">
+            Jeux de tests{tests.length > 0 ? ` · ${tests.length}` : ''}
+          </strong>
           <p className="sub" style={{ margin: '2px 0 0', fontSize: 12 }}>
-            Chaque test fait tourner la copie sur des valeurs choisies et compare le
-            résultat obtenu à celui que vous attendez.
+            {tests.length > 1
+              ? `Cliquez sur un test pour le modifier.${
+                  incomplets ? ` ${incomplets} reste${incomplets > 1 ? 'nt' : ''} à compléter.` : ''
+                }`
+              : 'Chaque test fait tourner la copie sur des valeurs choisies et compare le résultat obtenu à celui que vous attendez.'}
           </p>
         </div>
         {!picking && (
-          <Button variant="secondary" size="small" style={{ marginLeft: 'auto' }} onClick={startAdd}>
+          <Button
+            variant="secondary"
+            size="small"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => startAdd('haut')}
+          >
             + Ajouter un test
           </Button>
         )}
       </header>
 
-      {picking && (
-        <CiblePicker callable={callable} onPick={add} onCancel={() => setPicking(false)} />
-      )}
+      {picking === 'haut' && picker}
 
       {tests.length === 0 && !picking && (
         <div className="tests-vide">
@@ -394,7 +488,7 @@ export default function TestsEditor({
             Sans test, cet exercice ne pourra pas être corrigé automatiquement : seules
             les déclarations attendues seront vérifiées.
           </p>
-          <Button onClick={startAdd}>+ Ajouter un premier test</Button>
+          <Button onClick={() => startAdd('haut')}>+ Ajouter un premier test</Button>
         </div>
       )}
 
@@ -405,14 +499,38 @@ export default function TestsEditor({
           index={index}
           callable={callable}
           showComparison={showComparison}
+          open={open === index}
+          onToggle={() => setOpen(open === index ? null : index)}
           onChange={(patch) =>
             onChange(tests.map((t, i) => (i === index ? { ...t, ...patch } : t)))
           }
-          onRemove={() => onChange(tests.filter((_, i) => i !== index))}
+          onDuplicate={() => duplicate(index)}
+          onRemove={() => remove(index)}
         />
       ))}
 
-      <TestsRecap tests={tests} callable={callable} />
+      {picking === 'bas' && picker}
+      {tests.length >= 3 && !picking && (
+        <Button
+          variant="secondary"
+          size="small"
+          style={{ justifySelf: 'start' }}
+          onClick={() => startAdd('bas')}
+        >
+          + Ajouter un test
+        </Button>
+      )}
+
+      {/* Replié par défaut : les tests repliés se lisent déjà ligne à ligne ;
+          le tableau sert à relire les types d'un bloc, quand on le demande. */}
+      {tests.length > 1 && (
+        <Disclosure
+          summary="Récapitulatif des tests"
+          hint="Ce qui entre et ce qui doit sortir, test par test, avec les types."
+        >
+          <TestsRecap tests={tests} callable={callable} />
+        </Disclosure>
+      )}
     </section>
   );
 }

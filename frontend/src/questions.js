@@ -1,5 +1,5 @@
 /**
- * Exercices à plusieurs questions — QCM, correspondance, question-réponse.
+ * Exercices à plusieurs questions : QCM, correspondance, question-réponse.
  *
  * Un exercice de ces types n'a pas d'énoncé unique : il porte une liste de
  * questions, chacune avec son intitulé et son corrigé, rangées dans

@@ -86,7 +86,7 @@ def freeze(db: Session, evaluation: Evaluation, reason: str) -> None:
     label = "Temps écoulé" if reason == "expiration" else "Clôturée manuellement"
     notify(
         db, evaluation.teacher_id,
-        f"Épreuve terminée — {evaluation.title}",
+        f"Épreuve terminée : {evaluation.title}",
         f"{label}. {submitted}/{total} productions soumises.",
         f"/evaluations/{evaluation.id}/resultats",
     )
