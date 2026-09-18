@@ -758,6 +758,7 @@ function Exam({ evaluationId, data }) {
                     />
                   ) : exercise.kind === 'algo' ? (
                     <AlgoEditor
+                      key={exercise.id}
                       value={codeOf(exercise.id)}
                       onChange={onChange}
                       allowed={exercise.settings?.allowed_elements}

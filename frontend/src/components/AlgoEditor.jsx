@@ -50,9 +50,10 @@ const RUBRIQUES = { constantes: 'CONSTANTES', types: 'TYPES', variables: 'VARIAB
 function containerAt(tree, path) {
   let list = tree;
   for (const step of path) {
-    list = list[step.index][step.key];
+    list = list?.[step.index]?.[step.key];
   }
-  return list;
+  // Chemin périmé (bloc supprimé, autre exercice) : on retombe sur la racine.
+  return Array.isArray(list) ? list : tree;
 }
 
 function update(tree, path, mutate) {
