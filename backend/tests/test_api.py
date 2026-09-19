@@ -1458,3 +1458,190 @@ def test_annuler_une_evaluation_terminee(context):
 
     # Plus de publication possible.
     assert client.post(f"/api/evaluations/{eid}/validate", headers=t).status_code == 409
+
+
+def test_register_creates_admin(context):
+    me = client.get("/api/auth/me", headers=auth(context["admin"])).json()
+    assert me["user"]["role"] == "admin"
+
+
+def test_teacher_cannot_manage_establishment(context):
+    t = auth(context["teacher"])
+    assert client.get("/api/users", headers=t).status_code == 403
+    res = client.post(
+        "/api/users",
+        headers=t,
+        json={"email": "x@test.ci", "full_name": "Pirate", "role": "admin", "password": "motdepasse1"},
+    )
+    assert res.status_code == 403
+    assert client.post("/api/classrooms", headers=t, json={"name": "X"}).status_code == 403
+    assert client.get("/api/admin/audit", headers=t).status_code == 403
+    assert client.get("/api/stats/overview", headers=t).status_code == 403
+
+
+def test_admin_user_management(context):
+    a = auth(context["admin"])
+    me = client.get("/api/auth/me", headers=a).json()["user"]
+
+    # Un e-mail est unique sur toute la plateforme.
+    res = client.post(
+        "/api/users",
+        headers=a,
+        json={"email": "PROF@test.ci", "full_name": "Doublon", "role": "teacher", "password": "motdepasse1"},
+    )
+    assert res.status_code == 409
+
+    # Un étudiant créé directement dans sa classe.
+    res = client.post(
+        "/api/users",
+        headers=a,
+        json={
+            "email": "etu2@test.ci",
+            "full_name": "Second Étudiant",
+            "role": "student",
+            "password": "motdepasse1",
+            "classroom_id": context["classroom"],
+        },
+    )
+    assert res.status_code == 201, res.text
+    student = res.json()
+    listing = client.get(
+        f"/api/users?role=student&classroom_id={context['classroom']}", headers=a
+    ).json()
+    names = {u["email"]: u for u in listing["items"]}
+    assert names["etu2@test.ci"]["classrooms"] == ["L2 Test"]
+
+    # L'administrateur ne se désactive pas lui-même.
+    res = client.patch(f"/api/users/{me['id']}", headers=a, json={"is_active": False})
+    assert res.status_code == 409
+
+    # Mot de passe provisoire : il permet de se connecter.
+    temp = client.post(f"/api/users/{student['id']}/reset-password", headers=a).json()["password"]
+    res = client.post("/api/auth/login", json={"email": "etu2@test.ci", "password": temp})
+    assert res.status_code == 200
+
+    # Désactivé, le compte ne se connecte plus.
+    client.patch(f"/api/users/{student['id']}", headers=a, json={"is_active": False})
+    res = client.post("/api/auth/login", json={"email": "etu2@test.ci", "password": temp})
+    assert res.status_code == 403
+
+    client.delete(f"/api/classrooms/{context['classroom']}/students/{student['id']}", headers=a)
+    students = client.get(f"/api/classrooms/{context['classroom']}/students", headers=a).json()
+    assert student["id"] not in {s["id"] for s in students}
+
+
+def test_admin_classrooms_and_subjects(context):
+    a = auth(context["admin"])
+    teacher = next(
+        u for u in client.get("/api/users?role=teacher", headers=a).json()["items"]
+        if u["email"] == "prof@test.ci"
+    )
+    classroom = client.post("/api/classrooms", headers=a, json={"name": "L3 Temp"}).json()
+    subject = client.post("/api/subjects", headers=a, json={"name": "Réseaux"}).json()
+    assert client.post("/api/subjects", headers=a, json={"name": "réseaux"}).status_code == 409
+
+    res = client.post(
+        f"/api/classrooms/{classroom['id']}/teachers",
+        headers=a,
+        json={"teacher_id": teacher["id"], "subject_id": subject["id"]},
+    )
+    assert res.status_code == 201, res.text
+    assignment = res.json()
+    assert assignment["subject_name"] == "Réseaux"
+    listing = {c["id"]: c for c in client.get("/api/classrooms", headers=a).json()}
+    assert listing[classroom["id"]]["teachers_count"] == 1
+
+    res = client.patch(
+        f"/api/classrooms/{classroom['id']}", headers=a, json={"name": "L3 Réseaux", "level": "L3"}
+    )
+    assert res.json()["name"] == "L3 Réseaux"
+
+    # Une matière utilisée par une évaluation ne se supprime pas.
+    assert client.delete(f"/api/subjects/{context['subject']}", headers=a).status_code == 409
+    assert client.delete(f"/api/classrooms/{context['classroom']}", headers=a).status_code == 409
+
+    assert client.delete(f"/api/subjects/{subject['id']}", headers=a).status_code == 204
+    assert client.delete(f"/api/classrooms/{classroom['id']}", headers=a).status_code == 204
+
+
+def test_admin_supervision(context):
+    a = auth(context["admin"])
+    overview = client.get("/api/stats/overview", headers=a).json()
+    assert overview["admins"] == 1
+    evaluations = client.get("/api/admin/evaluations", headers=a).json()
+    assert evaluations["total"] >= 1
+    assert evaluations["items"][0]["teacher_name"] == "Prof Test"
+    audit = client.get("/api/admin/audit?action=user", headers=a).json()
+    assert audit["total"] >= 2
+    assert all(e["action"].startswith("user.") for e in audit["items"])
+    res = client.patch("/api/admin/organization", headers=a, json={"name": "Test University 2"})
+    assert res.json()["name"] == "Test University 2"
+
+
+def test_notation_du_cours_d_algorithmique():
+    """<>, virgule décimale, SELON, SINONSI, ECRIRE + CRLF, procédures (E)/(S)/(E/S),
+    récursivité, tableaux à deux dimensions et enregistrements."""
+    import json as _json
+    import subprocess
+    import sys
+
+    from app.grading.algo import DECLARATIONS, ELEMENTS, AlgoError, transpile
+
+    tout = list(ELEMENTS) + list(DECLARATIONS)
+
+    def run(doc, stdin=""):
+        source = transpile(_json.dumps(doc), tout, saut_de_ligne=False)
+        return subprocess.run([sys.executable, "-c", source], input=stdin,
+                              capture_output=True, text=True, timeout=10).stdout
+
+    v = lambda nom, t="entier", **k: {"nom": nom, "type": t, **k}  # noqa: E731
+    a = lambda c, e: {"type": "affectation", "cible": c, "expression": e}  # noqa: E731
+    e = lambda x: {"type": "ecrire", "expression": x}  # noqa: E731
+
+    cinema = {"variables": [v("jour", "chaine"), v("etud", "caractere"), v("prix", "reel")],
+              "corps": [{"type": "lire", "cible": "jour, etud"},
+                        {"type": "si", "condition": "etud = 'o'", "alors": [a("prix", "4,5")],
+                         "sinonsi": [{"condition": 'jour <> "sa"', "corps": [a("prix", "4,5")]}],
+                         "sinon": [a("prix", "7")]}, e("prix")]}
+    assert run(cinema, "sa n") == "7" and run(cinema, "lu n") == "4.5"
+
+    triangle = {"variables": [v("n"), v("i"), v("j")], "corps": [
+        {"type": "lire", "cible": "n"},
+        {"type": "pour", "variable": "i", "debut": "1", "fin": "n", "corps": [
+            {"type": "pour", "variable": "j", "debut": "1", "fin": "n-i+1", "corps": [e("'a'")]},
+            e("CRLF")]}]}
+    assert run(triangle, "3") == "aaa\naa\na\n"
+
+    vote = {"variables": [v("c", "caractere"), v("oui")], "corps": [
+        {"type": "repeter", "condition": "c = 'X'", "corps": [
+            {"type": "lire", "cible": "c"},
+            {"type": "selon", "expression": "c", "cas": [{"valeurs": "'O'", "corps": [a("oui", "oui + 1")]}]}]},
+        e('"oui : " + oui')]}
+    assert run(vote, "O N O X") == "oui : 2"
+
+    tri = {"variables": [v("c1", "caractere"), v("c2", "caractere")], "corps": [
+        {"type": "lire", "cible": "c1, c2"},
+        {"type": "appel", "nom": "échanger", "arguments": "c1, c2"}, e("c1, c2")],
+        "sousProgrammes": [{"type": "procedure", "nom": "échanger", "parametres": [
+            {"nom": "x", "type": "CARACTERE", "mode": "ES"}, {"nom": "y", "type": "CARACTERE", "mode": "ES"}],
+            "variables": [v("aux", "caractere")], "corps": [a("aux", "x"), a("x", "y"), a("y", "aux")]}]}
+    assert run(tri, "A B") == "BA"
+
+    fact = {"variables": [v("n")], "corps": [{"type": "lire", "cible": "n"}, e("fact(n)")],
+            "sousProgrammes": [{"type": "fonction", "nom": "fact", "parametres": [{"nom": "k", "type": "ENTIER"}],
+                                "typeRetour": "ENTIER", "corps": [
+                {"type": "si", "condition": "k <= 1", "alors": [{"type": "retour", "expression": "1"}],
+                 "sinon": [{"type": "retour", "expression": "k * fact(k - 1)"}]}]}]}
+    assert run(fact, "5") == "120"
+
+    classe = {"types": [{"nom": "Etudiant", "champs": [{"nom": "nom", "type": "CHAINE"},
+                                                      {"nom": "notes", "type": "TABLEAU[1..2] DE REEL"}]}],
+              "variables": [v("t", "tableau_nomme", cible="Etudiant", taille="2"),
+                            v("m", "tableau_entier", taille="2", taille2="2")],
+              "corps": [{"type": "lire", "cible": "t[2].nom, t[2].notes[1]"}, a("m[2][1]", "7"),
+                        e('t[2].nom, " ", t[2].notes[1] * 2, " ", m[2][1]')]}
+    assert run(classe, "Awa 7,5") == "Awa 15 7"
+
+    for dangereux in ['"a".format', "x.__class__", "_donnees"]:
+        with pytest.raises(AlgoError):
+            transpile(_json.dumps({"corps": [e(dangereux)]}), tout)

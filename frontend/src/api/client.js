@@ -10,7 +10,7 @@ export function setToken(token) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(message, status) {
     super(message);
     this.status = status;
@@ -53,8 +53,4 @@ export async function api(path, { method = 'GET', body, signal, raw = false } = 
   if (raw) return res;
   if (res.status === 204) return null;
   return res.json();
-}
-
-export function apiUrl(path) {
-  return `${BASE}${path}`;
 }

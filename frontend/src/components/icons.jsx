@@ -79,28 +79,6 @@ export const IconBook = () => (
   </svg>
 );
 
-export const IconScale = () => (
-  <svg {...base}>
-    <path d="M8.5 2v13" />
-    <path d="M3 5l5.5-2 5.5 2" />
-    <path d="M3 5l-1 5h4L5 5" />
-    <path d="M14 5l-1 5h-4l1-5" />
-  </svg>
-);
-
-export const IconSession = () => (
-  <svg {...base}>
-    <circle cx="8.5" cy="8.5" r="6.5" />
-    <path d="M7 6l4 2.5-4 2.5V6z" fill="currentColor" stroke="none" />
-  </svg>
-);
-
-export const IconCheck = () => (
-  <svg {...base}>
-    <path d="M3 8.5l3.5 3.5 7-7" />
-  </svg>
-);
-
 export const IconBell = () => (
   <svg {...base}>
     <path d="M4 6.5a4.5 4.5 0 019 0c0 5 2 6.5 2 6.5H2s2-1.5 2-6.5" />
@@ -108,47 +86,9 @@ export const IconBell = () => (
   </svg>
 );
 
-export const IconChevronRight = () => (
-  <svg {...base}>
-    <path d="M6 3l5 5.5L6 14" />
-  </svg>
-);
-
 export const IconChevronDown = () => (
   <svg {...base}>
     <path d="M3 6l5.5 5L14 6" />
-  </svg>
-);
-
-export const IconGraduation = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M10 2l8 4-8 4-8-4 8-4z" />
-    <path d="M4 8v5c0 1.5 2.7 3 6 3s6-1.5 6-3V8" />
-    <path d="M18 6v6" />
-  </svg>
-);
-
-export const IconCalendar = () => (
-  <svg {...base}>
-    <rect x="2" y="3" width="13" height="12" rx="2" />
-    <path d="M5.5 1v3M11.5 1v3M2 7h13" />
-  </svg>
-);
-
-export const IconTrophy = () => (
-  <svg {...base}>
-    <path d="M5 2h7v5a3.5 3.5 0 01-7 0V2z" />
-    <path d="M5 4H3.5a1.5 1.5 0 000 3H5M12 4h1.5a1.5 1.5 0 010 3H12" />
-    <path d="M8.5 10v2M6 12h5" />
-    <path d="M5 14h7" />
-  </svg>
-);
-
-export const IconTarget = () => (
-  <svg {...base}>
-    <circle cx="8.5" cy="8.5" r="6.5" />
-    <circle cx="8.5" cy="8.5" r="3.5" />
-    <circle cx="8.5" cy="8.5" r="1" fill="currentColor" stroke="none" />
   </svg>
 );
 

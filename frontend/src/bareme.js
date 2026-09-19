@@ -27,7 +27,7 @@
 
 import { describeAlgoCriterion, isAlgoCriterion } from './algoBareme';
 
-export const VALUE_TYPES = {
+const VALUE_TYPES = {
   int: { key: 'int', label: 'Entier', c: 'int', input: 'number', example: '42' },
   short: { key: 'short', label: 'Entier court', c: 'short', input: 'number', example: '32000' },
   long: { key: 'long', label: 'Entier long', c: 'long', input: 'number', example: '2400000000' },
@@ -293,7 +293,7 @@ export function baremeWeight(criteria, tests) {
 }
 
 /** Répartit également les points de l'exercice entre critères et tests officiels. */
-export function distributeBareme(criteria, tests, total) {
+function distributeBareme(criteria, tests, total) {
   const official = (tests ?? []).filter((t) => t.kind === 'official');
   const count = criteria.length + official.length;
   if (count === 0) return { criteria, tests: tests ?? [] };

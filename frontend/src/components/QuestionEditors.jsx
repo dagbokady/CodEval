@@ -53,7 +53,7 @@ export function TypePicker({ onPick, title = "Quel type d'exercice voulez-vous c
  * Une question de QCM. `name` isole le groupe de boutons radio : sans lui, deux
  * questions affichées sur la même page se voleraient la réponse cochée.
  */
-export function QcmEditor({ question, readOnly, onChange, name = 'qcm' }) {
+function QcmEditor({ question, readOnly, onChange, name = 'qcm' }) {
   const choices = question.choices ?? [{ text: '', correct: false }, { text: '', correct: false }];
   const multiple = Boolean(question.multiple);
 
@@ -128,7 +128,7 @@ export function QcmEditor({ question, readOnly, onChange, name = 'qcm' }) {
 }
 
 /** Une grille de correspondance : les paires correctes, mélangées ensuite pour l'apprenant. */
-export function MatchingEditor({ question, readOnly, onChange }) {
+function MatchingEditor({ question, readOnly, onChange }) {
   const pairs = question.pairs ?? [{ left: '', right: '' }, { left: '', right: '' }];
 
   const updatePair = (index, patch) =>
@@ -254,7 +254,7 @@ export function TrueFalseEditor({ settings, readOnly, onChange }) {
  * accepte ; sans rien lister, la question part en correction manuelle plutôt
  * que d'être comptée fausse.
  */
-export function ShortAnswerEditor({ question, readOnly, onChange, id = 'short' }) {
+function ShortAnswerEditor({ question, readOnly, onChange, id = 'short' }) {
   const accepted = question.accepted ?? [];
   const keywords = Boolean(question.keywords_mode);
 

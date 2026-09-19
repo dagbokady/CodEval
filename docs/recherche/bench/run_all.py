@@ -44,7 +44,6 @@ def s91():
 def s92():
     LOG("9.2 décomposition par étape (échantillon)")
     from app.grading.sandbox import Workspace
-    from app.config import settings
     from core import SB
     syn = []; comp = []; exe = []
     for _ in range(60):

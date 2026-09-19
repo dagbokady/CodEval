@@ -28,7 +28,7 @@ const darkQuery = () =>
     ? window.matchMedia('(prefers-color-scheme: dark)')
     : null;
 
-export function readMode() {
+function readMode() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     return THEME_MODES.includes(stored) ? stored : 'system';
@@ -37,15 +37,15 @@ export function readMode() {
   }
 }
 
-export function systemTheme() {
+function systemTheme() {
   return darkQuery()?.matches ? 'dark' : 'light';
 }
 
-export function resolve(mode) {
+function resolve(mode) {
   return mode === 'system' ? systemTheme() : mode;
 }
 
-export function applyTheme(theme) {
+function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
 }
 

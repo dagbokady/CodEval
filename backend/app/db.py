@@ -39,62 +39,14 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-# Colonnes ajoutées après coup à des tables déjà en production. `create_all` ne
-# crée que les tables manquantes, jamais les colonnes : on les ajoute nous-mêmes,
-# de façon idempotente, au démarrage.
-_ADDED_COLUMNS: list[tuple[str, str, str]] = [
-    ("test_cases", "args", "TEXT"),
-    ("test_cases", "target_id", "VARCHAR(24)"),
-    ("test_cases", "input_types", "TEXT"),
-    ("test_cases", "expected_type", "VARCHAR(20)"),
-    ("bank_test_cases", "args", "TEXT"),
-    ("bank_test_cases", "target_id", "VARCHAR(24)"),
-    ("bank_test_cases", "input_types", "TEXT"),
-    ("bank_test_cases", "expected_type", "VARCHAR(20)"),
-    ("evaluations", "is_template", "BOOLEAN DEFAULT FALSE"),
-]
-
-
-def _ensure_columns() -> None:
-    from sqlalchemy import inspect
-
-    inspector = inspect(engine)
-    tables = set(inspector.get_table_names())
-    with engine.begin() as conn:
-        for table, column, ddl_type in _ADDED_COLUMNS:
-            if table not in tables:
-                continue
-            existing = {c["name"] for c in inspector.get_columns(table)}
-            if column in existing:
-                continue
-            conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
-
-
-# Valeurs ajoutées après coup aux types énumérés de PostgreSQL : `create_all` ne
-# modifie pas un type existant.
-_ADDED_ENUM_VALUES: list[tuple[str, str]] = [
-    ("evaluationstatus", "CANCELLED"),
-]
-
-
-def _ensure_enum_values() -> None:
-    if _is_sqlite:
-        return
-    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        for type_name, value in _ADDED_ENUM_VALUES:
-            exists = conn.exec_driver_sql(
-                "SELECT 1 FROM pg_type WHERE typname = %s", (type_name,)
-            ).first()
-            if exists:
-                conn.exec_driver_sql(f"ALTER TYPE {type_name} ADD VALUE IF NOT EXISTS '{value}'")
-
-
 def init_db() -> None:
+    """Crée les tables manquantes au démarrage (dev / tests).
+
+    En production, utiliser `alembic upgrade head` avant de lancer l'API.
+    """
     from . import models  # noqa: F401
 
     if _is_sqlite:
         with engine.connect() as conn:
             conn.exec_driver_sql("PRAGMA journal_mode=WAL")
     Base.metadata.create_all(engine)
-    _ensure_columns()
-    _ensure_enum_values()

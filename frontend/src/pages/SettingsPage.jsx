@@ -14,7 +14,7 @@ import {
   saveEvaluationDefaults,
 } from '../evaluationDefaults';
 
-const ROLE_LABELS = { teacher: 'Enseignante', student: 'Étudiant' };
+const ROLE_LABELS = { admin: 'Administrateur', teacher: 'Enseignante', student: 'Étudiant' };
 
 const THEME_HINTS = {
   system: "Suit le réglage de l'appareil",

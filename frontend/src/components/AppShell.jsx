@@ -12,6 +12,7 @@ import {
   IconBook,
   IconChevronDown,
   IconClasses,
+  IconClock,
   IconCode,
   IconEvaluations,
   IconHome,
@@ -19,6 +20,7 @@ import {
   IconResults,
   IconSettings,
   IconStats,
+  IconUsers,
 } from './icons';
 
 /** Ferme un menu au clic extérieur et à Échap : le minimum attendu d'un menu. */
@@ -91,8 +93,27 @@ const STUDENT_NAV = [
   { to: '/mes-resultats', label: 'Mes résultats', icon: <IconResults /> },
 ];
 
-const NAV_MAP = { teacher: TEACHER_NAV, student: STUDENT_NAV };
-const ROLE_LABELS = { teacher: 'Enseignante', student: 'Étudiant' };
+const ADMIN_NAV = [
+  { to: '/admin', label: 'Tableau de bord', icon: <IconHome />, end: true },
+  {
+    title: 'Établissement',
+    items: [
+      { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: <IconUsers /> },
+      { to: '/admin/classes', label: 'Classes', icon: <IconClasses /> },
+      { to: '/admin/matieres', label: 'Matières', icon: <IconBook /> },
+    ],
+  },
+  {
+    title: 'Supervision',
+    items: [
+      { to: '/admin/evaluations', label: 'Évaluations', icon: <IconEvaluations /> },
+      { to: '/admin/journal', label: "Journal d'activité", icon: <IconClock /> },
+    ],
+  },
+];
+
+const NAV_MAP = { admin: ADMIN_NAV, teacher: TEACHER_NAV, student: STUDENT_NAV };
+const ROLE_LABELS = { admin: 'Administrateur', teacher: 'Enseignante', student: 'Étudiant' };
 
 function NotificationBell() {
   const navigate = useNavigate();

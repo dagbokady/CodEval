@@ -94,6 +94,7 @@ class UTCDateTime(TypeDecorator):
 
 
 class Role(str, enum.Enum):
+    ADMIN = "admin"
     TEACHER = "teacher"
     STUDENT = "student"
 
@@ -458,6 +459,17 @@ class Notification(Base):
     body: Mapped[str] = mapped_column(String(500), default="")
     link: Mapped[str] = mapped_column(String(300), default="")
     read: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    used_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 

@@ -5,8 +5,8 @@
  * qu'elles ne se contredisent jamais.
  */
 
-export const UPCOMING_STATUSES = ['draft', 'scheduled'];
-export const DONE_STATUSES = ['closed', 'correcting', 'corrected', 'validated', 'cancelled'];
+const UPCOMING_STATUSES = ['draft', 'scheduled'];
+const DONE_STATUSES = ['closed', 'correcting', 'corrected', 'validated', 'cancelled'];
 
 const time = (evaluation) =>
   evaluation.scheduled_start ? new Date(evaluation.scheduled_start).getTime() : null;

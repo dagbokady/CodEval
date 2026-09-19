@@ -1,14 +1,26 @@
 from __future__ import annotations
 
+import os
 import re
+from datetime import timedelta
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import func, select
 
 from ..audit import log
+from ..config import settings
 from ..deps import CurrentUser, DbSession
-from ..models import Organization, Role, User
-from ..schemas import LoginPayload, RegisterOrg, TokenOut, UserOut
+from ..mail import send_email
+from ..models import Organization, PasswordResetToken, Role, User, utcnow
+from ..rate_limit import limiter
+from ..schemas import (
+    ForgotPasswordPayload,
+    LoginPayload,
+    RegisterOrg,
+    ResetPasswordPayload,
+    TokenOut,
+    UserOut,
+)
 from ..security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -18,10 +30,18 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:60] or "etablissement"
 
 
+def _rate_limit_key(request: Request, email: str) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    return f"{ip}:{email.lower()}"
+
+
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
     """Crée un établissement et son compte administrateur."""
     slug = _slugify(payload.organization_name)
+    if db.scalar(select(User).where(func.lower(User.email) == payload.email.lower())):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
     if db.scalar(select(Organization).where(Organization.slug == slug)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Un établissement porte déjà ce nom")
 
@@ -33,7 +53,7 @@ def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
-        role=Role.TEACHER,
+        role=Role.ADMIN,
     )
     db.add(user)
     log(db, user, org.id, "organization.created", "organization", org.id)
@@ -47,13 +67,24 @@ def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
 
 
 @router.post("/login", response_model=TokenOut)
-def login(payload: LoginPayload, db: DbSession) -> TokenOut:
+def login(payload: LoginPayload, request: Request, db: DbSession) -> TokenOut:
+    key = _rate_limit_key(request, payload.email)
+
+    if limiter.is_locked(key):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Trop de tentatives. Réessayez dans {settings.login_lockout_minutes} minutes.",
+        )
+
     email = payload.email.lower()
     user = db.scalar(select(User).where(func.lower(User.email) == email))
     if user is None or not verify_password(payload.password, user.password_hash):
+        limiter.record_failure(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Identifiants invalides")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Compte désactivé")
+
+    limiter.reset(key)
     org = db.get(Organization, user.organization_id)
     log(db, user, org.id, "auth.login", "user", user.id)
     db.commit()
@@ -62,6 +93,56 @@ def login(payload: LoginPayload, db: DbSession) -> TokenOut:
         user=UserOut.model_validate(user),
         organization=org.name,
     )
+
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordPayload, db: DbSession) -> dict:
+    """Envoie un e-mail de réinitialisation. Répond toujours 200 pour ne pas
+    révéler l'existence d'un compte."""
+    user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
+    if user is None or not user.is_active:
+        return {"ok": True}
+
+    token_str = os.urandom(32).hex()
+    expires = utcnow() + timedelta(minutes=settings.reset_token_minutes)
+    db.add(PasswordResetToken(user_id=user.id, token=token_str, expires_at=expires))
+    db.commit()
+
+    link = f"{settings.frontend_url}/reset-password?token={token_str}"
+    send_email(
+        user.email,
+        "CodEval - Réinitialisation de votre mot de passe",
+        f"""<p>Bonjour {user.full_name},</p>
+<p>Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
+<p><a href="{link}">{link}</a></p>
+<p>Ce lien est valable {settings.reset_token_minutes} minutes.</p>
+<p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.</p>""",
+    )
+    return {"ok": True}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordPayload, db: DbSession) -> dict:
+    """Réinitialise le mot de passe via un jeton reçu par e-mail."""
+    now = utcnow()
+    reset = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token == payload.token,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    )
+    if reset is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Lien invalide ou expiré")
+
+    user = db.get(User, reset.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Lien invalide ou expiré")
+
+    user.password_hash = hash_password(payload.password)
+    reset.used_at = now
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/me", response_model=TokenOut)

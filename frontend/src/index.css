@@ -2383,15 +2383,6 @@ tr.row-confirm:hover { background: none; }
   tab-size: 4;
 }
 .code-bloc code { font: inherit; color: inherit; background: none; }
-.code-inline {
-  font-family: var(--mono);
-  font-size: 0.92em;
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  padding: 0 4px;
-  color: var(--code-text);
-}
 
 .tok-com { color: var(--code-comment); font-style: italic; }
 .tok-pre { color: var(--code-preproc); }
@@ -2399,7 +2390,7 @@ tr.row-confirm:hover { background: none; }
 .tok-num { color: var(--code-number); }
 .tok-kw  { color: var(--code-keyword); font-weight: 600; }
 /* Le pseudo-code garde les couleurs du cours : mots-clés en rouge. */
-.code-bloc--algo .tok-kw, .code-inline--algo .tok-kw { color: var(--algo-kw); font-weight: 700; }
+.code-bloc--algo .tok-kw { color: var(--algo-kw); font-weight: 700; }
 .tok-typ { color: var(--code-type); font-weight: 500; }
 .tok-fn  { color: var(--code-function); }
 .tok-op  { color: var(--code-operator); }
@@ -2696,3 +2687,129 @@ tr.row-confirm:hover { background: none; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+
+/* ========== Boîte de dialogue ========== */
+.dialog {
+  width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  background: var(--bg-card); color: var(--text-body); box-shadow: var(--shadow-elevated);
+}
+.dialog--wide { width: min(640px, calc(100vw - 32px)); }
+.dialog::backdrop { background: rgba(0, 0, 0, 0.35); }
+.dialog-body { padding: 20px 24px; }
+.dialog-head { margin-bottom: 16px; }
+.dialog-head h2 { font-size: 16px; font-weight: 600; color: var(--text-title); }
+.dialog-head .sub { margin-top: 4px; }
+.dialog-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ========== Backoffice ========== */
+.admin-section + .admin-section { margin-top: 32px; }
+.admin-inline-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.admin-inline-form .field { margin-bottom: 0; }
+.admin-attention { display: grid; gap: 8px; margin: 24px 0 0; padding: 0; list-style: none; }
+.admin-attention li {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: var(--radius-lg); font-size: 13.5px;
+}
+.admin-attention li > span { margin-right: auto; }
+.admin-feed { list-style: none; margin: 0; padding: 0; }
+.admin-feed li {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 16px;
+  padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 13.5px;
+}
+.admin-feed li:last-child { border-bottom: none; }
+.admin-feed time { font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
+.admin-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 32px; margin-top: 32px; }
+@media (max-width: 960px) { .admin-grid { grid-template-columns: 1fr; } }
+.admin-pick { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 12px; }
+.admin-pick label {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border-soft); font-size: 13.5px;
+}
+.admin-pick label:last-child { border-bottom: none; }
+.admin-pick label:hover { background: var(--bg-row-hover); }
+.admin-pick .sub { margin-left: auto; }
+.admin-secret {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px;
+  background: var(--bg-subtle); border-radius: var(--radius);
+}
+.admin-secret code {
+  margin-right: auto; font-family: var(--mono); font-size: 15px;
+  color: var(--text-title); letter-spacing: 0.04em;
+}
+.admin-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ========== Éditeur d'algorithme : notation du cours et glisser-déposer ========== */
+.algo-children { margin: 1px 0 1px 14px; padding-left: 14px; border-left: 1px solid var(--border); }
+.algo-cadre-corps > .algo-children { margin-left: 0; padding-left: 0; border-left: none; }
+.algo-handle {
+  cursor: grab; color: var(--text-faint); font-size: 13px; line-height: 1; padding: 2px 3px;
+  border-radius: var(--radius-xs); user-select: none; opacity: 0.35;
+}
+.algo-line:hover .algo-handle, .algo-decl-ligne:hover .algo-handle { opacity: 1; }
+.algo-handle:hover { color: var(--text-title); background: var(--bg-subtle); }
+.algo-handle:active { cursor: grabbing; }
+.algo-drop { height: 6px; margin: 1px 0; border-radius: 3px; transition: height 0.1s, background 0.1s; }
+.algo-dragging .algo-drop { height: 10px; background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.algo-drop.active, .algo-dragging .algo-drop.active { height: 22px; background: color-mix(in srgb, var(--primary) 25%, transparent); outline: 1px dashed var(--primary); }
+.algo-slot.survol { border-color: var(--primary); background: var(--bg-nav-active); color: var(--primary); }
+.algo-source { opacity: 0.4; }
+.algo-slot-ligne, .algo-sp-ajout { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.algo-slot-ligne .algo-drop, .algo-sp-ajout .algo-drop { flex-basis: 100%; }
+.algo-branches { display: flex; gap: 6px; }
+.algo-palette-item { cursor: grab; text-align: left; }
+.algo-palette-item:active { cursor: grabbing; }
+.algo-apercu { font-family: var(--mono); font-size: 12px; color: var(--text-body); white-space: normal; }
+.algo-apercu .kw { font-size: 12px; }
+.algo-palette-note { font-size: 11.5px; color: var(--text-muted); margin: 2px 0 0; }
+.algo-operateurs { display: flex; flex-wrap: wrap; gap: 4px; }
+.algo-op {
+  font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--algo-kw);
+  padding: 2px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-card); cursor: pointer;
+}
+.algo-op:hover { border-color: var(--primary); }
+.algo-params, .algo-param { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; font-family: var(--mono); font-size: 13px; }
+.algo-mode { font-size: 12px; color: var(--algo-kw); font-weight: 700; }
+.algo-sous-programmes { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--border); display: grid; gap: 14px; }
+.algo-sp { display: grid; gap: 2px; }
+.algo-cas { margin-left: 14px; }
+.algo-type { font-family: var(--mono); }
+.outils-ecriture { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--text-body); }
+.outils-ecriture input { margin-top: 2px; }
+.algo-palette { width: 250px; }
+.algo-palette-item { padding: 7px 10px; }
+.algo-palette-item .algo-apercu span { margin: 0; color: inherit; }
+.algo-palette-item:hover .algo-apercu { color: var(--primary); }
+@media (max-width: 900px) {
+  .algo-palette { width: 100%; align-items: flex-start; flex-shrink: 0; }
+  .algo-palette-item { align-self: flex-start; }
+  .algo-palette-item .algo-apercu { white-space: nowrap; }
+  .algo-palette-note { display: none; }
+  .algo-operateurs { flex-wrap: nowrap; }
+}
+
+/* --- Stats page --- */
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px; margin-bottom: 8px;
+}
+.stat-card {
+  background: var(--surface-raised); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 20px; text-align: center;
+}
+.stat-value { font-size: 28px; font-weight: 700; color: var(--text-main); }
+.stat-label { font-size: 13px; color: var(--text-soft); margin-top: 4px; }
+.stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.success-bars { display: flex; flex-direction: column; gap: 8px; }
+.success-bar-row { display: flex; align-items: center; gap: 10px; }
+.success-bar-label { width: 200px; font-size: 13px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+.success-bar-track { flex: 1; height: 18px; background: var(--surface-raised); border-radius: 9px; overflow: hidden; border: 1px solid var(--border-soft); }
+.success-bar-fill { height: 100%; border-radius: 9px; transition: width 0.3s ease; }
+.success-bar-value { width: 50px; text-align: right; font-size: 13px; font-weight: 600; color: var(--text-main); flex-shrink: 0; }
+
+/* --- Auth links --- */
+.auth-links { text-align: right; margin-top: -4px; margin-bottom: 8px; font-size: 13px; }
+.auth-links a { color: var(--primary); }

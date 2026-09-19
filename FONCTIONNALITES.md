@@ -1,7 +1,7 @@
 # CodEval : Fonctionnalités existantes
 
-État des lieux du code au 6 septembre 2026, après la simplification : **deux
-rôles** (enseignante, étudiant), **une classe** (SRIT 2A), **une matière**
+État des lieux du code au 18 septembre 2026 : **trois rôles** (administration,
+enseignante, étudiant), **une classe** (SRIT 2A), **une matière**
 (Langage C). Ce document décrit ce qui est implémenté aujourd'hui, rôle par rôle
 et écran par écran. Il ne décrit pas ce qui reste à faire.
 
@@ -48,10 +48,39 @@ hors de l'API** (file d'attente = une table, worker réplicable), **traçabilit�
 
 ## 2. Les rôles
 
-Deux rôles, définis dans `backend/app/models.py` (`Role`) et appliqués par
-`backend/app/deps.py` (`TeacherUser`, `StudentUser`). Le rôle est porté par le
+Trois rôles, définis dans `backend/app/models.py` (`Role`) et appliqués par
+`backend/app/deps.py` (`AdminUser`, `TeacherUser`, `StudentUser`). Le rôle est porté par le
 jeton JWT et vérifié côté serveur à chaque requête ; côté client, le composant
 `Protected` filtre en plus la navigation.
+
+### 2.0 Administration (`admin`)
+
+Elle gère l'établissement depuis un backoffice (`/admin`). Elle ne conçoit ni
+ne corrige aucune épreuve : les routes enseignantes lui répondent 403.
+
+- **Tableau de bord** (`/admin`, `GET /api/stats/overview`) : comptes, classes,
+  évaluations, sessions en cours, réussite moyenne, points à traiter
+  (étudiants sans classe, aucun enseignant), sessions ouvertes et activité récente.
+- **Utilisateurs** (`/admin/utilisateurs`, `/api/users`) : liste filtrable
+  (rôle, état, recherche, sans classe) avec classes et dernière connexion ;
+  création (mot de passe initial généré, classe d'inscription d'un étudiant),
+  modification, désactivation / réactivation, mot de passe provisoire
+  (`POST /api/users/:id/reset-password`). Un administrateur ne peut ni se
+  désactiver ni changer son propre rôle. L'e-mail est unique sur toute la plateforme.
+- **Classes** (`/admin/classes`, `/admin/classes/:id`) : création, renommage,
+  suppression (refusée si des évaluations y sont rattachées), inscription et
+  désinscription d'étudiants, attribution d'enseignements (enseignant + matière,
+  `/api/classrooms/:id/teachers`).
+- **Matières** (`/admin/matieres`, `GET /api/admin/subjects`) : création,
+  renommage, suppression tant qu'aucune évaluation ni exercice ne l'utilise.
+- **Évaluations** (`/admin/evaluations`, `GET /api/admin/evaluations`) :
+  toutes les épreuves de l'établissement, en lecture seule.
+- **Journal d'activité** (`/admin/journal`, `GET /api/admin/audit`) : les
+  opérations journalisées, filtrables par famille.
+- **Établissement** (`/admin/etablissement`, `/api/admin/organization`) : nom.
+
+`POST /api/auth/register` crée désormais l'établissement avec un compte
+d'administration.
 
 ### 2.1 Enseignante (`teacher`)
 
@@ -74,10 +103,7 @@ voit que **ses propres évaluations**, dans son établissement.
 - **Statistiques** (`/statistiques`).
 
 Les opérations d'établissement (créer un compte, une classe, une matière,
-inscrire un étudiant) restent servies par l'API (`/api/users`,
-`/api/classrooms`, `/api/subjects`) et sont désormais ouvertes à l'enseignante.
-Elles ne sont plus exposées par une page dédiée : la classe et son effectif sont
-préparés par le jeu de données initial.
+inscrire un étudiant) sont réservées à l'administration (§2.0).
 
 ### 2.2 Étudiant (`student`)
 
@@ -110,6 +136,7 @@ Il n'a accès qu'à ses épreuves et à ses copies. Il ne crée rien.
 | | |
 |---|---|
 | Établissement | ESATIC : École Supérieure Africaine des TIC |
+| Administration | **Administration ESATIC** `admin@esatic.ci` |
 | Enseignante | **Dr Johnson** `dr.johnson@esatic.ci` |
 | Classe | **SRIT 2A** (2ᵉ année), 5 étudiants |
 | Matière | **Langage C** |

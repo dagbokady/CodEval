@@ -1,8 +1,11 @@
 # CodEval
 
-Plateforme SaaS d'évaluation pratique en programmation et algorithmique : une enseignante
-prépare une évaluation et ses jeux de tests, ouvre une session pour sa classe, les
-étudiants rédigent leur programme dans un environnement contrôlé sans pouvoir
+Plateforme SaaS d'évaluation pratique en programmation et algorithmique.
+
+Une enseignante prépare une évaluation et ses jeux de tests, puis ouvre une session
+pour sa classe.
+
+Les étudiants rédigent leur programme dans un environnement contrôlé sans pouvoir
 l'exécuter, puis la correction automatique compile, exécute et note les productions
 figées.
 
@@ -54,7 +57,7 @@ cd frontend && npm install && npm run dev
 
 Interface sur <http://localhost:5173>, API sur <http://localhost:8000/docs>.
 Comptes chargés par le jeu de données (mot de passe `codeval2026`) :
-`dr.johnson@esatic.ci` (enseignante) et les 5 étudiants de la classe SRIT 2A,
+`admin@esatic.ci` (administration), `dr.johnson@esatic.ci` (enseignante) et les 5 étudiants de la classe SRIT 2A,
 `coulibaly.moussa@esatic.ci` … `diallo.sekou@esatic.ci`.
 
 Fonctionnalités détaillées : [FONCTIONNALITES.md](FONCTIONNALITES.md).

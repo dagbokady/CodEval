@@ -10,7 +10,7 @@
  * comme côté navigateur, plutôt que de réécrire la base.
  */
 
-export const MULTI_QUESTION_KINDS = new Set(['qcm', 'matching', 'short']);
+const MULTI_QUESTION_KINDS = new Set(['qcm', 'matching', 'short']);
 
 const LEGACY_FIELDS = {
   qcm: ['choices', 'multiple'],
@@ -28,7 +28,7 @@ const BLANKS = {
   short: () => ({ text: '', accepted: [], keywords_mode: false, rows: 4 }),
 };
 
-export function isMultiQuestion(kind) {
+function isMultiQuestion(kind) {
   return MULTI_QUESTION_KINDS.has(kind);
 }
 

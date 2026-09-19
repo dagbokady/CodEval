@@ -12,7 +12,7 @@ import CodeBlock from './CodeBlock';
 import MatchingBoard from './MatchingBoard';
 import { hasQuestions } from '../exerciseTypes';
 import { answersOf, questionsOf } from '../questions';
-import { structFields, typeNotation } from '../algoVocabulary';
+import { algorithmText } from '../algoVocabulary';
 
 function algoDocument(code) {
   const trimmed = (code ?? '').trim();
@@ -29,90 +29,12 @@ function algoDocument(code) {
   return null;
 }
 
-function commentaire(ligne) {
-  const texte = String(ligne?.commentaire ?? '').trim();
-  return texte ? ` /* ${texte} */` : '';
-}
-
-/** Le corps, relu comme sur le polycopié : mots-clés en capitales, sans point-virgule. */
-function algoToText(blocs, indent = 0) {
-  const pad = '    '.repeat(indent);
-  const lines = [];
-  const body = (list) => {
-    if (list?.length) lines.push(algoToText(list, indent + 1));
-  };
-  for (const b of blocs ?? []) {
-    if (b.type === 'variable') lines.push(`${pad}${b.nom} ← ${b.valeur || '0'}`);
-    else if (b.type === 'lire') lines.push(`${pad}LIRE(${b.cible})`);
-    else if (b.type === 'ecrire') lines.push(`${pad}ECRIRE(${b.expression})`);
-    else if (b.type === 'affectation') lines.push(`${pad}${b.cible} ← ${b.expression}`);
-    else if (b.type === 'retour') lines.push(`${pad}RETOURNE(${b.expression})`);
-    else if (b.type === 'tableau') lines.push(`${pad}TABLEAU ${b.nom} DE TAILLE ${b.taille}`);
-    else if (b.type === 'pour') {
-      lines.push(`${pad}POUR ${b.variable} de ${b.debut} à ${b.fin} par pas de ${b.pas || '1'}`);
-      body(b.corps);
-      lines.push(`${pad}FINPOUR`);
-    } else if (b.type === 'tantque') {
-      lines.push(`${pad}TANTQUE ${b.condition} FAIRE`);
-      body(b.corps);
-      lines.push(`${pad}FINTANTQUE`);
-    } else if (b.type === 'repeter') {
-      lines.push(`${pad}REPETER`);
-      body(b.corps);
-      lines.push(`${pad}JUSQU'A ${b.condition}`);
-    } else if (b.type === 'si') {
-      lines.push(`${pad}SI ${b.condition} ALORS`);
-      body(b.alors);
-      if (b.sinon?.length) {
-        lines.push(`${pad}SINON`);
-        body(b.sinon);
-      }
-      lines.push(`${pad}FINSI`);
-    } else if (b.type === 'fonction') {
-      const retour = b.typeRetour ? ` :${String(b.typeRetour).toUpperCase()}` : '';
-      lines.push(`${pad}FONCTION ${b.nom}(${(b.parametres || []).join(', ')})${retour}`);
-      lines.push(`${pad}DEBUT`);
-      body(b.corps);
-      lines.push(`${pad}FIN`);
-      lines.push(`${pad}FINFONCTION`);
-    }
-  }
-  return lines.join('\n');
-}
-
-function algoDocumentToText(doc) {
-  const lines = [`ALGORITHME ${doc.nom || ''}`.trimEnd()];
-  if (doc.constantes?.length) {
-    lines.push('    CONSTANTES');
-    doc.constantes.forEach((c) => lines.push(`        ${c.nom} = ${c.valeur}${commentaire(c)}`));
-  }
-  if (doc.types?.length) {
-    lines.push('    TYPES');
-    doc.types.forEach((t) => {
-      lines.push(`        ${t.nom} = STRUCTURE${commentaire(t)}`);
-      structFields(t).forEach((c) => lines.push(`            ${c.nom} :${String(c.type).toUpperCase()}`));
-      lines.push('        FINSTRUCTURE');
-    });
-  }
-  if (doc.variables?.length) {
-    lines.push('    VARIABLES');
-    doc.variables.forEach((v) => {
-      lines.push(`        ${v.nom} :${typeNotation(v.type ?? 'entier', v)}${commentaire(v)}`);
-    });
-  }
-  lines.push('DEBUT');
-  const corps = algoToText(doc.corps, 1);
-  if (corps) lines.push(corps);
-  lines.push('FIN');
-  return lines.join('\n');
-}
-
 /** L'algorithme en blocs est stocké en JSON : on le relit en pseudo-code. */
 function readableAnswer(code) {
   const doc = algoDocument(code);
   if (!doc) return code;
   try {
-    return algoDocumentToText(doc);
+    return algorithmText({ constantes: [], types: [], variables: [], sousProgrammes: [], ...doc });
   } catch {
     return code;
   }

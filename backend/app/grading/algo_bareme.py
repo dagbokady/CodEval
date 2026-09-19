@@ -44,7 +44,9 @@ TYPE_LABELS = {
 }
 
 # Les clés des enfants d'un bloc : c'est par elles qu'on descend dans le corps.
-_ENFANTS = ("corps", "alors", "sinon")
+_ENFANTS = ("corps", "alors", "sinon", "autre")
+# Les branches à plusieurs corps : SINONSI d'un SI, cas d'un SELON.
+_BRANCHES = ("sinonsi", "cas")
 
 
 def is_algo_criterion(kind) -> bool:
@@ -79,7 +81,7 @@ def describe_algo(criterion: dict) -> str:
 def type_notation(vtype: str, taille=None) -> str:
     """Le type tel qu'il s'écrit au cours : ENTIER, TABLEAU[1..MAX] DE REEL."""
     if vtype.startswith("tableau_"):
-        éléments = TYPE_LABELS.get(vtype.removeprefix("tableau_"), vtype.removeprefix("tableau_"))
+        éléments = TYPE_LABELS.get(vtype.removeprefix("tableau_"), vtype.removeprefix("tableau_").upper())
         borne = str(taille or "").strip()
         return f"TABLEAU[1..{borne}] DE {éléments}" if borne else f"TABLEAU DE {éléments}"
     return TYPE_LABELS.get(vtype, vtype.upper())
@@ -119,7 +121,7 @@ def check_algo_criterion(document: dict, criterion: dict) -> tuple[bool, str]:
         if élément not in ELEMENTS:
             return False, "Exigence incomplète : structure inconnue."
         minimum = _entier(criterion.get("min")) or 1
-        return _compte_structure(document.get("corps") or [], élément) >= minimum, ""
+        return _compte_structure(_tout(document), élément) >= minimum, ""
 
     if not nom:
         return False, "Exigence incomplète : nom manquant."
@@ -131,7 +133,7 @@ def check_algo_criterion(document: dict, criterion: dict) -> tuple[bool, str]:
     if kind == "algo_type":
         return _type(document, criterion, nom), ""
     if kind == "algo_fonction":
-        return _fonction(document.get("corps") or [], criterion, nom), ""
+        return _fonction(_tout(document), criterion, nom), ""
     return False, "Exigence inconnue."
 
 
@@ -183,7 +185,7 @@ def _type(document: dict, criterion: dict, nom: str) -> bool:
 def _fonction(corps: list, criterion: dict, nom: str) -> bool:
     arité = _entier(criterion.get("arity"))
     for bloc in _parcours(corps):
-        if bloc.get("type") != "fonction" or not _même(bloc.get("nom"), nom):
+        if bloc.get("type") not in ("fonction", "procedure") or not _même(bloc.get("nom"), nom):
             continue
         if arité is None:
             return True
@@ -200,7 +202,17 @@ def _compte_structure(corps: list, élément: str) -> int:
     """
     if élément == "sinon":
         return sum(1 for bloc in _parcours(corps) if bloc.get("type") == "si" and bloc.get("sinon"))
+    if élément == "sinonsi":
+        return sum(len(bloc.get("sinonsi") or []) for bloc in _parcours(corps) if bloc.get("type") == "si")
     return sum(1 for bloc in _parcours(corps) if bloc.get("type") == élément)
+
+
+def _tout(document: dict) -> list:
+    """Le corps, suivi des sous-programmes déclarés après FIN."""
+    corps = document.get("corps") or []
+    sous_programmes = document.get("sousProgrammes") or []
+    return [*(corps if isinstance(corps, list) else []),
+            *(sous_programmes if isinstance(sous_programmes, list) else [])]
 
 
 def _parcours(corps):
@@ -213,6 +225,10 @@ def _parcours(corps):
             enfants = bloc.get(clé)
             if isinstance(enfants, list):
                 yield from _parcours(enfants)
+        for clé in _BRANCHES:
+            for branche in bloc.get(clé) or []:
+                if isinstance(branche, dict):
+                    yield from _parcours(branche.get("corps") or [])
 
 
 # ----- Outils -----

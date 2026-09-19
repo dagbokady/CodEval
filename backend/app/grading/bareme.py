@@ -31,7 +31,7 @@ from __future__ import annotations
 import re
 
 from .algo_bareme import ALGO_CRITERION_KINDS, describe_algo, is_algo_criterion
-from .harness import CALLABLE_LANGUAGES, ValueType, declaration_of, get_type  # noqa: F401
+from .harness import ValueType, declaration_of, get_type
 
 # Familles de critères de déclaration, dans l'ordre du sélecteur enseignant.
 CRITERION_KINDS = ("variable", "function", "struct")

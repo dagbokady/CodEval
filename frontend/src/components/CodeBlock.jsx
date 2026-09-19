@@ -31,14 +31,3 @@ export default function CodeBlock({ code, language, className = '', ...rest }) {
     </pre>
   );
 }
-
-/** Code court dans une phrase, coloré de la même façon. */
-export function InlineCode({ code, language, className = '' }) {
-  const text = code ?? '';
-  const famille = familleDe(text, language);
-  return (
-    <code className={`code-inline code-inline--${famille} ${className}`.trim()}>
-      {peindre(text, famille)}
-    </code>
-  );
-}

@@ -292,7 +292,7 @@ function Exam({ evaluationId, data }) {
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
     // Tenter une sync au montage si des données sont en attente
-    if (navigator.onLine) syncPending();
+    if (navigator.onLine) queueMicrotask(syncPending);
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
@@ -417,6 +417,12 @@ function Exam({ evaluationId, data }) {
     const onCopy = stop('copy_blocked');
     const onPaste = stop('paste_blocked');
     const onContext = (event) => event.preventDefault();
+    // Seul le glisser de texte est bloqué : les blocs de l'éditeur d'algorithme
+    // (palette et poignées) doivent rester déplaçables.
+    const onDragStart = (event) => {
+      if (event.target.closest?.('.algo-editor [draggable="true"]')) return;
+      event.preventDefault();
+    };
     const onKeyDown = (event) => {
       const combo = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
@@ -434,7 +440,7 @@ function Exam({ evaluationId, data }) {
       document.addEventListener('copy', onCopy);
       document.addEventListener('cut', onCopy);
       document.addEventListener('paste', onPaste);
-      document.addEventListener('dragstart', onContext);
+      document.addEventListener('dragstart', onDragStart);
     }
     document.addEventListener('contextmenu', onContext);
     document.addEventListener('keydown', onKeyDown, true);
@@ -442,7 +448,7 @@ function Exam({ evaluationId, data }) {
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('cut', onCopy);
       document.removeEventListener('paste', onPaste);
-      document.removeEventListener('dragstart', onContext);
+      document.removeEventListener('dragstart', onDragStart);
       document.removeEventListener('contextmenu', onContext);
       document.removeEventListener('keydown', onKeyDown, true);
     };
@@ -483,19 +489,20 @@ function Exam({ evaluationId, data }) {
     // L'écran de fin reste affiché : il confirme la remise et, hors ligne, il
     // demande de garder la page ouverte jusqu'à l'envoi.
     guardSuspended.current = true;
+    const markExpired = () => {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      setFinished({ reason: 'expired', at: new Date().toISOString() });
+    };
     if (navigator.onLine) {
       flush().then((complete) => {
         if (complete) {
           clearDrafts(evaluationId, data.exercises.map((item) => item.id));
           clearFinalSnapshot(evaluationId);
         }
-        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-        setFinished({ reason: 'expired', at: new Date().toISOString() });
+        markExpired();
       });
     } else {
-      // Hors ligne : le snapshot local est déjà écrit, il sera envoyé au retour
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-      setFinished({ reason: 'expired', at: new Date().toISOString() });
+      queueMicrotask(markExpired);
     }
   }, [secondsLeft, submittedAt, locked, flush, evaluationId, data.exercises, codeOf]);
 

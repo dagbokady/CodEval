@@ -26,6 +26,19 @@ class Settings(BaseSettings):
     # le client pousse son travail au moment où la session se ferme.
     autosave_grace_seconds: int = 60
 
+    # Limite de tentatives de connexion
+    login_max_attempts: int = 5
+    login_lockout_minutes: int = 15
+
+    # SMTP pour la réinitialisation de mot de passe
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "noreply@codeval.fr"
+    frontend_url: str = "http://localhost:5173"
+    reset_token_minutes: int = 30
+
     @property
     def origins(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

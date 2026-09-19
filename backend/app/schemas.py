@@ -43,6 +43,15 @@ class TokenOut(BaseModel):
     organization: str
 
 
+class ForgotPasswordPayload(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordPayload(BaseModel):
+    token: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=8, max_length=128)
+
+
 # ----- Organisation -----
 class UserCreate(BaseModel):
     email: EmailStr
@@ -50,14 +59,30 @@ class UserCreate(BaseModel):
     role: Role
     password: str = Field(min_length=8, max_length=128)
     matricule: str | None = Field(default=None, max_length=60)
+    # Classe où inscrire d'emblée un étudiant : un compte créé sans classe ne
+    # voit aucune épreuve.
+    classroom_id: int | None = None
 
 
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    email: EmailStr | None = None
     role: Role | None = None
     is_active: bool | None = None
     matricule: str | None = Field(default=None, max_length=60)
     password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class AdminUserOut(UserOut):
+    """Compte vu par l'administration : où il est rattaché, quand il a servi."""
+
+    created_at: datetime | None = None
+    last_login_at: datetime | None = None
+    classrooms: list[str] = []
+
+
+class PasswordResetOut(BaseModel):
+    password: str
 
 
 class NamedCreate(BaseModel):
@@ -68,9 +93,20 @@ class ClassroomCreate(NamedCreate):
     level: str | None = Field(default=None, max_length=60)
 
 
+class ClassroomUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    level: str | None = Field(default=None, max_length=60)
+
+
 class SubjectOut(ORMModel):
     id: int
     name: str
+
+
+class SubjectAdminOut(SubjectOut):
+    evaluations_count: int = 0
+    bank_count: int = 0
+    teachers_count: int = 0
 
 
 class ClassroomOut(ORMModel):
@@ -78,6 +114,8 @@ class ClassroomOut(ORMModel):
     name: str
     level: str | None = None
     students_count: int = 0
+    teachers_count: int = 0
+    evaluations_count: int = 0
 
 
 class ClassroomDetailOut(ORMModel):
@@ -91,6 +129,56 @@ class ClassroomDetailOut(ORMModel):
 
 class EnrollPayload(BaseModel):
     student_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class AssignPayload(BaseModel):
+    teacher_id: int
+    subject_id: int
+
+
+class AssignmentOut(BaseModel):
+    id: int
+    teacher_id: int
+    teacher_name: str
+    teacher_email: str
+    subject_id: int
+    subject_name: str
+
+
+class OrganizationOut(ORMModel):
+    id: int
+    name: str
+    slug: str
+    created_at: datetime | None = None
+
+
+class OrganizationUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+
+
+class AuditEntryOut(BaseModel):
+    id: int
+    action: str
+    target_type: str
+    target_id: int | None
+    actor_id: int | None
+    actor_name: str | None
+    meta: dict
+    created_at: datetime
+
+
+class AdminEvaluationOut(BaseModel):
+    id: int
+    title: str
+    kind: EvaluationKind
+    status: EvaluationStatus
+    teacher_name: str
+    classroom_name: str | None
+    subject_name: str | None
+    scheduled_start: datetime | None
+    duration_minutes: int
+    participants_count: int
+    created_at: datetime | None
 
 
 # ----- Évaluations -----

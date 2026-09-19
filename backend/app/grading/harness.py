@@ -31,9 +31,6 @@ class ValueType:
     printf: str
     # Un tableau occupe deux paramètres C : le pointeur, puis sa taille.
     is_array: bool = False
-    # Type de retour uniquement, ou entrée uniquement.
-    returns_only: bool = False
-    inputs_only: bool = False
 
 
 TYPES: dict[str, ValueType] = {
@@ -52,11 +49,8 @@ TYPES: dict[str, ValueType] = {
     "double[]": ValueType("double[]", "Tableau de décimaux", "double", "%.6g", is_array=True),
     "char[]": ValueType("char[]", "Tableau de caractères", "char", "%c", is_array=True),
     "bool[]": ValueType("bool[]","Tableau de booléens","bool","%d",is_array=True),
-    "void": ValueType("void", "Rien (affiche seulement)", "void", "", returns_only=True),
+    "void": ValueType("void", "Rien (affiche seulement)", "void", ""),
 }
-
-RETURN_TYPES = [t for t in TYPES.values() if not t.inputs_only]
-PARAM_TYPES = [t for t in TYPES.values() if not t.returns_only]
 
 # Langages disposant du harnais d'appel de fonction. Ailleurs, une sous-question
 # est corrigée par entrée/sortie même si elle déclare une signature.

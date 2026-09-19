@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
 from .db import init_db
-from .routers import auth, bank, corrections, evaluations, notifications, org, student
+from .routers import admin, auth, bank, corrections, evaluations, notifications, org, student
 from .scheduler import run_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -67,7 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (auth, org, evaluations, corrections, student, bank, notifications):
+for module in (auth, org, admin, evaluations, corrections, student, bank, notifications):
     app.include_router(module.router)
 
 

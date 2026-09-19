@@ -254,7 +254,15 @@ def _grade_questions(answer: str, exercise: Exercise) -> ExerciseOutcome:
 def _prepare_code(code: str, exercise: Exercise) -> tuple[str, object]:
     """Code réellement compilé, et son langage. L'algorithme en blocs devient du Python."""
     if getattr(exercise, "kind", "code") == "algo":
-        code = transpile(code, (exercise.settings or {}).get("allowed_elements"))
+        settings_ = exercise.settings or {}
+        # Au cours, ECRIRE ne passe pas à la ligne (c'est le rôle de CRLF). Les
+        # exercices créés avant l'alignement sur le cours n'ont pas ce réglage et
+        # gardent l'ancien comportement, pour que leurs tests restent justes.
+        code = transpile(
+            code,
+            settings_.get("allowed_elements"),
+            saut_de_ligne=not settings_.get("ecriture_cours", False),
+        )
         return code, get_language("python")
     return code, get_language(exercise.language)
 

@@ -11,7 +11,7 @@
 import { blankQuestion } from './questions';
 import { DEFAULT_ELEMENTS } from './algoVocabulary';
 
-export const EXERCISE_TYPES = [
+const EXERCISE_TYPES = [
   {
     key: 'qcm',
     badge: 'QCM',
@@ -21,7 +21,6 @@ export const EXERCISE_TYPES = [
     family: 'Questions fermées',
     grading: 'auto',
     sheetTitle: 'QUESTIONS À CHOIX MULTIPLES (QCM)',
-    closed: true,
     needsTests: false,
     usesLanguage: false,
     multiQuestion: true,
@@ -39,7 +38,6 @@ export const EXERCISE_TYPES = [
     family: 'Questions fermées',
     grading: 'auto',
     sheetTitle: 'QUESTIONS DE CORRESPONDANCE',
-    closed: true,
     needsTests: false,
     usesLanguage: false,
     multiQuestion: true,
@@ -57,7 +55,6 @@ export const EXERCISE_TYPES = [
     family: 'Questions fermées',
     grading: 'auto',
     sheetTitle: 'QUESTIONS VRAI / FAUX',
-    closed: true,
     needsTests: false,
     usesLanguage: false,
     gradingNote:
@@ -76,7 +73,6 @@ export const EXERCISE_TYPES = [
     family: 'Questions ouvertes',
     grading: 'mixed',
     sheetTitle: 'QUESTIONS DE COURS',
-    closed: false,
     needsTests: false,
     usesLanguage: false,
     multiQuestion: true,
@@ -94,7 +90,6 @@ export const EXERCISE_TYPES = [
     family: 'Exercices pratiques',
     grading: 'tests',
     sheetTitle: 'EXERCICES DE PROGRAMMATION',
-    closed: false,
     needsTests: true,
     usesLanguage: true,
     gradingNote:
@@ -111,7 +106,6 @@ export const EXERCISE_TYPES = [
     family: 'Exercices pratiques',
     grading: 'tests',
     sheetTitle: "EXERCICES D'ALGORITHMIQUE",
-    closed: false,
     needsTests: true,
     usesLanguage: false,
     gradingNote:
@@ -119,7 +113,7 @@ export const EXERCISE_TYPES = [
     // Un exercice algorithmique naît avec le vocabulaire de base déjà autorisé :
     // l'étape « outils » part d'un état écrit, et l'exercice garde trace de ce
     // qui était permis le jour où il a été créé.
-    defaults: () => ({ allowed_elements: [...DEFAULT_ELEMENTS] }),
+    defaults: () => ({ allowed_elements: [...DEFAULT_ELEMENTS], ecriture_cours: true }),
   },
 ];
 
@@ -144,11 +138,6 @@ export function typeFamilies() {
 /** Étiquettes courtes (listes, badges, résumés), indexées par type. */
 export const KIND_LABELS = Object.fromEntries(
   EXERCISE_TYPES.map((type) => [type.key, type.badge]),
-);
-
-/** Les questions fermées se numérotent « Q1 », les exercices « Exercice 1 ». */
-export const CLOSED_KINDS = new Set(
-  EXERCISE_TYPES.filter((type) => type.closed).map((type) => type.key),
 );
 
 /**

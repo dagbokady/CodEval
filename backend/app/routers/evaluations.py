@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from ..audit import log
 from ..deps import DbSession, TeacherUser
-from ..grading.languages import LANGUAGES, enabled_languages
+from ..grading.languages import enabled_languages
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
 from ..models import (
     AuditLog,

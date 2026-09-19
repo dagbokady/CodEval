@@ -103,7 +103,7 @@ function TableauInput({ type, value, onChange, label }) {
 }
 
 /** Un champ de saisie accordé au type de la valeur attendue. */
-export function ValueInput({ type, value, onChange, label, placeholder }) {
+function ValueInput({ type, value, onChange, label, placeholder }) {
   const kind = valueType(type);
   const common = {
     'aria-label': label,

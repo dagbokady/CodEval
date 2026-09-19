@@ -6,6 +6,7 @@ import json
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from ..audit import log
 from ..deps import DbSession, StudentUser
@@ -38,7 +39,7 @@ from ..schemas import (
 )
 from ..config import settings
 from ..grading import matching
-from ..grading.questions import answers_of, questions_of
+from ..grading.questions import questions_of
 from ..grading.languages import default_starter
 from ..services import (
     close_if_expired,
@@ -394,29 +395,41 @@ def autosave(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Exercice introuvable")
 
     now = utcnow()
-    submission = db.scalar(
-        select(Submission).where(
-            Submission.participation_id == participation.id,
-            Submission.exercise_id == exercise_id,
+
+    def _upsert():
+        submission = db.scalar(
+            select(Submission).where(
+                Submission.participation_id == participation.id,
+                Submission.exercise_id == exercise_id,
+            )
         )
-    )
-    if submission is None:
-        submission = Submission(participation_id=participation.id, exercise_id=exercise_id)
-        db.add(submission)
-    elif payload.version and payload.version < submission.version:
-        # Une sauvegarde plus récente existe déjà : on ne régresse pas.
-        return {
-            "version": submission.version,
-            "saved_at": submission.updated_at,
-            "stale": True,
-            "seconds_left": seconds_left(evaluation),
-        }
-    submission.code = payload.code
-    submission.version = (submission.version or 0) + 1
-    submission.updated_at = now
-    participation.last_saved_at = now
-    participation.last_seen_at = now
-    db.commit()
+        if submission is None:
+            submission = Submission(participation_id=participation.id, exercise_id=exercise_id)
+            db.add(submission)
+        elif payload.version and payload.version < submission.version:
+            return {
+                "version": submission.version,
+                "saved_at": submission.updated_at,
+                "stale": True,
+                "seconds_left": seconds_left(evaluation),
+            }
+        submission.code = payload.code
+        submission.version = (submission.version or 0) + 1
+        submission.updated_at = now
+        participation.last_saved_at = now
+        participation.last_seen_at = now
+        db.commit()
+        return submission
+
+    try:
+        result = _upsert()
+    except IntegrityError:
+        db.rollback()
+        result = _upsert()
+
+    if isinstance(result, dict):
+        return result
+    submission = result
     return {
         "version": submission.version,
         "saved_at": submission.updated_at,

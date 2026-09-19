@@ -8,7 +8,7 @@
  * (`backend/app/grading/languages.py`).
  */
 
-export const STARTER_CODE = {
+const STARTER_CODE = {
   c: `#include <stdio.h>
 
 int main(void)

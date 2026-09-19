@@ -1306,6 +1306,10 @@ function EnvironmentStep({ exercises, setExercises, readOnly, onBack, onNext, pe
                       settings: { ...exercise.settings, allowed_elements: allowed },
                     })
                   }
+                  ecritureCours={Boolean(exercise.settings?.ecriture_cours)}
+                  onEcritureCours={(ecriture_cours) =>
+                    update(index, { settings: { ...exercise.settings, ecriture_cours } })
+                  }
                 />
               ) : (
                 <>

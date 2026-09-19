@@ -1,12 +1,13 @@
 """Jeu de données initial : python -m app.seed
 
-Une seule enseignante, une seule classe, deux matières : le langage C et
+Un administrateur, une seule enseignante, une seule classe, deux matières : le langage C et
 l'initiation à l'algorithmique, qui se répondent : la première se travaille avec
 l'éditeur de code, la seconde avec l'éditeur de blocs. Aucun exercice ni
 évaluation : l'enseignante crée les siens depuis l'interface.
 
 Le script est rejouable : sur une base déjà installée, il n'ajoute que les
-matières manquantes et les rattachements qui vont avec.
+matières manquantes et les rattachements qui vont avec, et le compte
+d'administration s'il manque.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ ORG_NAME = "ESATIC (École Supérieure Africaine des TIC)"
 ORG_SLUG = "esatic"
 PASSWORD = "codeval2026"
 
+ADMIN = ("admin@esatic.ci", "Administration ESATIC")
 TEACHER = ("dr.johnson@esatic.ci", "Dr Johnson")
 CLASSROOM = ("SRIT 2A", "2ᵉ année")
 SUBJECTS = ["Langage C", "Initiation à l'algorithmique"]
@@ -75,6 +77,22 @@ def _compléter_matières(db, org: Organization) -> list[str]:
     return ajoutées
 
 
+def _compléter_admin(db, org: Organization) -> bool:
+    """Le compte d'administration, créé s'il manque à une base déjà installée."""
+    if db.scalar(select(User).where(User.email == ADMIN[0])):
+        return False
+    db.add(
+        User(
+            organization_id=org.id,
+            email=ADMIN[0],
+            password_hash=hash_password(PASSWORD),
+            full_name=ADMIN[1],
+            role=Role.ADMIN,
+        )
+    )
+    return True
+
+
 def main() -> None:
     init_db()
     db = SessionLocal()
@@ -82,10 +100,13 @@ def main() -> None:
         existante = db.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
         if existante:
             ajoutées = _compléter_matières(db, existante)
+            admin = _compléter_admin(db, existante)
             db.commit()
             if ajoutées:
                 print(f"Matière ajoutée : {', '.join(ajoutées)}")
-            else:
+            if admin:
+                print(f"Administrateur ajouté : {ADMIN[1]} <{ADMIN[0]}>")
+            if not ajoutées and not admin:
                 print("Jeu de données déjà présent.")
             return
 
@@ -105,6 +126,7 @@ def main() -> None:
             db.add(u)
             return u
 
+        user(ADMIN[0], ADMIN[1], Role.ADMIN)
         teacher = user(TEACHER[0], TEACHER[1], Role.TEACHER)
         students = [user(email, name, Role.STUDENT, mat) for email, name, mat in STUDENTS]
         db.flush()
@@ -125,6 +147,7 @@ def main() -> None:
         db.commit()
 
         print(f"Établissement    : {ORG_NAME}")
+        print(f"Administrateur   : {ADMIN[1]} <{ADMIN[0]}>")
         print(f"Enseignante      : {TEACHER[1]} <{TEACHER[0]}>")
         print(f"Classe           : {CLASSROOM[0]} ({len(students)} étudiants)")
         print(f"Matières         : {' · '.join(SUBJECTS)}")

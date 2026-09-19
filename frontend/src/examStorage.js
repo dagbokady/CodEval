@@ -8,7 +8,7 @@
 
 const key = (evaluationId, exerciseId) => `codeval.exam.${evaluationId}.${exerciseId}`;
 
-export function readDraft(evaluationId, exerciseId) {
+function readDraft(evaluationId, exerciseId) {
   try {
     const raw = localStorage.getItem(key(evaluationId, exerciseId));
     return raw ? JSON.parse(raw) : null;

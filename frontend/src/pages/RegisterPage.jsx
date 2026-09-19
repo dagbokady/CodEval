@@ -48,7 +48,7 @@ export default function RegisterPage() {
       <div className="auth-zone">
         <form className="auth-card" onSubmit={onSubmit} noValidate>
           <h1>Inscription</h1>
-          <p className="subtitle">Créez votre établissement et son compte enseignant</p>
+          <p className="subtitle">Créez votre établissement et son compte d’administration</p>
           <Alert>{error}</Alert>
           <Field label="Établissement" id="org">
             <input

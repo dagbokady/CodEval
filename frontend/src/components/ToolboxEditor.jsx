@@ -19,23 +19,27 @@ import { Button } from './ui';
 
 /** Le squelette imposé, tel qu'il est écrit au tableau. */
 const SQUELETTE = [
-  { texte: 'Algorithme', suite: ' <nom>' },
+  { texte: 'ALGORITHME', suite: ' <nom>' },
+  { texte: '    CONSTANTES', suite: ' <définition de constantes>', rubrique: 'constante' },
+  { texte: '    TYPES', suite: ' <définition de types>', rubrique: 'type' },
+  { texte: '    VARIABLES', suite: ' <définition de variables>', rubrique: 'declaration' },
+  { texte: 'DEBUT' },
+  { texte: '    …', suite: ' <instructions>', gris: true },
+  { texte: 'FIN' },
   { texte: '' },
-  { texte: 'Déclaration' },
-  { texte: '    Constante', suite: ' <définition de constantes>', rubrique: 'constante' },
-  { texte: '    Type', suite: ' <définition de types>', rubrique: 'type' },
-  { texte: '    Variable', suite: ' <définition de variables>', rubrique: 'declaration' },
-  { texte: 'Début' },
-  { texte: '    Action 1', gris: true },
-  { texte: '    Action 2', gris: true },
-  { texte: '    …', suite: ' <partie instructions> (corps)', gris: true },
-  { texte: '' },
-  { texte: 'Fin' },
+  { texte: 'FONCTION / PROCEDURE', suite: ' <sous-programmes, après FIN>', rubrique: 'sousprog' },
 ];
 
-export default function ToolboxEditor({ value, onChange, readOnly = false }) {
+export default function ToolboxEditor({
+  value,
+  onChange,
+  ecritureCours = true,
+  onEcritureCours,
+  readOnly = false,
+}) {
   const autorisés = value?.length ? value : DEFAULT_ELEMENTS;
-  const permits = (key) => autorisés.includes(key);
+  const permits = (key) =>
+    key === 'sousprog' ? autorisés.includes('fonction') || autorisés.includes('procedure') : autorisés.includes(key);
 
   const toggle = (key, checked) =>
     onChange(
@@ -110,6 +114,22 @@ export default function ToolboxEditor({ value, onChange, readOnly = false }) {
           </div>
         </div>
       ))}
+
+      {onEcritureCours && (
+        <label className="outils-ecriture">
+          <input
+            type="checkbox"
+            checked={ecritureCours}
+            disabled={readOnly}
+            onChange={(e) => onEcritureCours(e.target.checked)}
+          />
+          <span>
+            <strong>ECRIRE comme au cours</strong> : ECRIRE reste sur la même ligne, CRLF fait
+            passer à la ligne suivante. Décoché : chaque ECRIRE passe à la ligne (comportement des
+            exercices créés avant cette option ; leurs sorties attendues en dépendent).
+          </span>
+        </label>
+      )}
 
       {autorisés.length === 0 && (
         <p className="sub" style={{ marginTop: 10 }}>

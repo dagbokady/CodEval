@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useDocumentTitle } from '../useDocumentTitle';
 
@@ -142,10 +142,6 @@ export function Field({ label, error, hint, children, id }) {
       )}
     </div>
   );
-}
-
-export function Input({ id, ...props }) {
-  return <input id={id} {...props} />;
 }
 
 /** Mot de passe avec bouton « Afficher » : on vérifie ce qu'on a tapé avant d'envoyer. */
@@ -374,5 +370,43 @@ export function NavItem({ to, icon, label }) {
       {icon}
       <span>{label}</span>
     </NavLink>
+  );
+}
+
+/**
+ * Boîte de dialogue modale, sur l'élément natif <dialog> : le navigateur
+ * piège le focus, ferme à Échap et rend le reste de la page inerte. Un clic
+ * sur le fond ne la ferme pas : une saisie en cours ne se perd pas par mégarde.
+ */
+export function Dialog({ open, onClose, title, description, children, footer, size }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
+  }, [open]);
+  const titleId = useId();
+  return (
+    <dialog
+      ref={ref}
+      className={`dialog ${size ? `dialog--${size}` : ''}`.trim()}
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      {open && (
+        <div className="dialog-body">
+          <header className="dialog-head">
+            <h2 id={titleId}>{title}</h2>
+            {description && <p className="sub">{description}</p>}
+          </header>
+          {children}
+          {footer && <footer className="dialog-foot">{footer}</footer>}
+        </div>
+      )}
+    </dialog>
   );
 }

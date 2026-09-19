@@ -411,6 +411,10 @@ export default function BankPage() {
                   onChange={(allowed_elements) =>
                     setForm({ ...form, settings: { ...form.settings, allowed_elements } })
                   }
+                  ecritureCours={Boolean(form.settings.ecriture_cours)}
+                  onEcritureCours={(ecriture_cours) =>
+                    setForm({ ...form, settings: { ...form.settings, ecriture_cours } })
+                  }
                 />
               )}
 

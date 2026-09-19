@@ -72,6 +72,9 @@ export default function LoginPage() {
           <Button size="large" type="submit" disabled={pending}>
             {pending ? 'Connexion…' : 'Se connecter'}
           </Button>
+          <div className="auth-links">
+            <Link to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+          </div>
           <div className="auth-footer">
             Pas encore d'établissement ? <Link to="/inscription">Créer un compte</Link>
           </div>

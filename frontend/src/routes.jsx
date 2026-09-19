@@ -1,36 +1,59 @@
+import { Suspense, lazy } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import { Landing, Protected } from './components/Protected';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import SettingsPage from './pages/SettingsPage';
-import TeacherHomePage from './pages/teacher/TeacherHomePage';
-import DashboardPage from './pages/teacher/DashboardPage';
-import EvaluationEditorPage from './pages/teacher/EvaluationEditorPage';
-import SessionMonitorPage from './pages/teacher/SessionMonitorPage';
-import ResultsPage from './pages/teacher/ResultsPage';
-import SubmissionDetailPage from './pages/teacher/SubmissionDetailPage';
-import ClassesPage from './pages/teacher/ClassesPage';
-import ClassDetailPage from './pages/teacher/ClassDetailPage';
-import BankPage from './pages/teacher/BankPage';
-import BankEvaluationsPage from './pages/teacher/BankEvaluationsPage';
-import StatsPage from './pages/teacher/StatsPage';
-import StudentHomePage from './pages/student/StudentHomePage';
-import StudentResultsPage from './pages/student/StudentResultsPage';
-import StudentCopyPage from './pages/student/StudentCopyPage';
-import LazyExamPage from './pages/student/LazyExamPage';
+import { Loading } from './components/ui';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+
+const TeacherHomePage = lazy(() => import('./pages/teacher/TeacherHomePage'));
+const DashboardPage = lazy(() => import('./pages/teacher/DashboardPage'));
+const EvaluationEditorPage = lazy(() => import('./pages/teacher/EvaluationEditorPage'));
+const SessionMonitorPage = lazy(() => import('./pages/teacher/SessionMonitorPage'));
+const ResultsPage = lazy(() => import('./pages/teacher/ResultsPage'));
+const SubmissionDetailPage = lazy(() => import('./pages/teacher/SubmissionDetailPage'));
+const ClassesPage = lazy(() => import('./pages/teacher/ClassesPage'));
+const ClassDetailPage = lazy(() => import('./pages/teacher/ClassDetailPage'));
+const BankPage = lazy(() => import('./pages/teacher/BankPage'));
+const BankEvaluationsPage = lazy(() => import('./pages/teacher/BankEvaluationsPage'));
+const StatsPage = lazy(() => import('./pages/teacher/StatsPage'));
+
+const StudentHomePage = lazy(() => import('./pages/student/StudentHomePage'));
+const StudentResultsPage = lazy(() => import('./pages/student/StudentResultsPage'));
+const StudentCopyPage = lazy(() => import('./pages/student/StudentCopyPage'));
+const LazyExamPage = lazy(() => import('./pages/student/LazyExamPage'));
+
+const AdminHomePage = lazy(() => import('./pages/admin/AdminHomePage'));
+const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
+const ClassroomsAdminPage = lazy(() => import('./pages/admin/ClassroomsAdminPage'));
+const ClassroomAdminDetailPage = lazy(() => import('./pages/admin/ClassroomAdminDetailPage'));
+const SubjectsPage = lazy(() => import('./pages/admin/SubjectsPage'));
+const EvaluationsAdminPage = lazy(() => import('./pages/admin/EvaluationsAdminPage'));
+const AuditPage = lazy(() => import('./pages/admin/AuditPage'));
+const OrganizationPage = lazy(() => import('./pages/admin/OrganizationPage'));
+
+function Lazy({ children }) {
+  return <Suspense fallback={<Loading />}>{children}</Suspense>;
+}
 
 const teacher = ['teacher'];
+const admin = ['admin'];
 
 export const router = createBrowserRouter([
   { path: '/', element: <Landing /> },
-  { path: '/connexion', element: <LoginPage /> },
-  { path: '/inscription', element: <RegisterPage /> },
+  { path: '/connexion', element: <Lazy><LoginPage /></Lazy> },
+  { path: '/inscription', element: <Lazy><RegisterPage /></Lazy> },
+  { path: '/mot-de-passe-oublie', element: <Lazy><ForgotPasswordPage /></Lazy> },
+  { path: '/reset-password', element: <Lazy><ResetPasswordPage /></Lazy> },
   {
     path: '/epreuve/:evaluationId',
     element: (
       <Protected roles={['student']}>
-        <LazyExamPage />
+        <Lazy><LazyExamPage /></Lazy>
       </Protected>
     ),
   },
@@ -41,28 +64,36 @@ export const router = createBrowserRouter([
       </Protected>
     ),
     children: [
-      { path: '/accueil', element: <Protected roles={teacher}><TeacherHomePage /></Protected> },
-      { path: '/evaluations', element: <Protected roles={teacher}><DashboardPage /></Protected> },
-      { path: '/evaluations/nouvelle', element: <Protected roles={teacher}><EvaluationEditorPage /></Protected> },
-      { path: '/evaluations/:evaluationId', element: <Protected roles={teacher}><EvaluationEditorPage /></Protected> },
-      { path: '/evaluations/:evaluationId/session', element: <Protected roles={teacher}><SessionMonitorPage /></Protected> },
-      { path: '/evaluations/:evaluationId/resultats', element: <Protected roles={teacher}><ResultsPage /></Protected> },
+      { path: '/admin', element: <Protected roles={admin}><Lazy><AdminHomePage /></Lazy></Protected> },
+      { path: '/admin/utilisateurs', element: <Protected roles={admin}><Lazy><UsersPage /></Lazy></Protected> },
+      { path: '/admin/classes', element: <Protected roles={admin}><Lazy><ClassroomsAdminPage /></Lazy></Protected> },
+      { path: '/admin/classes/:classroomId', element: <Protected roles={admin}><Lazy><ClassroomAdminDetailPage /></Lazy></Protected> },
+      { path: '/admin/matieres', element: <Protected roles={admin}><Lazy><SubjectsPage /></Lazy></Protected> },
+      { path: '/admin/evaluations', element: <Protected roles={admin}><Lazy><EvaluationsAdminPage /></Lazy></Protected> },
+      { path: '/admin/journal', element: <Protected roles={admin}><Lazy><AuditPage /></Lazy></Protected> },
+      { path: '/admin/etablissement', element: <Protected roles={admin}><Lazy><OrganizationPage /></Lazy></Protected> },
+      { path: '/accueil', element: <Protected roles={teacher}><Lazy><TeacherHomePage /></Lazy></Protected> },
+      { path: '/evaluations', element: <Protected roles={teacher}><Lazy><DashboardPage /></Lazy></Protected> },
+      { path: '/evaluations/nouvelle', element: <Protected roles={teacher}><Lazy><EvaluationEditorPage /></Lazy></Protected> },
+      { path: '/evaluations/:evaluationId', element: <Protected roles={teacher}><Lazy><EvaluationEditorPage /></Lazy></Protected> },
+      { path: '/evaluations/:evaluationId/session', element: <Protected roles={teacher}><Lazy><SessionMonitorPage /></Lazy></Protected> },
+      { path: '/evaluations/:evaluationId/resultats', element: <Protected roles={teacher}><Lazy><ResultsPage /></Lazy></Protected> },
       {
         path: '/evaluations/:evaluationId/resultats/:participationId',
-        element: <Protected roles={teacher}><SubmissionDetailPage /></Protected>,
+        element: <Protected roles={teacher}><Lazy><SubmissionDetailPage /></Lazy></Protected>,
       },
-      { path: '/classes', element: <Protected roles={teacher}><ClassesPage /></Protected> },
-      { path: '/classes/:classroomId', element: <Protected roles={teacher}><ClassDetailPage /></Protected> },
-      { path: '/banque', element: <Protected roles={teacher}><BankPage /></Protected> },
-      { path: '/banque/evaluations', element: <Protected roles={teacher}><BankEvaluationsPage /></Protected> },
-      { path: '/statistiques', element: <Protected roles={teacher}><StatsPage /></Protected> },
-      { path: '/mes-evaluations', element: <Protected roles={['student']}><StudentHomePage /></Protected> },
-      { path: '/mes-resultats', element: <Protected roles={['student']}><StudentResultsPage /></Protected> },
+      { path: '/classes', element: <Protected roles={teacher}><Lazy><ClassesPage /></Lazy></Protected> },
+      { path: '/classes/:classroomId', element: <Protected roles={teacher}><Lazy><ClassDetailPage /></Lazy></Protected> },
+      { path: '/banque', element: <Protected roles={teacher}><Lazy><BankPage /></Lazy></Protected> },
+      { path: '/banque/evaluations', element: <Protected roles={teacher}><Lazy><BankEvaluationsPage /></Lazy></Protected> },
+      { path: '/statistiques', element: <Protected roles={teacher}><Lazy><StatsPage /></Lazy></Protected> },
+      { path: '/mes-evaluations', element: <Protected roles={['student']}><Lazy><StudentHomePage /></Lazy></Protected> },
+      { path: '/mes-resultats', element: <Protected roles={['student']}><Lazy><StudentResultsPage /></Lazy></Protected> },
       {
         path: '/mes-resultats/:evaluationId',
-        element: <Protected roles={['student']}><StudentCopyPage /></Protected>,
+        element: <Protected roles={['student']}><Lazy><StudentCopyPage /></Lazy></Protected>,
       },
-      { path: '/parametres', element: <SettingsPage /> },
+      { path: '/parametres', element: <Lazy><SettingsPage /></Lazy> },
     ],
   },
   { path: '*', element: <Landing /> },

@@ -5,46 +5,65 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from .db import SessionLocal
+from .db import SessionLocal, _is_sqlite
 from .models import Evaluation, EvaluationStatus, User, utcnow
 from .services import start_session
 
 logger = logging.getLogger("codeval.scheduler")
 
 POLL_SECONDS = 30
+_LOCK_ID = 737_001
+
+
+def _try_advisory_lock(db) -> bool:
+    if _is_sqlite:
+        return True
+    row = db.execute(text("SELECT pg_try_advisory_lock(:id)"), {"id": _LOCK_ID}).scalar()
+    return bool(row)
+
+
+def _release_advisory_lock(db) -> None:
+    if _is_sqlite:
+        return
+    db.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": _LOCK_ID})
 
 
 async def _tick() -> int:
     db = SessionLocal()
     launched = 0
     try:
-        now = utcnow()
-        due = list(
-            db.scalars(
-                select(Evaluation).where(
-                    Evaluation.status == EvaluationStatus.SCHEDULED,
-                    Evaluation.scheduled_start.isnot(None),
-                    Evaluation.scheduled_start <= now,
+        if not _try_advisory_lock(db):
+            return 0
+        try:
+            now = utcnow()
+            due = list(
+                db.scalars(
+                    select(Evaluation).where(
+                        Evaluation.status == EvaluationStatus.SCHEDULED,
+                        Evaluation.scheduled_start.isnot(None),
+                        Evaluation.scheduled_start <= now,
+                    )
                 )
             )
-        )
-        for evaluation in due:
-            try:
-                actor = db.get(User, evaluation.teacher_id)
-                start_session(db, evaluation, actor)
-                launched += 1
-                logger.info(
-                    "Évaluation %d « %s » lancée automatiquement",
-                    evaluation.id,
-                    evaluation.title,
-                )
-            except Exception:
-                logger.exception(
-                    "Échec du lancement auto de l'évaluation %d", evaluation.id
-                )
-                db.rollback()
+            for evaluation in due:
+                try:
+                    actor = db.get(User, evaluation.teacher_id)
+                    start_session(db, evaluation, actor)
+                    launched += 1
+                    logger.info(
+                        "Évaluation %d « %s » lancée automatiquement",
+                        evaluation.id,
+                        evaluation.title,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Échec du lancement auto de l'évaluation %d", evaluation.id
+                    )
+                    db.rollback()
+        finally:
+            _release_advisory_lock(db)
     finally:
         db.close()
     return launched

@@ -17,7 +17,7 @@
  * ici doit l'être là aussi.
  */
 
-import { DATA_TYPES, ELEMENTS, SIZED_TYPES, typeNotation } from './algoVocabulary';
+import { ELEMENTS, SIZED_TYPES, typeNotation } from './algoVocabulary';
 
 /** Les familles de critères algorithmiques, dans l'ordre du sélecteur. */
 export const ALGO_CRITERION_KINDS = [
@@ -71,16 +71,13 @@ export function algoCriterionKind(key) {
  * un bloc qu'on pose mais la seconde branche du SI : « traitez le cas contraire »
  * est une consigne courante, et le correcteur sait la voir.
  */
-export const ALGO_STRUCTURES = Object.entries(ELEMENTS).map(([key, element]) => ({
+export const ALGO_STRUCTURES = Object.entries(ELEMENTS)
+  .filter(([, element]) => !element.herite)
+  .map(([key, element]) => ({
   key,
   label: element.label,
   group: element.group,
 }));
-
-/** Le type de données d'une variable, tel qu'il s'écrit sur le sujet. */
-export function dataTypeLabel(key) {
-  return DATA_TYPES.find((t) => t.key === key)?.label ?? key;
-}
 
 export function isSizedType(key) {
   return SIZED_TYPES.has(key);

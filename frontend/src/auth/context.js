@@ -9,6 +9,7 @@ export function useAuth() {
 }
 
 export const HOME_BY_ROLE = {
+  admin: '/admin',
   teacher: '/accueil',
   student: '/mes-evaluations',
 };

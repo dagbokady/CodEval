@@ -51,6 +51,8 @@ const ALGO_KEYWORDS = new Set([
   'SI', 'ALORS', 'SINON', 'FINSI', 'POUR', 'FINPOUR', 'TANTQUE', 'FAIRE', 'FINTANTQUE',
   'REPETER', 'RÉPÉTER', 'JUSQU', 'LIRE', 'ECRIRE', 'ÉCRIRE', 'RETOURNE', 'RETOUR',
   'FONCTION', 'FINFONCTION', 'ET', 'OU', 'NON', 'VRAI', 'FAUX', 'MOD', 'DIV',
+  'SINONSI', 'SELON', 'DANS', 'FINSELON', 'PROCEDURE', 'PROCÉDURE', 'RETOURNER', 'CRLF',
+  'ENRG', 'FINENRG',
   // anciennes copies
   'VARIABLE', 'TANT', 'QUE', 'CONSTANTE', 'DÉCLARATION',
 ]);
@@ -70,7 +72,7 @@ export function highlightFamily(language) {
  * relu depuis sa forme JSON.
  */
 export function looksLikeAlgo(code) {
-  return /^\s*(ALGORITHME|VARIABLE|TABLEAU|POUR|TANTQUE|TANT QUE|SI|FONCTION|LIRE|ECRIRE|ÉCRIRE|RETOUR|DÉBUT|DEBUT)\b/m
+  return /^\s*(ALGORITHME|VARIABLE|TABLEAU|POUR|TANTQUE|TANT QUE|SI|SELON|FONCTION|PROCEDURE|LIRE|ECRIRE|ÉCRIRE|RETOUR|DÉBUT|DEBUT)\b/m
     .test(code ?? '') || /^algorithme\b/.test((code ?? '').trimStart());
 }
 
