@@ -1,19 +1,27 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HOME_BY_ROLE, useAuth } from '../auth';
+import { GenderField, PhotoPicker } from '../components/IdentityFields';
 import { Alert, Button, Field, PasswordInput } from '../components/ui';
 import { useDocumentTitle } from '../useDocumentTitle';
 
 /**
  * Inscription d'un enseignant. Il n'a besoin de personne : un espace personnel
  * est créé pour lui, où il ouvre ses classes. Les apprenants, eux, ne
- * s'inscrivent pas ici : ils entrent par le code de leur classe.
+ * s'inscrivent pas ici : ils entrent par le code de leur classe. La photo est
+ * demandée : c'est elle que les apprenants voient à côté de son nom.
  */
 export default function RegisterPage() {
   useDocumentTitle('Inscription');
   const { authenticate } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ full_name: '', email: '', password: '' });
+  const [form, setForm] = useState({
+    full_name: '',
+    email: '',
+    password: '',
+    photo: '',
+    gender: '',
+  });
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false);
 
@@ -21,6 +29,14 @@ export default function RegisterPage() {
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (!form.photo) {
+      setError('Ajoutez une photo de vous.');
+      return;
+    }
+    if (!form.gender) {
+      setError('Indiquez votre sexe.');
+      return;
+    }
     if (form.password.length < 8) {
       setError('Le mot de passe doit contenir au moins 8 caractères.');
       return;
@@ -52,6 +68,12 @@ export default function RegisterPage() {
             Créez votre espace gratuitement et ouvrez jusqu’à 2 classes.
           </p>
           <Alert>{error}</Alert>
+          <PhotoPicker
+            value={form.photo}
+            onChange={(photo) => setForm((current) => ({ ...current, photo }))}
+            onError={setError}
+            hint="Vos apprenants la verront à côté de votre nom."
+          />
           <Field label="Nom complet" id="name">
             <input
               id="name"
@@ -62,6 +84,10 @@ export default function RegisterPage() {
               onChange={update('full_name')}
             />
           </Field>
+          <GenderField
+            value={form.gender}
+            onChange={(gender) => setForm((current) => ({ ...current, gender }))}
+          />
           <Field label="E-mail" id="email">
             <input
               id="email"

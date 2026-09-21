@@ -543,3 +543,23 @@ export function Dialog({ open, onClose, title, description, children, footer, si
     </dialog>
   );
 }
+
+/** Initiales d'un nom : « Jean Koné » donne « JK ». */
+function initialsOf(name) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase();
+}
+
+/** La photo de la personne si elle en a une, ses initiales sinon. */
+export function Avatar({ user, className = '' }) {
+  return (
+    <span className={`avatar ${className}`.trim()} aria-hidden="true">
+      {user.photo ? <img src={user.photo} alt="" /> : initialsOf(user.full_name)}
+    </span>
+  );
+}

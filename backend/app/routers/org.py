@@ -180,7 +180,8 @@ def create_user(payload: UserCreate, admin: AdminUser, db: DbSession) -> UserOut
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
         role=payload.role,
-        matricule=payload.matricule or None,
+        matricule=(payload.matricule or "").strip() or None,
+        gender=payload.gender,
     )
     db.add(user)
     db.flush()

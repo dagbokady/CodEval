@@ -91,6 +91,8 @@ def register_teacher(payload: RegisterTeacher, db: DbSession) -> TokenOut:
         password_hash=hash_password(payload.password),
         full_name=payload.full_name.strip(),
         role=Role.TEACHER,
+        photo=payload.photo,
+        gender=payload.gender,
     )
     db.add(user)
     db.flush()

@@ -23,6 +23,8 @@ import {
   IconStats,
   IconUsers,
 } from './icons';
+import { roleLabel } from '../roles';
+import { Avatar } from './ui';
 
 /** Ferme un menu au clic extérieur et à Échap : le minimum attendu d'un menu. */
 function useDismiss(open, setOpen, ref) {
@@ -116,7 +118,6 @@ const ADMIN_NAV = [
 ];
 
 const NAV_MAP = { admin: ADMIN_NAV, teacher: TEACHER_NAV, student: STUDENT_NAV };
-const ROLE_LABELS = { admin: 'Administrateur', teacher: 'Enseignante', student: 'Étudiant' };
 
 function NotificationBell() {
   const navigate = useNavigate();
@@ -238,7 +239,7 @@ function ThemeToggle() {
   );
 }
 
-function UserMenu({ user, organization, initials, signOut }) {
+function UserMenu({ user, organization, signOut }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useDismiss(open, setOpen, ref);
@@ -251,10 +252,10 @@ function UserMenu({ user, organization, initials, signOut }) {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <span className="avatar" aria-hidden="true">{initials}</span>
+        <Avatar user={user} />
         <span className="identity">
           <strong>{user.full_name}</strong>
-          <span>{ROLE_LABELS[user.role]}{organization ? ` · ${organization}` : ''}</span>
+          <span>{roleLabel(user.role, user.gender)}{organization ? ` · ${organization}` : ''}</span>
         </span>
         <span className={`sidebar-chevron ${open ? 'is-open' : ''}`} aria-hidden="true">
           <IconChevronDown />
@@ -277,13 +278,6 @@ function UserMenu({ user, organization, initials, signOut }) {
 export default function AppShell() {
   const { user, organization, signOut } = useAuth();
   const navConfig = NAV_MAP[user.role] ?? [];
-  const initials = user.full_name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
 
   return (
     <div className="shell">
@@ -320,7 +314,7 @@ export default function AppShell() {
           <NavItem to="/parametres" label="Paramètres" icon={<IconSettings />} />
         </div>
 
-        <UserMenu user={user} organization={organization} initials={initials} signOut={signOut} />
+        <UserMenu user={user} organization={organization} signOut={signOut} />
       </nav>
 
       <main className="main" id="contenu" tabIndex={-1}>

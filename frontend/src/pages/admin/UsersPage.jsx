@@ -9,6 +9,7 @@ import {
   useAdminUsers,
 } from '../../api/admin';
 import { useAuth } from '../../auth';
+import { roleLabel } from '../../roles';
 import {
   Alert,
   Button,
@@ -185,7 +186,7 @@ export default function UsersPage() {
                         </span>
                         <span className="sub">{u.email}</span>
                       </td>
-                      <td>{ROLE_LABELS[u.role]}</td>
+                      <td>{roleLabel(u.role, u.gender)}</td>
                       <td className="mono">{u.matricule ?? <span className="cell-muted">-</span>}</td>
                       <td>
                         {u.classrooms.length ? (
@@ -299,6 +300,7 @@ function UserDialog({ user, isSelf, onClose }) {
     email: user.email ?? '',
     role: user.role ?? 'student',
     matricule: user.matricule ?? '',
+    gender: user.gender ?? '',
     classroom_id: user.classroom_id ?? '',
     password: creating ? generatePassword() : '',
   }));
@@ -318,11 +320,16 @@ function UserDialog({ user, isSelf, onClose }) {
   async function submit(event) {
     event.preventDefault();
     setError(null);
+    if (form.role === 'student' && !form.matricule.trim()) {
+      setError('Le matricule est obligatoire pour un étudiant.');
+      return;
+    }
     const body = {
       full_name: form.full_name.trim(),
       email: form.email.trim(),
       role: form.role,
       matricule: form.role === 'student' ? form.matricule.trim() || null : null,
+      gender: form.gender || null,
     };
     if (creating) {
       body.password = form.password;
@@ -384,10 +391,17 @@ function UserDialog({ user, isSelf, onClose }) {
           </Field>
           {form.role === 'student' && (
             <Field label="Matricule" id="u-mat">
-              <input id="u-mat" value={form.matricule} onChange={set('matricule')} />
+              <input id="u-mat" required value={form.matricule} onChange={set('matricule')} />
             </Field>
           )}
         </div>
+        <Field label="Sexe" id="u-gender">
+          <select id="u-gender" value={form.gender} onChange={set('gender')}>
+            <option value="">Non renseigné</option>
+            <option value="F">Femme</option>
+            <option value="M">Homme</option>
+          </select>
+        </Field>
         {creating && form.role === 'student' && (
           <Field label="Classe" id="u-class" hint="Un étudiant sans classe ne voit aucune épreuve.">
             <select id="u-class" value={form.classroom_id} onChange={set('classroom_id')}>

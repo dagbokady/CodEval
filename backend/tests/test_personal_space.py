@@ -21,8 +21,15 @@ from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Classroom, utcnow  # noqa: E402
 from app.rate_limit import limiter  # noqa: E402
+from app.security import create_join_token  # noqa: E402
 
 client = TestClient(app)
+
+
+# Un pixel PNG : la plus petite photo valide.
+PHOTO = (
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
+)
 
 
 def auth(token: str) -> dict:
@@ -37,9 +44,23 @@ def teacher() -> str:
         "/api/auth/register-teacher",
         json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1"},
     )
+    assert res.status_code == 422, "la photo est obligatoire"
+    res = client.post(
+        "/api/auth/register-teacher",
+        json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1",
+              "photo": "data:text/plain;base64,aGVsbG8="},
+    )
+    assert res.status_code == 422, "une photo doit être une image"
+    res = client.post(
+        "/api/auth/register-teacher",
+        json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1",
+              "photo": PHOTO, "gender": "F"},
+    )
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["user"]["role"] == "teacher"
+    assert body["user"]["photo"] == PHOTO
+    assert body["user"]["gender"] == "F"
     assert body["organization"] == "Espace de Jean Koné"
     assert body["organization_kind"] == "personal"
     return body["access_token"]
@@ -105,12 +126,12 @@ def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
     res = client.post(f"/api/classrooms/{cid}/join-code", headers=auth(teacher), json={})
     assert res.status_code == 200, res.text
     code = res.json()["join_code"]
-    assert len(code) == 8
+    assert len(code) == 12
     detail = client.get(f"/api/classrooms/{cid}", headers=auth(teacher)).json()
     assert detail["join_code"] == code
 
     # Le code se tape comme on le lit au tableau : minuscules et tiret passent.
-    typed = f"{code[:4]}-{code[4:]}".lower()
+    typed = f"{code[:4]}-{code[4:8]}-{code[8:]}".lower()
     preview = client.get(f"/api/join/{typed}")
     assert preview.status_code == 200
     assert preview.json()["classroom_name"] == classroom["name"]
@@ -119,7 +140,20 @@ def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
     res = client.post(
         "/api/join",
         json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
-              "password": "motdepasse1"},
+              "password": "motdepasse1", "matricule": "  ", "photo": PHOTO,
+              "gender": "F"},
+    )
+    assert res.status_code == 422, "le matricule est obligatoire"
+    res = client.post(
+        "/api/join",
+        json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
+              "password": "motdepasse1", "matricule": "ETU-001", "gender": "F"},
+    )
+    assert res.status_code == 422, "la photo est obligatoire"
+    res = client.post(
+        "/api/join",
+        json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
+              "password": "motdepasse1", "matricule": "ETU-001", "photo": PHOTO, "gender": "F"},
     )
     assert res.status_code == 201, res.text
     assert res.json()["user"]["role"] == "student"
@@ -136,7 +170,8 @@ def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
     # Même e-mail une seconde fois : on l'envoie vers la connexion.
     res = client.post(
         "/api/join",
-        json={"code": code, "full_name": "Awa", "email": "AWA@etu.ci", "password": "motdepasse1"},
+        json={"code": code, "full_name": "Awa", "email": "AWA@etu.ci", "password": "motdepasse1",
+              "matricule": "ETU-001", "photo": PHOTO, "gender": "M"},
     )
     assert res.status_code == 409
 
@@ -181,6 +216,37 @@ def test_un_code_expire_ne_sert_plus(teacher):
     assert client.get(f"/api/join/{code}").status_code == 404
 
 
+def test_le_lien_d_invitation_expire(teacher):
+    limiter._attempts.clear()
+    cid = client.get("/api/classrooms", headers=auth(teacher)).json()[0]["id"]
+    client.delete(f"/api/classrooms/{cid}/join-code", headers=auth(teacher))
+    # Pas de lien sans code ouvert : le lien s'adosse au code.
+    res = client.post(f"/api/classrooms/{cid}/join-link", headers=auth(teacher), json={})
+    assert res.status_code == 409
+
+    client.post(f"/api/classrooms/{cid}/join-code", headers=auth(teacher), json={})
+    res = client.post(
+        f"/api/classrooms/{cid}/join-link", headers=auth(teacher), json={"expires_in_hours": 2}
+    )
+    assert res.status_code == 200, res.text
+    token = res.json()["token"]
+    assert client.get(f"/api/join/link/{token}").status_code == 200
+
+    res = client.post(
+        "/api/join",
+        json={"token": token, "full_name": "Koffi", "email": "koffi@etu.ci",
+              "password": "motdepasse1", "matricule": "ETU-003", "photo": PHOTO, "gender": "M"},
+    )
+    assert res.status_code == 201, res.text
+
+    # Échu, le lien ne sert plus.
+    expired = create_join_token(cid, "X", utcnow() - timedelta(minutes=1))
+    assert client.get(f"/api/join/link/{expired}").status_code == 404
+    # Changer le code tue aussi les liens déjà partagés.
+    client.post(f"/api/classrooms/{cid}/join-code", headers=auth(teacher), json={})
+    assert client.get(f"/api/join/link/{token}").status_code == 404
+
+
 def test_deviner_un_code_finit_par_etre_bloque():
     limiter._attempts.clear()
     for _ in range(5):
@@ -197,7 +263,8 @@ def test_seul_le_personnel_gere_le_code(teacher):
     ).json()["join_code"]
     student = client.post(
         "/api/join",
-        json={"code": code, "full_name": "Yao", "email": "yao@etu.ci", "password": "motdepasse1"},
+        json={"code": code, "full_name": "Yao", "email": "yao@etu.ci", "password": "motdepasse1",
+              "matricule": "ETU-002", "photo": PHOTO, "gender": "M"},
     ).json()["access_token"]
     res = client.post(f"/api/classrooms/{cid}/join-code", headers=auth(student), json={})
     assert res.status_code == 403

@@ -46,3 +46,18 @@ def decode_access_token(token: str) -> dict | None:
         return jwt.decode(token, settings.secret_key, algorithms=["HS256"])
     except jwt.PyJWTError:
         return None
+
+
+def create_join_token(classroom_id: int, join_code: str, expires_at: datetime) -> str:
+    """Jeton du lien d'invitation. Il porte le code en cours : changer ou fermer
+    le code rend aussi le lien caduc, en plus de sa propre échéance."""
+    payload = {"typ": "join", "cls": classroom_id, "code": join_code, "exp": expires_at}
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def decode_join_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+    return payload if payload.get("typ") == "join" else None

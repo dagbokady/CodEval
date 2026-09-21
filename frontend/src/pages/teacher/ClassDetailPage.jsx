@@ -7,7 +7,9 @@ import { useAuth } from '../../auth';
 import { formatJoinCode, joinLink } from '../../joinCode';
 import {
   Alert,
+  Avatar,
   Button,
+  Dialog,
   EmptyState,
   Loading,
   PageHeader,
@@ -28,6 +30,20 @@ import { summarize } from '../../classroomSummary';
 
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 const expiryFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+const linkExpiryFmt = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+// Durées proposées pour un lien d'invitation : il vit peu, par principe.
+const LINK_DURATIONS = [
+  { value: 2, label: '2 heures' },
+  { value: 24, label: '24 heures' },
+  { value: 72, label: '3 jours' },
+  { value: 168, label: '7 jours' },
+];
 
 const EVAL_FILTERS = [
   { value: 'upcoming', label: 'À venir' },
@@ -344,14 +360,26 @@ function JoinCodePanel({ classroom }) {
     () => api(`/api/classrooms/${classroom.id}/join-code`, { method: 'DELETE' }),
     invalidate,
   );
-  const busy = open.isPending || close.isPending;
+  const [hours, setHours] = useState(24);
+  // Le lien créé : il n'est montré qu'ici, le serveur ne le garde pas.
+  const [link, setLink] = useState(null);
+  const createLink = useAction(() =>
+    api(`/api/classrooms/${classroom.id}/join-link`, {
+      method: 'POST',
+      body: { expires_in_hours: hours },
+    }),
+  );
+  const busy = open.isPending || close.isPending || createLink.isPending;
   const code = classroom.join_code;
 
   async function run(action) {
     setError(null);
     setCopied(null);
     try {
-      await action.mutateAsync();
+      const result = await action.mutateAsync();
+      // Changer ou fermer le code rend caducs les liens déjà créés.
+      if (action === createLink) setLink(result);
+      else setLink(null);
     } catch (err) {
       setError(err.message);
     }
@@ -385,15 +413,64 @@ function JoinCodePanel({ classroom }) {
             <Button size="small" onClick={() => copy('code', formatJoinCode(code))}>
               {copied === 'code' ? 'Code copié' : 'Copier le code'}
             </Button>
-            <Button size="small" variant="secondary" onClick={() => copy('lien', joinLink(code))}>
-              {copied === 'lien' ? 'Lien copié' : 'Copier le lien'}
-            </Button>
             <Button size="small" variant="secondary" disabled={busy} onClick={() => run(open)}>
               Changer le code
             </Button>
             <Button size="small" variant="secondary" disabled={busy} onClick={() => run(close)}>
               Fermer
             </Button>
+          </div>
+
+          <div className="join-link">
+            <div className="join-link-head">
+              <strong>Lien d'invitation</strong>
+              <span className="sub">
+                Il ouvre l'inscription sans avoir à taper le code, et cesse de fonctionner à
+                son échéance ou dès que vous changez le code.
+              </span>
+            </div>
+            {link ? (
+              <>
+                <div className="join-link-row">
+                  <input
+                    className="join-link-url"
+                    readOnly
+                    aria-label="Lien d'invitation"
+                    value={joinLink(link.token)}
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <Button size="small" onClick={() => copy('lien', joinLink(link.token))}>
+                    {copied === 'lien' ? 'Lien copié' : 'Copier'}
+                  </Button>
+                </div>
+                <span className="sub">
+                  Expire le {linkExpiryFmt.format(new Date(link.expires_at))}
+                  {' · '}
+                  <button type="button" className="cd-link" onClick={() => setLink(null)}>
+                    Créer un autre lien
+                  </button>
+                </span>
+              </>
+            ) : (
+              <div className="join-link-row">
+                <label className="join-link-duration">
+                  <span>Valable</span>
+                  <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+                    {LINK_DURATIONS.map((d) => (
+                      <option key={d.value} value={d.value}>{d.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => run(createLink)}
+                >
+                  Créer le lien
+                </Button>
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -415,19 +492,22 @@ function JoinCodePanel({ classroom }) {
 function StudentsTab({ classroom, students, pending, error, canRemove }) {
   const [search, setSearch] = useState('');
   const [removeError, setRemoveError] = useState(null);
+  // L'apprenant qu'on s'apprête à retirer : la confirmation dit ce que ça change.
+  const [removing, setRemoving] = useState(null);
   const remove = useAction(
     (studentId) =>
       api(`/api/classrooms/${classroom.id}/students/${studentId}`, { method: 'DELETE' }),
     [['classroom-students', String(classroom.id)], ['classroom', String(classroom.id)]],
   );
 
-  async function removeStudent(student) {
-    if (!window.confirm(`Retirer ${student.full_name} de la classe ${classroom.name} ?`)) return;
+  async function confirmRemove() {
     setRemoveError(null);
     try {
-      await remove.mutateAsync(student.id);
+      await remove.mutateAsync(removing.id);
+      setRemoving(null);
     } catch (err) {
       setRemoveError(err.message);
+      setRemoving(null);
     }
   }
   const query = search.trim().toLowerCase();
@@ -482,7 +562,10 @@ function StudentsTab({ classroom, students, pending, error, canRemove }) {
               {shown.map((student) => (
                 <tr key={student.id}>
                   <td>
-                    <span className="cell-title">{student.full_name}</span>
+                    <span className="student-cell">
+                      <Avatar user={student} />
+                      <span className="cell-title">{student.full_name}</span>
+                    </span>
                   </td>
                   <td className="mono">{student.matricule ?? '-'}</td>
                   <td className="cell-muted">{student.email}</td>
@@ -497,7 +580,7 @@ function StudentsTab({ classroom, students, pending, error, canRemove }) {
                         variant="secondary"
                         size="small"
                         disabled={remove.isPending}
-                        onClick={() => removeStudent(student)}
+                        onClick={() => setRemoving(student)}
                       >
                         Retirer
                       </Button>
@@ -508,6 +591,31 @@ function StudentsTab({ classroom, students, pending, error, canRemove }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {removing && (
+        <Dialog
+          open
+          onClose={() => setRemoving(null)}
+          title={`Retirer ${removing.full_name} ?`}
+          description={`${removing.full_name} quittera la classe ${classroom.name}.`}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setRemoving(null)}>
+                Annuler
+              </Button>
+              <Button variant="danger" disabled={remove.isPending} onClick={confirmRemove}>
+                {remove.isPending ? 'Retrait…' : 'Retirer de la classe'}
+              </Button>
+            </>
+          }
+        >
+          <p className="sub">
+            Son compte et ses copies passées sont conservés. Il ne verra plus les épreuves de
+            cette classe ; s'il n'appartient plus à aucune classe, on lui demandera un code à sa
+            prochaine connexion.
+          </p>
+        </Dialog>
       )}
     </section>
   );

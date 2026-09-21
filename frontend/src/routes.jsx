@@ -54,6 +54,7 @@ export const router = createBrowserRouter([
   { path: '/connexion', element: <Lazy screen><LoginPage /></Lazy> },
   { path: '/inscription', element: <Lazy screen><RegisterPage /></Lazy> },
   { path: '/rejoindre', element: <Lazy screen><JoinPage /></Lazy> },
+  { path: '/rejoindre/lien/:token', element: <Lazy screen><JoinPage /></Lazy> },
   { path: '/rejoindre/:code', element: <Lazy screen><JoinPage /></Lazy> },
   { path: '/mot-de-passe-oublie', element: <Lazy screen><ForgotPasswordPage /></Lazy> },
   { path: '/reset-password', element: <Lazy screen><ResetPasswordPage /></Lazy> },

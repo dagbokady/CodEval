@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth';
-import { Alert, Button, Chips, EmptyState, Loading, Tabs, Tag } from '../../components/ui';
+import { Alert, Button, Chips, EmptyState, Field, Loading, Tabs, Tag } from '../../components/ui';
+import { cleanJoinCode, typeJoinCode } from '../../joinCode';
 import { useDocumentTitle } from '../../useDocumentTitle';
 import { EVAL_KIND_LABELS, formatDuration } from '../../format';
 
@@ -347,6 +348,71 @@ function DoneCard({ evaluation }) {
   );
 }
 
+/**
+ * Apprenant sans classe (jamais inscrit, ou retiré par son enseignant) : il ne
+ * verra aucune épreuve tant qu'il n'a pas saisi le code d'une classe.
+ */
+function NoClassroom() {
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(null);
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (cleanJoinCode(code).length < 8) {
+      setError('Saisissez le code donné par votre enseignant.');
+      return;
+    }
+    setError(null);
+    setPending(true);
+    try {
+      await api('/api/me/classrooms/join', {
+        method: 'POST',
+        body: { code: cleanJoinCode(code) },
+      });
+      await queryClient.invalidateQueries({ queryKey: ['my-classrooms'] });
+      await queryClient.invalidateQueries({ queryKey: ['my-evaluations'] });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <section className="no-classroom" aria-labelledby="no-classroom-title">
+      <div className="no-classroom-text">
+        <h2 id="no-classroom-title">Vous n'appartenez à aucune classe</h2>
+        <p className="sub">
+          Vous ne verrez aucune épreuve tant que vous n'aurez pas rejoint une classe. Saisissez
+          le code que votre enseignant vous a donné.
+        </p>
+      </div>
+      <form className="no-classroom-form" onSubmit={onSubmit} noValidate>
+        <Alert>{error}</Alert>
+        <Field label="Code de la classe" id="no-class-code" hint="Par exemple 9E5G-97CJ-34DD">
+          <input
+            id="no-class-code"
+            className="join-code-input"
+            autoFocus
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            maxLength={14}
+            placeholder="XXXX-XXXX-XXXX"
+            value={code}
+            onChange={(e) => setCode(typeJoinCode(e.target.value))}
+          />
+        </Field>
+        <Button type="submit" disabled={pending}>
+          {pending ? 'Inscription…' : 'Rejoindre la classe'}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
 export default function StudentHomePage() {
   useDocumentTitle('Mes évaluations');
   const { user } = useAuth();
@@ -356,6 +422,11 @@ export default function StudentHomePage() {
     queryFn: () => api('/api/me/evaluations'),
     refetchInterval: 30_000,
   });
+  const classrooms = useQuery({
+    queryKey: ['my-classrooms'],
+    queryFn: () => api('/api/me/classrooms'),
+  });
+  const noClassroom = classrooms.isSuccess && classrooms.data.length === 0;
   const [tab, setTab] = useState(null);
   const [subject, setSubject] = useState(null);
 
@@ -413,13 +484,18 @@ export default function StudentHomePage() {
           {user?.full_name ? `Bonjour, ${user.full_name}` : 'Espace apprenant'}
         </div>
         <h1>Mes évaluations</h1>
-        <p className="sub">{lead}</p>
-        <Link className="cd-link" to="/rejoindre">Rejoindre une autre classe avec un code</Link>
+        {!noClassroom && (
+          <>
+            <p className="sub">{lead}</p>
+            <Link className="cd-link" to="/rejoindre">Rejoindre une autre classe avec un code</Link>
+          </>
+        )}
       </header>
 
+      {noClassroom && <NoClassroom />}
       {evaluations.error && <Alert>{evaluations.error.message}</Alert>}
 
-      {items.length === 0 ? (
+      {noClassroom && items.length === 0 ? null : items.length === 0 ? (
         <EmptyState title="Aucune évaluation prévue">
           Vos épreuves apparaîtront ici dès qu'un enseignant vous y aura inscrit. Il vous a
           donné un code ? <Link to="/rejoindre">Rejoignez sa classe</Link>.

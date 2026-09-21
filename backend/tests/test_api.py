@@ -211,6 +211,12 @@ def test_full_flow(context):
     # L'énoncé accompagne le résultat : la copie se corrige la question sous les yeux.
     assert detail["exercises"][0]["statement"]
 
+    # Statistiques : la note retenue (6 sur 10) compte pour 12 sur 20.
+    stats = client.get("/api/stats", headers=t).json()
+    corrigee = next(e for e in stats["evaluations"] if e["id"] == eid)
+    assert corrigee["average"] == 12.0 and corrigee["success_rate"] == 100.0
+    assert sum(stats["distribution"]) == stats["copies_count"]
+
     # Le barème de l'exercice borne sa note, pas celui de la copie entière.
     trop = client.post(
         f"/api/evaluations/{eid}/results/{participation_id}/adjust",
@@ -1500,6 +1506,7 @@ def test_admin_user_management(context):
             "full_name": "Second Étudiant",
             "role": "student",
             "password": "motdepasse1",
+            "matricule": "INF002",
             "classroom_id": context["classroom"],
         },
     )

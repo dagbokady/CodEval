@@ -4,7 +4,10 @@ from datetime import datetime
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+import base64
+import binascii
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .models import EvaluationKind, EvaluationStatus, ResultStatus, Role, RunStatus, TestKind
 
@@ -21,21 +24,74 @@ class RegisterOrg(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+PHOTO_MAX_BYTES = 300_000
+_PHOTO_PREFIXES = ("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
+
+
+def check_photo(value: str) -> str:
+    """Une image JPEG, PNG ou WebP en data URL, de 300 Ko au plus."""
+    prefix = next((p for p in _PHOTO_PREFIXES if value.startswith(p)), None)
+    if prefix is None:
+        raise ValueError("La photo doit être une image JPEG, PNG ou WebP")
+    try:
+        raw = base64.b64decode(value[len(prefix):], validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("Photo illisible") from None
+    if not raw or len(raw) > PHOTO_MAX_BYTES:
+        raise ValueError("La photo ne doit pas dépasser 300 Ko")
+    return value
+
+
+Gender = Literal["F", "M"]
+
+
 class RegisterTeacher(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    photo: str
+    gender: Gender
+
+    @field_validator("photo")
+    @classmethod
+    def _photo(cls, value: str) -> str:
+        return check_photo(value)
 
 
 class JoinClassPayload(BaseModel):
-    code: str = Field(min_length=4, max_length=20)
+    """On entre dans une classe par son code, ou par le jeton d'un lien."""
+
+    code: str | None = Field(default=None, min_length=4, max_length=20)
+    token: str | None = Field(default=None, min_length=10, max_length=1000)
+
+    @model_validator(mode="after")
+    def _code_or_token(self):
+        if not self.code and not self.token:
+            raise ValueError("Saisissez le code de la classe")
+        return self
 
 
 class JoinClassSignup(JoinClassPayload):
     full_name: str = Field(min_length=2, max_length=160)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    matricule: str | None = Field(default=None, max_length=60)
+    # Obligatoire : c'est lui qui identifie la copie sur les relevés de notes.
+    matricule: str = Field(max_length=60)
+    photo: str
+    gender: Gender
+
+    @field_validator("matricule")
+    @classmethod
+    def _matricule(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Le matricule est obligatoire")
+        return value
+
+    @field_validator("photo")
+    @classmethod
+    def _photo(cls, value: str) -> str:
+        return check_photo(value)
 
 
 class JoinClassPreview(BaseModel):
@@ -55,6 +111,8 @@ class UserOut(ORMModel):
     full_name: str
     role: Role
     matricule: str | None = None
+    photo: str | None = None
+    gender: str | None = None
     is_active: bool
     organization_id: int
 
@@ -83,9 +141,16 @@ class UserCreate(BaseModel):
     role: Role
     password: str = Field(min_length=8, max_length=128)
     matricule: str | None = Field(default=None, max_length=60)
+    gender: Gender | None = None
     # Classe où inscrire d'emblée un étudiant : un compte créé sans classe ne
     # voit aucune épreuve.
     classroom_id: int | None = None
+
+    @model_validator(mode="after")
+    def _student_matricule(self):
+        if self.role is Role.STUDENT and not (self.matricule or "").strip():
+            raise ValueError("Le matricule est obligatoire pour un étudiant")
+        return self
 
 
 class UserUpdate(BaseModel):
@@ -94,6 +159,7 @@ class UserUpdate(BaseModel):
     role: Role | None = None
     is_active: bool | None = None
     matricule: str | None = Field(default=None, max_length=60)
+    gender: Gender | None = None
     password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
@@ -156,6 +222,15 @@ class ClassroomDetailOut(ORMModel):
 class JoinCodePayload(BaseModel):
     # Nul : le code reste valable jusqu'à ce qu'on le ferme.
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class JoinLinkPayload(BaseModel):
+    expires_in_hours: int = Field(default=48, ge=1, le=720)
+
+
+class JoinLinkOut(BaseModel):
+    token: str
+    expires_at: datetime
 
 
 class JoinCodeOut(BaseModel):

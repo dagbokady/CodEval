@@ -506,11 +506,7 @@ function CommunityCard({
   onTag,
 }) {
   const subject = item.item_type === 'subject';
-  const facts = [
-    item.subject_name,
-    item.language ? languageLabel(item.language) : null,
-    points(item.total_points),
-  ].filter(Boolean);
+  const hasFacts = item.subject_name || item.language;
 
   return (
     <article className={`cm-card ${subject ? 'cm-card--subject' : ''}`.trim()}>
@@ -519,6 +515,7 @@ function CommunityCard({
           {subject ? <IconSheets /> : <IconSheet />}
           {kindLabel(item)}
         </span>
+        <span className="cm-points" title="Barème total">{points(item.total_points)}</span>
         {item.uses > 0 && (
           <span className="cm-uses" title={`Repris ${item.uses} fois par des enseignants`}>
             <IconReuse />
@@ -539,17 +536,14 @@ function CommunityCard({
         </button>
       </h3>
 
-      {item.description ? (
-        <p className="cm-desc">{item.description}</p>
-      ) : (
-        <p className="cm-desc is-empty">Pas de description.</p>
-      )}
+      {item.description && <p className="cm-desc">{item.description}</p>}
 
-      <div className="cm-facts">
-        {facts.map((fact) => (
-          <span key={fact}>{fact}</span>
-        ))}
-      </div>
+      {hasFacts && (
+        <div className="cm-facts">
+          {item.subject_name && <span className="cm-subject">{item.subject_name}</span>}
+          {item.language && <span className="cm-lang">{languageLabel(item.language)}</span>}
+        </div>
+      )}
 
       {item.tags?.length > 0 && (
         <div className="cm-tags">

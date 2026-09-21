@@ -17,10 +17,10 @@ def email_taken(db: Session, email: str) -> bool:
     return db.scalar(select(User.id).where(func.lower(User.email) == email.lower())) is not None
 
 
-def unique_code(db: Session, column) -> str:
+def unique_code(db: Session, column, length: int = 8) -> str:
     """Un code libre dans la colonne donnée (collision improbable, mais vérifiée)."""
     while True:
-        code = new_code()
+        code = new_code(length)
         if db.scalar(select(func.count()).where(column == code)) == 0:
             return code
 

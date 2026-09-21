@@ -49,6 +49,16 @@ export function useClassrooms() {
  * Les épreuves de l'enseignant pour une classe : ou pour toutes, afin de
  * résumer chaque classe dans la liste. Cent suffisent largement à une année.
  */
+/** Statistiques de l'enseignant, toutes classes ou pour une seule. */
+export function useStats(classroomId) {
+  const params = classroomId ? `?classroom_id=${classroomId}` : '';
+  return useQuery({
+    queryKey: key('stats', classroomId ?? 'toutes'),
+    queryFn: () => api(`/api/stats${params}`),
+    placeholderData: (prev) => prev,
+  });
+}
+
 export function useClassroomEvaluations(classroomId) {
   const params = new URLSearchParams({ page: '1', page_size: '100' });
   if (classroomId) params.set('classroom_id', String(classroomId));

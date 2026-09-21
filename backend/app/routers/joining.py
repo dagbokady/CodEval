@@ -26,13 +26,18 @@ from ..schemas import (
     JoinClassSignup,
     JoinCodeOut,
     JoinCodePayload,
+    JoinLinkOut,
+    JoinLinkPayload,
     TokenOut,
 )
-from ..security import hash_password
+from ..security import create_join_token, decode_join_token, hash_password
 from ..workspace import email_taken, unique_code
 from .auth import client_ip, token_out
 
 router = APIRouter(prefix="/api", tags=["inscription des apprenants"])
+
+# Douze caractères, lus par groupes de quatre : 9E5G-97CJ-34DD.
+JOIN_CODE_LENGTH = 12
 
 
 def _staff_classroom(db, user: User, classroom_id: int) -> Classroom:
@@ -66,6 +71,22 @@ def _classroom_by_code(db, request: Request, code: str) -> Classroom:
     return classroom
 
 
+def _classroom_by_token(db, request: Request, token: str) -> Classroom:
+    """Classe désignée par un lien d'invitation. Le lien meurt à son échéance,
+    ou dès que le code qu'il porte est changé ou fermé."""
+    payload = decode_join_token(token)
+    classroom = db.get(Classroom, payload["cls"]) if payload else None
+    if classroom is None or classroom.join_code != payload["code"]:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ce lien d'invitation a expiré")
+    return _classroom_by_code(db, request, payload["code"])
+
+
+def _classroom_for(db, request: Request, payload: JoinClassPayload) -> Classroom:
+    if payload.token:
+        return _classroom_by_token(db, request, payload.token)
+    return _classroom_by_code(db, request, payload.code)
+
+
 # ----- Côté enseignant : ouvrir, changer, fermer le code -----
 @router.post("/classrooms/{classroom_id}/join-code", response_model=JoinCodeOut)
 def open_join_code(
@@ -74,7 +95,7 @@ def open_join_code(
     """Crée un nouveau code. L'ancien cesse aussitôt de fonctionner ; les
     apprenants déjà inscrits restent dans la classe."""
     classroom = _staff_classroom(db, user, classroom_id)
-    classroom.join_code = unique_code(db, Classroom.join_code)
+    classroom.join_code = unique_code(db, Classroom.join_code, JOIN_CODE_LENGTH)
     classroom.join_code_expires_at = (
         utcnow() + timedelta(days=payload.expires_in_days) if payload.expires_in_days else None
     )
@@ -83,6 +104,30 @@ def open_join_code(
     db.commit()
     return JoinCodeOut(
         join_code=classroom.join_code, join_code_expires_at=classroom.join_code_expires_at
+    )
+
+
+@router.post("/classrooms/{classroom_id}/join-link", response_model=JoinLinkOut)
+def create_join_link(
+    classroom_id: int, payload: JoinLinkPayload, user: CurrentUser, db: DbSession
+) -> JoinLinkOut:
+    """Un lien d'invitation à durée de vie courte, adossé au code ouvert : il
+    n'expire jamais après le code lui-même."""
+    classroom = _staff_classroom(db, user, classroom_id)
+    now = utcnow()
+    if not classroom.join_code or (
+        classroom.join_code_expires_at and classroom.join_code_expires_at <= now
+    ):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Ouvrez d'abord un code d'accès")
+    expires_at = now + timedelta(hours=payload.expires_in_hours)
+    if classroom.join_code_expires_at:
+        expires_at = min(expires_at, classroom.join_code_expires_at)
+    log(db, user, user.organization_id, "classroom.join_link_created", "classroom", classroom.id,
+        expires_in_hours=payload.expires_in_hours)
+    db.commit()
+    return JoinLinkOut(
+        token=create_join_token(classroom.id, classroom.join_code, expires_at),
+        expires_at=expires_at,
     )
 
 
@@ -96,6 +141,15 @@ def close_join_code(classroom_id: int, user: CurrentUser, db: DbSession) -> None
 
 
 # ----- Côté apprenant -----
+@router.get("/join/link/{token}", response_model=JoinClassPreview)
+def preview_link(token: str, request: Request, db: DbSession) -> JoinClassPreview:
+    classroom = _classroom_by_token(db, request, token)
+    org = db.get(Organization, classroom.organization_id)
+    return JoinClassPreview(
+        classroom_name=classroom.name, level=classroom.level, organization_name=org.name
+    )
+
+
 @router.get("/join/{code}", response_model=JoinClassPreview)
 def preview(code: str, request: Request, db: DbSession) -> JoinClassPreview:
     """Ce que l'apprenant s'apprête à rejoindre, pour qu'il vérifie avant."""
@@ -108,7 +162,7 @@ def preview(code: str, request: Request, db: DbSession) -> JoinClassPreview:
 
 @router.post("/join", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def join_with_new_account(payload: JoinClassSignup, request: Request, db: DbSession) -> TokenOut:
-    classroom = _classroom_by_code(db, request, payload.code)
+    classroom = _classroom_for(db, request, payload)
     if email_taken(db, payload.email):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -122,7 +176,9 @@ def join_with_new_account(payload: JoinClassSignup, request: Request, db: DbSess
         password_hash=hash_password(payload.password),
         full_name=payload.full_name.strip(),
         role=Role.STUDENT,
-        matricule=(payload.matricule or "").strip() or None,
+        matricule=payload.matricule,
+        photo=payload.photo,
+        gender=payload.gender,
     )
     db.add(student)
     db.flush()
@@ -137,7 +193,7 @@ def join_with_new_account(payload: JoinClassSignup, request: Request, db: DbSess
 def join_as_student(
     payload: JoinClassPayload, request: Request, user: StudentUser, db: DbSession
 ) -> ClassroomOut:
-    classroom = _classroom_by_code(db, request, payload.code)
+    classroom = _classroom_for(db, request, payload)
     if classroom.organization_id != user.organization_id:
         raise HTTPException(
             status.HTTP_409_CONFLICT,

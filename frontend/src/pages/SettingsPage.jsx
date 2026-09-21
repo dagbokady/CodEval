@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
 import { useLanguages } from '../api/hooks';
-import { Button, Field, PageHeader } from '../components/ui';
+import { Avatar, Button, Field, PageHeader } from '../components/ui';
+import { roleLabel } from '../roles';
 import { formatExamDuration } from '../format';
 import { MODE_LABELS, THEME_MODES, useTheme } from '../theme';
 import {
@@ -14,7 +15,6 @@ import {
   saveEvaluationDefaults,
 } from '../evaluationDefaults';
 
-const ROLE_LABELS = { admin: 'Administrateur', teacher: 'Enseignante', student: 'Étudiant' };
 
 const THEME_HINTS = {
   system: "Suit le réglage de l'appareil",
@@ -38,24 +38,17 @@ function Section({ title, description, children }) {
 export default function SettingsPage() {
   const { user, organization, signOut } = useAuth();
   const { mode, theme, choose } = useTheme();
-  const initials = user.full_name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
 
   return (
     <>
       <PageHeader breadcrumb="Compte" title="Paramètres" />
       <div className="content settings">
         <section className="card profile-card">
-          <span className="avatar avatar--xl" aria-hidden="true">{initials}</span>
+          <Avatar user={user} className="avatar--xl" />
           <div className="profile-card-id">
             <strong>{user.full_name}</strong>
             <span className="sub">
-              {ROLE_LABELS[user.role]}
+              {roleLabel(user.role, user.gender)}
               {organization ? ` · ${organization}` : ''}
             </span>
           </div>
@@ -72,7 +65,7 @@ export default function SettingsPage() {
             {[
               ['Nom complet', user.full_name],
               ['Adresse e-mail', user.email],
-              ['Rôle', ROLE_LABELS[user.role]],
+              ['Rôle', roleLabel(user.role, user.gender)],
               ['Établissement', organization ?? '-'],
               ...(user.matricule ? [['Matricule', user.matricule]] : []),
             ].map(([label, value]) => (

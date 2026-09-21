@@ -21,6 +21,7 @@ from .routers import (
     joining,
     notifications,
     org,
+    stats,
     student,
 )
 from .scheduler import run_scheduler
@@ -79,7 +80,8 @@ app.add_middleware(
 )
 
 for module in (
-    auth, org, admin, evaluations, corrections, student, bank, community, notifications, joining
+    auth, org, admin, evaluations, corrections, student, bank, community, notifications, joining,
+    stats,
 ):
     app.include_router(module.router)
 

@@ -50,12 +50,11 @@ export default function ClassesPage() {
   // Liste vide : l'état vide porte déjà le bouton de création.
   const newClassroom = personal && list.length > 0 && (
     <Button
-      variant="secondary"
       disabled={full}
       title={full ? `L'offre gratuite est limitée à ${maxClassrooms} classes` : undefined}
       onClick={() => setCreating(true)}
     >
-      + Nouvelle classe
+      + Ajouter une classe
     </Button>
   );
 
@@ -63,9 +62,6 @@ export default function ClassesPage() {
     <>
       <PageHeader breadcrumb="Espace enseignant" title="Mes classes">
         {newClassroom}
-        {list.length > 0 && (
-          <Button onClick={() => navigate('/evaluations/nouvelle')}>+ Nouvelle évaluation</Button>
-        )}
       </PageHeader>
 
       <div className="content">
