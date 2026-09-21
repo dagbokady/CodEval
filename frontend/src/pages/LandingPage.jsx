@@ -5,31 +5,31 @@ import '../styles/landing.css';
 const STEPS = [
   {
     who: 'Enseignant',
-    title: "Préparer l'épreuve",
+    title: 'Créer les évaluations',
     text:
-      "Vous rédigez les exercices, le code de départ et les jeux de tests. Le barème se pose en dernier, une fois les tests écrits.",
+      "Vous rédigez les exercices, le code de départ et les jeux de tests, puis vous ouvrez l'épreuve à votre classe.",
     Illustration: PrepareSheet,
   },
   {
-    who: 'Enseignant',
-    title: 'Inviter la classe',
-    text:
-      "Chaque classe a son code, à écrire au tableau. Vous pouvez aussi envoyer un lien d'invitation, qui expire de lui-même.",
-    Illustration: InviteSheet,
-  },
-  {
-    who: 'Étudiant',
+    who: 'Étudiants',
     title: 'Composer',
     text:
       "L'étudiant écrit son programme en plein écran, sans pouvoir l'exécuter, comme sur papier. Chaque frappe est sauvegardée.",
     Illustration: ExamSheet,
   },
   {
-    who: 'CodEval, puis vous',
-    title: 'Corriger et publier',
+    who: 'Enseignant',
+    title: 'Corriger sans se fatiguer, puis publier',
     text:
-      "À la clôture, les copies sont figées. CodEval compile, exécute les tests en bac à sable et note chaque exercice. Vous relisez, puis publiez.",
+      "Un clic lance la correction : CodEval compile, exécute les tests en bac à sable et note chaque copie. Vous relisez, puis publiez les résultats.",
     Illustration: ResultsSheet,
+  },
+  {
+    who: 'Étudiants',
+    title: 'Recevoir ses résultats',
+    text:
+      "Dès la publication, chaque étudiant voit sa note et le détail par exercice : les tests réussis et ceux qui ont échoué.",
+    Illustration: StudentResultSheet,
   },
 ];
 
@@ -98,7 +98,7 @@ export default function LandingPage() {
           <div className="landing-wrap">
             <h2 className="landing-h2">Comment ça fonctionne</h2>
             <p className="landing-body landing-body--narrow">
-              Quatre temps, dans cet ordre. De la préparation à la note publiée, rien ne sort
+              Quatre temps, dans cet ordre. De la création de l'épreuve aux résultats des étudiants, rien ne sort
               de la plateforme.
             </p>
             <ol className="landing-how">
@@ -279,28 +279,10 @@ function PrepareSheet() {
   );
 }
 
-/** Étape 2 : le code de classe au tableau, et les premiers inscrits. */
-function InviteSheet() {
-  return (
-    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt" aria-label="Exemple de code de classe">
-      <div className="landing-sheet-head">
-        <span>SRIT 1 · Groupe B</span>
-        <span className="landing-mini-muted">32 inscrits</span>
-      </div>
-      <p className="landing-joincode">9E5G-97CJ-34DD</p>
-      <ul className="landing-mini-list">
-        <li>Aya Koné<span>vient de rejoindre</span></li>
-        <li>Yao Kouassi<span>il y a 2 min</span></li>
-        <li>Fatou Traoré<span>il y a 5 min</span></li>
-      </ul>
-    </figure>
-  );
-}
-
-/** Étape 3 : la salle d'examen, sans bouton pour exécuter. */
+/** Étape 2 : la salle d'examen, sans bouton pour exécuter. */
 function ExamSheet() {
   return (
-    <figure className="landing-sheet landing-sheet--small landing-exam" aria-label="Exemple d'écran d'épreuve">
+    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt landing-exam" aria-label="Exemple d'écran d'épreuve">
       <div className="landing-exam-bar">
         <span>Exercice 2 sur 4</span>
         <span className="landing-exam-timer">00:42:15</span>
@@ -320,10 +302,10 @@ function ExamSheet() {
   );
 }
 
-/** Étape 4 : les notes tombent à la clôture, vous relisez puis publiez. */
+/** Étape 3 : la correction note les copies, vous relisez puis publiez. */
 function ResultsSheet() {
   return (
-    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt" aria-label="Exemple de résultats">
+    <figure className="landing-sheet landing-sheet--small" aria-label="Exemple de résultats">
       <div className="landing-sheet-head">
         <span>Devoir 3 · Boucles</span>
         <span className="landing-mini-muted">clos à 10 h 00</span>
@@ -337,6 +319,24 @@ function ResultsSheet() {
         <span className="landing-mini-muted">32 copies notées</span>
         <span className="landing-mini-btn">Publier les notes</span>
       </div>
+    </figure>
+  );
+}
+
+/** Étape 4 : l'étudiant reçoit sa note et le détail par exercice. */
+function StudentResultSheet() {
+  return (
+    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt" aria-label="Exemple de résultat étudiant">
+      <div className="landing-sheet-head">
+        <span>Devoir 3 · Boucles<br /><span className="landing-mini-muted">Aya Koné</span></span>
+        <span className="landing-sheet-grade">18<small>/20</small></span>
+      </div>
+      <ul className="landing-mini-list">
+        <li>Exercice 1<span>5 / 5</span></li>
+        <li>Exercice 2<span>6 / 6</span></li>
+        <li>Exercice 3<span>4 / 6 · 1 test échoué</span></li>
+        <li>Exercice 4<span>3 / 3</span></li>
+      </ul>
     </figure>
   );
 }

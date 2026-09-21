@@ -31,14 +31,27 @@ class Settings(BaseSettings):
     login_max_attempts: int = 5
     login_lockout_minutes: int = 15
 
-    # SMTP pour la réinitialisation de mot de passe
+    # Envoi des e-mails (code de vérification, mot de passe oublié). Mailjet
+    # d'abord, par son API ; à défaut SMTP ; sans l'un ni l'autre, le contenu
+    # part dans les journaux du serveur (développement).
+    mailjet_api_key: str = ""
+    mailjet_api_secret: str = ""
+    mail_from_name: str = "CodEval"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    # Adresse d'expédition, pour Mailjet comme pour SMTP. Avec Mailjet, elle
+    # doit être validée comme expéditeur dans le compte.
     smtp_from: str = "noreply@codeval.fr"
     frontend_url: str = "http://localhost:5173"
     reset_token_minutes: int = 30
+
+    # Code envoyé pour confirmer l'adresse avant la création d'un compte
+    email_code_minutes: int = 15
+    email_code_max_attempts: int = 5
+    email_code_resend_seconds: int = 60
+    email_code_per_ip_hour: int = 10
 
     # Compte d'administration créé par `python -m app.seed`
     org_name: str = ""

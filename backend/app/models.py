@@ -545,6 +545,23 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 
+class EmailVerification(Base):
+    """Code envoyé à une adresse avant la création du compte qui la porte.
+
+    Seul le dernier code d'une adresse compte ; les précédents restent le temps
+    de compter les envois par adresse IP."""
+
+    __tablename__ = "email_verifications"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(190), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    ip: Mapped[str] = mapped_column(String(64), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
     __table_args__ = (Index("ix_audit_org_created", "organization_id", "created_at"),)

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { requestEmailCode } from '../api/emailCode';
 import { HOME_BY_ROLE, useAuth } from '../auth';
+import EmailCodeForm from '../components/EmailCodeForm';
 import { GenderField, PhotoPicker } from '../components/IdentityFields';
 import { Alert, Button, Field, Loading, PasswordInput } from '../components/ui';
 import { cleanJoinCode, typeJoinCode } from '../joinCode';
@@ -165,6 +167,8 @@ function SignupForm({ via, classroom, onBack }) {
   });
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false);
+  // Renseigné une fois le code envoyé : on passe à sa saisie.
+  const [resendIn, setResendIn] = useState(null);
   const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
 
   async function onSubmit(event) {
@@ -185,16 +189,34 @@ function SignupForm({ via, classroom, onBack }) {
     setError(null);
     setPending(true);
     try {
-      const account = await authenticate('/api/join', {
-        ...form,
-        ...via,
-        matricule: form.matricule.trim(),
-      });
-      navigate(HOME_BY_ROLE[account.role], { replace: true });
+      setResendIn(await requestEmailCode(form.email));
     } catch (err) {
       setError(err.message);
+    } finally {
       setPending(false);
     }
+  }
+
+  async function confirm(code) {
+    const account = await authenticate('/api/join', {
+      ...form,
+      ...via,
+      matricule: form.matricule.trim(),
+      email_code: code,
+    });
+    navigate(HOME_BY_ROLE[account.role], { replace: true });
+  }
+
+  if (resendIn !== null) {
+    return (
+      <EmailCodeForm
+        email={form.email}
+        resendIn={resendIn}
+        onConfirm={confirm}
+        onBack={() => setResendIn(null)}
+        submitLabel="Rejoindre la classe"
+      />
+    );
   }
 
   return (
@@ -252,7 +274,7 @@ function SignupForm({ via, classroom, onBack }) {
         />
       </Field>
       <Button size="large" type="submit" disabled={pending}>
-        {pending ? 'Inscription…' : 'Rejoindre la classe'}
+        {pending ? 'Envoi du code…' : 'Continuer'}
       </Button>
       <div className="auth-footer">
         Déjà un compte ? <Link to="/connexion">Se connecter</Link>, puis saisissez le code

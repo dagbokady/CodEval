@@ -150,6 +150,12 @@ l'administrateur ouvre les langages et crée les comptes depuis l'interface.
 
 - `POST /api/auth/register` : crée une organisation + son premier compte
   enseignant (le nom de l'organisation devient un `slug` unique).
+- **Confirmation de l'adresse** : avant toute création de compte (enseignant par
+  `/inscription`, étudiant par le code de classe), `POST /api/auth/email-code`
+  envoie un code à six chiffres par Mailjet. Le formulaire le renvoie dans
+  `email_code` ; sans code valide, aucun compte ni espace n'est créé. Le code vaut
+  15 minutes, cinq essais ; un nouveau code se demande après 60 s, dix au plus
+  par heure et par adresse IP.
 - `POST /api/auth/login` : e-mail + mot de passe, renvoie un JWT (`sub`,
   organisation, rôle). Les mots de passe sont hachés (`security.py`).
 - `GET /api/auth/me` : profil courant, rôle et nom de l'organisation.

@@ -90,6 +90,11 @@ Toutes les variables sont préfixées `CODEVAL_` et lues depuis l'environnement 
 | `SANDBOX_COMPILE_TIMEOUT` | délai de compilation | `20` |
 | `SANDBOX_MAX_PROCESSES` | processus par exécution (Linux) | `64` |
 | `WORKER_POLL_SECONDS` | fréquence de scrutation des campagnes | `2.0` |
+| `MAILJET_API_KEY` / `MAILJET_API_SECRET` | clés de l'API Mailjet : envoi du code de vérification et du lien « mot de passe oublié ». Sans elles ni SMTP, le code s'affiche dans les journaux du serveur | (vide) |
+| `SMTP_FROM` | adresse d'expédition, à valider comme expéditeur dans Mailjet | `noreply@codeval.fr` |
+| `MAIL_FROM_NAME` | nom d'expéditeur affiché | `CodEval` |
+| `EMAIL_CODE_MINUTES` | validité du code de vérification | `15` |
+| `EMAIL_CODE_RESEND_SECONDS` | délai avant de pouvoir redemander un code | `60` |
 | `ADMIN_EMAIL` | e-mail de l'administrateur créé par `app.seed` | (obligatoire pour le seed) |
 | `ADMIN_PASSWORD` | mot de passe de cet administrateur | (obligatoire pour le seed) |
 | `ADMIN_NAME` | nom affiché de l'administrateur | `Administration` |

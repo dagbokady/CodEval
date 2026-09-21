@@ -16,6 +16,7 @@ from sqlalchemy import select
 from ..audit import log
 from ..config import settings
 from ..deps import CurrentUser, DbSession, StudentUser
+from ..email_verification import check_code
 from ..models import Classroom, Enrollment, Organization, Role, User, utcnow
 from ..plans import normalize_code
 from ..rate_limit import limiter
@@ -169,6 +170,7 @@ def join_with_new_account(payload: JoinClassSignup, request: Request, db: DbSess
             "Un compte existe déjà avec cet e-mail : connectez-vous, puis rejoignez la classe "
             "depuis votre espace.",
         )
+    check_code(db, payload.email, payload.email_code)
     org = db.get(Organization, classroom.organization_id)
     student = User(
         organization_id=org.id,

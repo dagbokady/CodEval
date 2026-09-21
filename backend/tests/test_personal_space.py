@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import timedelta
 
 import pytest
@@ -17,6 +18,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("CODEVAL_SECRET_KEY", "test-secret-key-with-enough-entropy")
 
+from app import email_verification  # noqa: E402
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Classroom, utcnow  # noqa: E402
@@ -24,6 +26,34 @@ from app.rate_limit import limiter  # noqa: E402
 from app.security import create_join_token  # noqa: E402
 
 client = TestClient(app)
+
+# Les e-mails partent dans cette boîte : adresse -> dernier code reçu.
+MAILBOX: dict[str, str] = {}
+
+
+def _fake_send(to, subject, html, text=None):
+    MAILBOX[to] = re.search(r"\b(\d{6})\b", text).group(1)
+    return True
+
+
+email_verification.mail_configured = lambda: True
+email_verification.send_email = _fake_send
+
+
+def email_code(email: str) -> str:
+    """Premier temps de l'inscription : demande le code et le lit dans la boîte."""
+    from app.models import EmailVerification
+
+    # Le délai entre deux envois ne concerne pas les tests.
+    db = SessionLocal()
+    try:
+        db.query(EmailVerification).filter_by(email=email.lower()).delete()
+        db.commit()
+    finally:
+        db.close()
+    res = client.post("/api/auth/email-code", json={"email": email})
+    assert res.status_code == 200, res.text
+    return MAILBOX[email.lower()]
 
 
 def create_admin(org_name: str, full_name: str, email: str) -> str:
@@ -63,19 +93,20 @@ def teacher() -> str:
     init_db()
     res = client.post(
         "/api/auth/register-teacher",
-        json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1"},
+        json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1",
+              "email_code": "000000"},
     )
     assert res.status_code == 422, "la photo est obligatoire"
     res = client.post(
         "/api/auth/register-teacher",
         json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1",
-              "photo": "data:text/plain;base64,aGVsbG8="},
+              "photo": "data:text/plain;base64,aGVsbG8=", "email_code": "000000"},
     )
     assert res.status_code == 422, "une photo doit être une image"
     res = client.post(
         "/api/auth/register-teacher",
         json={"full_name": "Jean Koné", "email": "kone@perso.ci", "password": "motdepasse1",
-              "photo": PHOTO, "gender": "F"},
+              "photo": PHOTO, "gender": "F", "email_code": email_code("kone@perso.ci")},
     )
     assert res.status_code == 201, res.text
     body = res.json()
@@ -85,6 +116,44 @@ def teacher() -> str:
     assert body["organization"] == "Espace de Jean Koné"
     assert body["organization_kind"] == "personal"
     return body["access_token"]
+
+
+def test_l_adresse_est_confirmee_par_un_code_avant_l_inscription(teacher):
+    signup = {"full_name": "Ama Yao", "email": "ama@perso.ci", "password": "motdepasse1",
+              "photo": PHOTO, "gender": "F"}
+
+    # Sans code demandé, ou avec un faux, aucun compte n'est créé.
+    res = client.post("/api/auth/register-teacher", json={**signup, "email_code": "123456"})
+    assert res.status_code == 400
+    code = email_code("ama@perso.ci")
+    wrong = "000000" if code != "000000" else "111111"
+    res = client.post("/api/auth/register-teacher", json={**signup, "email_code": wrong})
+    assert res.status_code == 400
+    res = client.post("/api/auth/login", json={"email": "ama@perso.ci", "password": "motdepasse1"})
+    assert res.status_code == 401
+
+    # On ne redemande pas un code dans la minute.
+    res = client.post("/api/auth/email-code", json={"email": "ama@perso.ci"})
+    assert res.status_code == 429
+
+    # Le bon code crée le compte, et ne sert qu'une fois.
+    res = client.post("/api/auth/register-teacher", json={**signup, "email_code": code})
+    assert res.status_code == 201, res.text
+    res = client.post("/api/auth/email-code", json={"email": "AMA@perso.ci"})
+    assert res.status_code == 409, "l'adresse a déjà un compte"
+
+
+def test_trop_d_essais_invalident_le_code():
+    code = email_code("essais@perso.ci")
+    wrong = "000000" if code != "000000" else "111111"
+    signup = {"full_name": "Essai", "email": "essais@perso.ci", "password": "motdepasse1",
+              "photo": PHOTO, "gender": "M"}
+    for _ in range(5):
+        res = client.post("/api/auth/register-teacher", json={**signup, "email_code": wrong})
+        assert res.status_code == 400
+    res = client.post("/api/auth/register-teacher", json={**signup, "email_code": code})
+    assert res.status_code == 400
+    assert "nouveau code" in res.json()["detail"]
 
 
 def test_l_enseignant_gere_lui_meme_ses_classes_dans_la_limite_de_deux(teacher):
@@ -152,19 +221,21 @@ def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
         "/api/join",
         json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
               "password": "motdepasse1", "matricule": "  ", "photo": PHOTO,
-              "gender": "F"},
+              "gender": "F", "email_code": "000000"},
     )
     assert res.status_code == 422, "le matricule est obligatoire"
     res = client.post(
         "/api/join",
         json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
-              "password": "motdepasse1", "matricule": "ETU-001", "gender": "F"},
+              "password": "motdepasse1", "matricule": "ETU-001", "gender": "F",
+              "email_code": "000000"},
     )
     assert res.status_code == 422, "la photo est obligatoire"
     res = client.post(
         "/api/join",
         json={"code": typed, "full_name": "Awa Traoré", "email": "awa@etu.ci",
-              "password": "motdepasse1", "matricule": "ETU-001", "photo": PHOTO, "gender": "F"},
+              "password": "motdepasse1", "matricule": "ETU-001", "photo": PHOTO, "gender": "F",
+              "email_code": email_code("awa@etu.ci")},
     )
     assert res.status_code == 201, res.text
     assert res.json()["user"]["role"] == "student"
@@ -182,7 +253,7 @@ def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
     res = client.post(
         "/api/join",
         json={"code": code, "full_name": "Awa", "email": "AWA@etu.ci", "password": "motdepasse1",
-              "matricule": "ETU-001", "photo": PHOTO, "gender": "M"},
+              "matricule": "ETU-001", "photo": PHOTO, "gender": "M", "email_code": "000000"},
     )
     assert res.status_code == 409
 
@@ -246,7 +317,8 @@ def test_le_lien_d_invitation_expire(teacher):
     res = client.post(
         "/api/join",
         json={"token": token, "full_name": "Koffi", "email": "koffi@etu.ci",
-              "password": "motdepasse1", "matricule": "ETU-003", "photo": PHOTO, "gender": "M"},
+              "password": "motdepasse1", "matricule": "ETU-003", "photo": PHOTO, "gender": "M",
+              "email_code": email_code("koffi@etu.ci")},
     )
     assert res.status_code == 201, res.text
 
@@ -275,7 +347,8 @@ def test_seul_le_personnel_gere_le_code(teacher):
     student = client.post(
         "/api/join",
         json={"code": code, "full_name": "Yao", "email": "yao@etu.ci", "password": "motdepasse1",
-              "matricule": "ETU-002", "photo": PHOTO, "gender": "M"},
+              "matricule": "ETU-002", "photo": PHOTO, "gender": "M",
+              "email_code": email_code("yao@etu.ci")},
     ).json()["access_token"]
     res = client.post(f"/api/classrooms/{cid}/join-code", headers=auth(student), json={})
     assert res.status_code == 403

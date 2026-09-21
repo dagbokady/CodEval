@@ -154,10 +154,6 @@
 .landing-mini-table th:last-child, .landing-mini-table td:last-child { text-align: right; padding-right: 0; }
 .landing-pen--inline { position: static; display: block; text-align: right; margin: 12px 0 -4px; background: none; font-size: 22px; }
 
-.landing-joincode {
-  font-family: var(--mono); font-size: clamp(20px, 2.4vw, 26px); font-weight: 600;
-  letter-spacing: 0.06em; color: var(--text-title); margin: 4px 0 16px;
-}
 .landing-mini-list { list-style: none; margin: 0; padding: 12px 0 0; border-top: 1px dashed var(--border); display: grid; gap: 8px; font-size: 13px; color: var(--text-title); }
 .landing-mini-list li { display: flex; align-items: center; gap: 8px; }
 .landing-mini-list li span:last-child { margin-left: auto; font-size: 12px; color: var(--text-faint); }

@@ -3344,6 +3344,12 @@ tr.row-confirm:hover { background: none; }
   .cm-filters .select-inline { flex: 1; min-width: 0; }
 }
 
+/* ========== Code de vérification de l'e-mail ========== */
+.email-code-input {
+  font-family: var(--mono);
+  font-size: 22px; letter-spacing: 0.4em; text-align: center;
+}
+
 /* ========== Code de classe ========== */
 .join-code-input {
   font-family: var(--mono);

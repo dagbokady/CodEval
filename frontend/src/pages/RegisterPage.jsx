@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { requestEmailCode } from '../api/emailCode';
 import { HOME_BY_ROLE, useAuth } from '../auth';
+import EmailCodeForm from '../components/EmailCodeForm';
 import { GenderField, PhotoPicker } from '../components/IdentityFields';
 import { Alert, Button, Field, PasswordInput } from '../components/ui';
 import { useDocumentTitle } from '../useDocumentTitle';
@@ -9,7 +11,8 @@ import { useDocumentTitle } from '../useDocumentTitle';
  * Inscription d'un enseignant. Il n'a besoin de personne : un espace personnel
  * est créé pour lui, où il ouvre ses classes. Les apprenants, eux, ne
  * s'inscrivent pas ici : ils entrent par le code de leur classe. La photo est
- * demandée : c'est elle que les apprenants voient à côté de son nom.
+ * demandée : c'est elle que les apprenants voient à côté de son nom. L'espace
+ * n'est créé qu'une fois l'adresse confirmée par le code reçu.
  */
 export default function RegisterPage() {
   useDocumentTitle('Inscription');
@@ -24,6 +27,8 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false);
+  // Renseigné une fois le code envoyé : on passe à sa saisie.
+  const [resendIn, setResendIn] = useState(null);
 
   const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
 
@@ -44,13 +49,17 @@ export default function RegisterPage() {
     setError(null);
     setPending(true);
     try {
-      const account = await authenticate('/api/auth/register-teacher', form);
-      navigate(HOME_BY_ROLE[account.role], { replace: true });
+      setResendIn(await requestEmailCode(form.email));
     } catch (err) {
       setError(err.message);
     } finally {
       setPending(false);
     }
+  }
+
+  async function confirm(code) {
+    const account = await authenticate('/api/auth/register-teacher', { ...form, email_code: code });
+    navigate(HOME_BY_ROLE[account.role], { replace: true });
   }
 
   return (
@@ -62,69 +71,79 @@ export default function RegisterPage() {
         </Link>
       </header>
       <div className="auth-zone">
-        <form className="auth-card" onSubmit={onSubmit} noValidate>
-          <h1>Inscription enseignant</h1>
-          <p className="subtitle">
-            Créez votre espace gratuitement et ouvrez jusqu’à 2 classes.
-          </p>
-          <Alert>{error}</Alert>
-          <PhotoPicker
-            value={form.photo}
-            onChange={(photo) => setForm((current) => ({ ...current, photo }))}
-            onError={setError}
-            hint="Vos apprenants la verront à côté de votre nom."
+        {resendIn !== null ? (
+          <EmailCodeForm
+            email={form.email}
+            resendIn={resendIn}
+            onConfirm={confirm}
+            onBack={() => setResendIn(null)}
+            submitLabel="Créer mon espace"
           />
-          <Field label="Nom complet" id="name">
-            <input
-              id="name"
-              autoComplete="name"
-              autoFocus
-              required
-              value={form.full_name}
-              onChange={update('full_name')}
+        ) : (
+          <form className="auth-card" onSubmit={onSubmit} noValidate>
+            <h1>Inscription enseignant</h1>
+            <p className="subtitle">
+              Créez votre espace gratuitement et ouvrez jusqu’à 2 classes.
+            </p>
+            <Alert>{error}</Alert>
+            <PhotoPicker
+              value={form.photo}
+              onChange={(photo) => setForm((current) => ({ ...current, photo }))}
+              onError={setError}
+              hint="Vos apprenants la verront à côté de votre nom."
             />
-          </Field>
-          <GenderField
-            value={form.gender}
-            onChange={(gender) => setForm((current) => ({ ...current, gender }))}
-          />
-          <Field label="E-mail" id="email">
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              required
-              value={form.email}
-              onChange={update('email')}
+            <Field label="Nom complet" id="name">
+              <input
+                id="name"
+                autoComplete="name"
+                autoFocus
+                required
+                value={form.full_name}
+                onChange={update('full_name')}
+              />
+            </Field>
+            <GenderField
+              value={form.gender}
+              onChange={(gender) => setForm((current) => ({ ...current, gender }))}
             />
-          </Field>
-          <Field
-            label="Mot de passe"
-            id="password"
-            hint={
-              form.password && form.password.length < 8
-                ? `Encore ${8 - form.password.length} caractère${8 - form.password.length > 1 ? 's' : ''}`
-                : '8 caractères minimum'
-            }
-          >
-            <PasswordInput
+            <Field label="E-mail" id="email">
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                inputMode="email"
+                required
+                value={form.email}
+                onChange={update('email')}
+              />
+            </Field>
+            <Field
+              label="Mot de passe"
               id="password"
-              autoComplete="new-password"
-              required
-              value={form.password}
-              onChange={update('password')}
-            />
-          </Field>
-          <Button size="large" type="submit" disabled={pending}>
-            {pending ? 'Création…' : 'Créer mon espace'}
-          </Button>
-          <div className="auth-footer">
-            Déjà un compte ? <Link to="/connexion">Se connecter</Link>
-            <br />
-            Étudiant avec un code ? <Link to="/rejoindre">Rejoindre votre classe</Link>
-          </div>
-        </form>
+              hint={
+                form.password && form.password.length < 8
+                  ? `Encore ${8 - form.password.length} caractère${8 - form.password.length > 1 ? 's' : ''}`
+                  : '8 caractères minimum'
+              }
+            >
+              <PasswordInput
+                id="password"
+                autoComplete="new-password"
+                required
+                value={form.password}
+                onChange={update('password')}
+              />
+            </Field>
+            <Button size="large" type="submit" disabled={pending}>
+              {pending ? 'Envoi du code…' : 'Continuer'}
+            </Button>
+            <div className="auth-footer">
+              Déjà un compte ? <Link to="/connexion">Se connecter</Link>
+              <br />
+              Étudiant avec un code ? <Link to="/rejoindre">Rejoindre votre classe</Link>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
