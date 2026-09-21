@@ -10,10 +10,10 @@ from __future__ import annotations
 import logging
 import time
 
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from .config import settings
-from .db import SessionLocal, init_db
+from .db import SessionLocal, engine
 from .grading.engine import process_run
 from .models import CorrectionRun, RunStatus, utcnow
 
@@ -57,8 +57,16 @@ def run_once() -> bool:
         db.close()
 
 
+def wait_for_migrations() -> None:
+    # Le schéma appartient à l'API (alembic upgrade head). Créer les tables ici
+    # ferait échouer la première migration si le worker démarre avant l'API.
+    while not inspect(engine).has_table("alembic_version"):
+        log.info("En attente des migrations de l'API")
+        time.sleep(5)
+
+
 def main() -> None:
-    init_db()
+    wait_for_migrations()
     log.info("Worker de correction démarré")
     while True:
         if not run_once():
