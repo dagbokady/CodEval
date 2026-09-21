@@ -10,6 +10,7 @@
  * de base sur `.sujet` (petite dans l'aperçu, pleine dans l'épreuve).
  */
 
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import CodeBlock from './CodeBlock';
 import { exerciseLabel, formatExamDuration, formatExamDate } from '../format';
 import {
@@ -21,7 +22,7 @@ import {
   valueType,
 } from '../bareme';
 import { exerciseType, hasQuestions } from '../exerciseTypes';
-import { questionsOf } from '../questions';
+import { answersOf, questionsOf } from '../questions';
 
 function sessionYear(date) {
   const value = date ? new Date(date) : new Date();
@@ -138,13 +139,19 @@ function groupExercises(exercises) {
   return groups;
 }
 
-function QcmChoices({ question }) {
+/**
+ * La réponse de l'apprenant, reportée sur la feuille pendant l'épreuve : les
+ * choix cochés sont entourés à l'encre, les correspondances tracées. Absente,
+ * la feuille reste le sujet vierge.
+ */
+function QcmChoices({ question, answer }) {
   const choices = question.choices ?? [];
+  const selected = answer?.selected ?? [];
   if (choices.length === 0) return null;
   return (
     <ol className="sujet-choix">
       {choices.map((choice, index) => (
-        <li key={index}>
+        <li key={index} className={selected.includes(index) ? 'sujet-choisi' : undefined}>
           <span className="sujet-lettre">{letter(index)})</span>
           <span>{choice.text || <em className="sujet-vide">(choix vide)</em>}</span>
         </li>
@@ -160,26 +167,72 @@ function QcmChoices({ question }) {
  * Pendant l'épreuve le serveur n'envoie que `right_options`, déjà mélangée : la
  * disposition des colonnes ne révèle donc rien.
  */
-function MatchingColumns({ question }) {
+function MatchingColumns({ question, answer }) {
   const pairs = question.pairs ?? [];
   const options =
     question.right_options ??
     pairs.map((pair, index) => ({ token: `p${index}`, text: pair.right }));
+  // Les traits sont mesurés sur le rendu réel : la feuille change de largeur
+  // et de taille de texte, et les attaches bougent avec.
+  const zone = useRef(null);
+  const [traits, setTraits] = useState([]);
+  const clé = JSON.stringify(
+    Object.entries(answer?.matches ?? {}).filter(([, droite]) => droite != null),
+  );
+
+  const retracer = useCallback(() => {
+    const cadre = zone.current?.getBoundingClientRect();
+    if (!cadre) return;
+    const centre = (attache) => {
+      const node = zone.current.querySelector(`[data-attache="${attache}"]`);
+      if (!node) return null;
+      const r = node.getBoundingClientRect();
+      return { x: r.left + r.width / 2 - cadre.left, y: r.top + r.height / 2 - cadre.top };
+    };
+    const tracés = [];
+    JSON.parse(clé).forEach(([gauche, droite]) => {
+      const a = centre(`g:${gauche}`);
+      const b = centre(`d:${droite}`);
+      if (a && b) tracés.push({ key: gauche, x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+    });
+    setTraits(tracés);
+  }, [clé]);
+
+  useLayoutEffect(retracer, [retracer]);
+  useEffect(() => {
+    const node = zone.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(retracer);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [retracer]);
+
   if (pairs.length === 0) return null;
   return (
-    <div className="sujet-correspondance">
+    <div className="sujet-correspondance" ref={zone}>
+      {traits.length > 0 && (
+        <svg className="sujet-traits" aria-hidden="true">
+          {traits.map((t) => (
+            <line key={t.key} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} />
+          ))}
+        </svg>
+      )}
       <ul className="sujet-colonne sujet-colonne--gauche">
         {pairs.map((pair, index) => (
           <li key={index}>
             <span>{pair.left || <em className="sujet-vide">(élément vide)</em>}</span>
-            <span className="sujet-attache" aria-hidden="true" />
+            <span className="sujet-attache" data-attache={`g:${index}`} aria-hidden="true" />
           </li>
         ))}
       </ul>
       <ul className="sujet-colonne sujet-colonne--droite">
         {options.map((option, index) => (
           <li key={option.token ?? index}>
-            <span className="sujet-attache" aria-hidden="true" />
+            <span
+              className="sujet-attache"
+              data-attache={`d:${option.token ?? `p${index}`}`}
+              aria-hidden="true"
+            />
             <span>{option.text || <em className="sujet-vide">(élément vide)</em>}</span>
           </li>
         ))}
@@ -189,18 +242,26 @@ function MatchingColumns({ question }) {
 }
 
 /** Vrai/Faux : les affirmations numérotées, avec leurs deux cases à cocher. */
-function TrueFalseStatements({ exercise }) {
+function TrueFalseStatements({ exercise, answer }) {
   const statements = exercise.settings?.statements ?? [];
   if (statements.length === 0) return null;
+  const choix = answer?.answers ?? {};
   return (
     <ol className="sujet-choix">
-      {statements.map((statement, index) => (
-        <li key={index}>
-          <span className="sujet-lettre">{index + 1}.</span>
-          <span>{statement.text || <em className="sujet-vide">(affirmation vide)</em>}</span>
-          <span className="sujet-vf" aria-hidden="true">V &nbsp;/&nbsp; F</span>
-        </li>
-      ))}
+      {statements.map((statement, index) => {
+        const coché = choix[String(index)];
+        return (
+          <li key={index}>
+            <span className="sujet-lettre">{index + 1}.</span>
+            <span>{statement.text || <em className="sujet-vide">(affirmation vide)</em>}</span>
+            <span className="sujet-vf" aria-hidden="true">
+              <span className={coché === true ? 'sujet-vf-choisi' : undefined}>V</span>
+              &nbsp;/&nbsp;
+              <span className={coché === false ? 'sujet-vf-choisi' : undefined}>F</span>
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -300,9 +361,10 @@ function SheetExamples({ exercise }) {
   );
 }
 
-function SheetSubQuestions({ exercise, showAnswerZone }) {
+function SheetSubQuestions({ exercise, showAnswerZone, answer }) {
   const kind = exercise.kind ?? 'code';
   const questions = questionsOf(kind, exercise.settings);
+  const answers = answersOf(kind, answer, questions.length);
   if (questions.length === 0) return null;
   return (
     <ol className="sujet-parts">
@@ -312,8 +374,10 @@ function SheetSubQuestions({ exercise, showAnswerZone }) {
             <span className="sujet-question-num">Q{index + 1}.</span>{' '}
             {question.text || <em className="sujet-vide">(question sans énoncé)</em>}
           </p>
-          {kind === 'qcm' && <QcmChoices question={question} />}
-          {kind === 'matching' && <MatchingColumns question={question} />}
+          {kind === 'qcm' && <QcmChoices question={question} answer={answers[index]} />}
+          {kind === 'matching' && (
+            <MatchingColumns question={question} answer={answers[index]} />
+          )}
           {kind === 'short' && showAnswerZone && <ShortAnswerLines question={question} />}
         </li>
       ))}
@@ -321,7 +385,14 @@ function SheetSubQuestions({ exercise, showAnswerZone }) {
   );
 }
 
-export function SheetExercise({ exercise, number, showAnswerZone = true, showTests = false }) {
+/** `answer` : la production de l'apprenant, reportée sur la feuille (épreuve en cours). */
+export function SheetExercise({
+  exercise,
+  number,
+  showAnswerZone = true,
+  showTests = false,
+  answer,
+}) {
   const kind = exercise.kind ?? 'code';
   const label = exerciseLabel(number);
 
@@ -341,9 +412,11 @@ export function SheetExercise({ exercise, number, showAnswerZone = true, showTes
       <SheetCriteria exercise={exercise} />
 
       {hasQuestions(kind) && (
-        <SheetSubQuestions exercise={exercise} showAnswerZone={showAnswerZone} />
+        <SheetSubQuestions exercise={exercise} showAnswerZone={showAnswerZone} answer={answer} />
       )}
-      {kind === 'truefalse' && <TrueFalseStatements exercise={exercise} />}
+      {kind === 'truefalse' && (
+        <TrueFalseStatements exercise={exercise} answer={parseAnswer(answer)} />
+      )}
       {kind === 'code' && exercise.starter_code && (
         <CodeBlock
           className="sujet-code"
@@ -356,6 +429,14 @@ export function SheetExercise({ exercise, number, showAnswerZone = true, showTes
       {showTests && <SheetExamples exercise={exercise} />}
     </article>
   );
+}
+
+function parseAnswer(value) {
+  try {
+    return JSON.parse(value || 'null');
+  } catch {
+    return null;
+  }
 }
 
 /** Sujet complet : en-tête officiel, consignes, puis les questions par blocs. */

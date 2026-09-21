@@ -913,7 +913,7 @@ function Exam({ evaluationId, data }) {
                 total={data.exercises.length}
                 points={barèmeTotal}
                 language={langageAffiche}
-                copie={exercise.kind === 'algo' ? codeOf(exercise.id) : undefined}
+                copie={COPIE_SUR_FEUILLE.has(exercise.kind) ? codeOf(exercise.id) : undefined}
               />
 
               <div className="exam-right">
@@ -1143,10 +1143,14 @@ function DeliveryNotice({ sending, pending, refused, online, onRetry }) {
  * position de lecture. D'où le `memo` : les props ne changent qu'en changeant
  * d'exercice, jamais à la frappe.
  *
- * Seule exception, l'algorithme : il se compose en blocs, loin de sa forme
- * écrite. `copie` porte alors le document de l'apprenant, relu sous l'énoncé
- * en pseudo-code, tel qu'il figurera sur sa copie.
+ * Exception, les exercices dont la réponse se reporte sur la feuille (voir
+ * `COPIE_SUR_FEUILLE`) : `copie` porte alors la production de l'apprenant.
+ * L'algorithme se relit sous l'énoncé en pseudo-code, tel qu'il figurera sur
+ * sa copie ; les V/F et QCM cochés s'entourent, les correspondances se tracent.
  */
+/** Les types dont la réponse se reporte en direct sur la feuille de gauche. */
+const COPIE_SUR_FEUILLE = new Set(['algo', 'truefalse', 'qcm', 'matching']);
+
 const FeuilleDeComposition = memo(function FeuilleDeComposition({
   organization,
   evaluation,
@@ -1158,7 +1162,7 @@ const FeuilleDeComposition = memo(function FeuilleDeComposition({
   language,
   copie,
 }) {
-  const algo = copie !== undefined;
+  const algo = exercise.kind === 'algo';
   return (
     <section className="exam-feuille" aria-label="Feuille de composition">
       <div className="exam-feuille-tete">
@@ -1181,7 +1185,12 @@ const FeuilleDeComposition = memo(function FeuilleDeComposition({
           header={evaluation.sheet_header}
         />
         <SheetInstructions>{instructions}</SheetInstructions>
-        <SheetExercise exercise={exercise} number={number} showAnswerZone={false} />
+        <SheetExercise
+          exercise={exercise}
+          number={number}
+          showAnswerZone={false}
+          answer={algo ? undefined : copie}
+        />
         {algo && <ApercuAlgorithme copie={copie} />}
         <p className="exam-feuille-pied">
           {algo
