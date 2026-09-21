@@ -6,6 +6,7 @@ import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
 import { api, sendOnLeave } from '../../api/client';
 import AlgoEditor from '../../components/AlgoEditor';
+import CodeBlock from '../../components/CodeBlock';
 import MatchingBoard from '../../components/MatchingBoard';
 import { Alert, Button, Loading } from '../../components/ui';
 import {
@@ -18,6 +19,7 @@ import { useAuth } from '../../auth';
 import { formatDateTime, formatDuration, formatRelative } from '../../format';
 import { evaluationUsesLanguage, exerciseType, hasQuestions } from '../../exerciseTypes';
 import { answersOf, packAnswers, questionsOf } from '../../questions';
+import { algorithmText, parseAlgorithm } from '../../algoVocabulary';
 import { useServerCountdown } from '../../useNow';
 import { useTheme } from '../../theme';
 import {
@@ -911,6 +913,7 @@ function Exam({ evaluationId, data }) {
                 total={data.exercises.length}
                 points={barèmeTotal}
                 language={langageAffiche}
+                copie={exercise.kind === 'algo' ? codeOf(exercise.id) : undefined}
               />
 
               <div className="exam-right">
@@ -1135,10 +1138,14 @@ function DeliveryNotice({ sending, pending, refused, online, onRetry }) {
  * distribué sur papier : en-tête de l'épreuve, énoncé de l'exercice en cours,
  * code de départ, exigences du barème.
  *
- * Elle est figée. L'apprenant écrit à droite, et rien de ce qu'il tape ne
- * touche à cette feuille : ni le code de départ, qui reste celui de l'énoncé,
- * ni sa position de lecture. D'où le `memo` : les props ne changent qu'en
- * changeant d'exercice, jamais à la frappe.
+ * Le sujet est figé. L'apprenant écrit à droite, et rien de ce qu'il tape ne
+ * touche à l'énoncé : ni le code de départ, qui reste celui de l'énoncé, ni sa
+ * position de lecture. D'où le `memo` : les props ne changent qu'en changeant
+ * d'exercice, jamais à la frappe.
+ *
+ * Seule exception, l'algorithme : il se compose en blocs, loin de sa forme
+ * écrite. `copie` porte alors le document de l'apprenant, relu sous l'énoncé
+ * en pseudo-code, tel qu'il figurera sur sa copie.
  */
 const FeuilleDeComposition = memo(function FeuilleDeComposition({
   organization,
@@ -1149,7 +1156,9 @@ const FeuilleDeComposition = memo(function FeuilleDeComposition({
   total,
   points,
   language,
+  copie,
 }) {
+  const algo = copie !== undefined;
   return (
     <section className="exam-feuille" aria-label="Feuille de composition">
       <div className="exam-feuille-tete">
@@ -1173,13 +1182,27 @@ const FeuilleDeComposition = memo(function FeuilleDeComposition({
         />
         <SheetInstructions>{instructions}</SheetInstructions>
         <SheetExercise exercise={exercise} number={number} showAnswerZone={false} />
+        {algo && <ApercuAlgorithme copie={copie} />}
         <p className="exam-feuille-pied">
-          Ce sujet ne change pas pendant l'épreuve : votre travail s'écrit dans la zone de droite.
+          {algo
+            ? 'Le sujet ne change pas pendant l\'épreuve. Votre algorithme se compose à droite et se relit ici, tel qu\'il figurera sur votre copie.'
+            : 'Ce sujet ne change pas pendant l\'épreuve : votre travail s\'écrit dans la zone de droite.'}
         </p>
       </div>
     </section>
   );
 });
+
+/** L'algorithme en cours, relu en pseudo-code sous l'énoncé. */
+function ApercuAlgorithme({ copie }) {
+  const texte = useMemo(() => algorithmText(parseAlgorithm(copie)), [copie]);
+  return (
+    <div className="exam-feuille-copie" aria-live="off">
+      <span className="exam-feuille-copie-titre">Votre algorithme</span>
+      <CodeBlock className="exam-feuille-copie-code" code={texte} language="algo" />
+    </div>
+  );
+}
 
 /**
  * Mélange stable : l'ordre dépend de l'exercice, jamais du hasard du moment.

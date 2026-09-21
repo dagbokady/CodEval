@@ -763,6 +763,15 @@ tr.row-confirm:hover { background: none; }
   box-shadow: var(--shadow-card);
   font-size: 14px;
 }
+.exam-feuille-copie {
+  margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.exam-feuille-copie-titre {
+  display: block; margin-bottom: 8px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.exam-feuille-copie-code { margin: 0; font-size: 13px; white-space: pre-wrap; }
 .exam-feuille-pied {
   margin: 22px 0 0; padding-top: 12px; border-top: 1px dashed var(--border);
   font-size: 11.5px; font-style: italic; color: var(--text-muted);
