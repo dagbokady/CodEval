@@ -12,11 +12,11 @@ import time
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
 from .config import settings
-from .db import engine
+from .db import Base, engine
 
 
 def wait_for_database(timeout: int = 300) -> None:
@@ -36,7 +36,16 @@ def wait_for_database(timeout: int = 300) -> None:
 
 def main() -> None:
     wait_for_database()
-    command.upgrade(Config("alembic.ini"), "head")
+    alembic_cfg = Config("alembic.ini")
+    if not inspect(engine).get_table_names():
+        # Base vide : les migrations supposent les tables de base, que create_all
+        # a toujours créées. On pose le schéma complet puis on le marque à jour.
+        from . import models  # noqa: F401
+
+        Base.metadata.create_all(engine)
+        command.stamp(alembic_cfg, "head")
+    else:
+        command.upgrade(alembic_cfg, "head")
     if settings.admin_email.strip() and settings.admin_password.strip():
         from .seed import main as seed
 
