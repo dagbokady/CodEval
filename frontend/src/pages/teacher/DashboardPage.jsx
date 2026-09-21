@@ -108,6 +108,7 @@ export default function DashboardPage() {
 
       {data && data.items.length === 0 && (
         <EmptyState
+          variant={subjectId ? 'search' : 'empty'}
           title={subjectId ? 'Aucune évaluation pour cette matière' : empty.title}
           action={
             subjectId ? (

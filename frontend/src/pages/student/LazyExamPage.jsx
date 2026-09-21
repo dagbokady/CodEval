@@ -6,7 +6,7 @@ const ExamPage = lazy(() => import('./ExamPage'));
 
 export default function LazyExamPage() {
   return (
-    <Suspense fallback={<Loading label="Ouverture de l'épreuve…" />}>
+    <Suspense fallback={<Loading variant="screen" label="Ouverture de l'épreuve…" />}>
       <ExamPage />
     </Suspense>
   );

@@ -78,6 +78,27 @@ export function useBankExercises({ q, language, scope = 'all', subjectId, page =
   });
 }
 
+/** La communauté : exercices et sujets complets publiés par tous les établissements. */
+export function useCommunity({ q, itemType, language, scope = 'all', sort = 'recent', page = 1 }) {
+  const params = new URLSearchParams({ page: String(page), page_size: '18', scope, sort });
+  if (q) params.set('q', q);
+  if (itemType) params.set('item_type', itemType);
+  if (language) params.set('language', language);
+  return useQuery({
+    queryKey: key('community', scope, sort, itemType, language, q, page),
+    queryFn: () => api(`/api/community?${params}`),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCommunityItem(id) {
+  return useQuery({
+    queryKey: key('community-item', id),
+    queryFn: () => api(`/api/community/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
 export function useSessionMonitor(id, enabled) {
   return useQuery({
     queryKey: key('session', id),
@@ -140,4 +161,9 @@ export function useAction(fn, invalidate = []) {
       invalidate.forEach((k) => client.invalidateQueries({ queryKey: Array.isArray(k) ? k : [k] }));
     },
   });
+}
+
+/** L'offre de l'espace : ses limites (nulles si aucune) et ce qui en est consommé. */
+export function usePlan() {
+  return useQuery({ queryKey: ['plan'], queryFn: () => api('/api/plan') });
 }

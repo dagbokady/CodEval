@@ -17,11 +17,13 @@ from ..schemas import (
     ForgotPasswordPayload,
     LoginPayload,
     RegisterOrg,
+    RegisterTeacher,
     ResetPasswordPayload,
     TokenOut,
     UserOut,
 )
 from ..security import create_access_token, hash_password, verify_password
+from ..workspace import create_personal_space, email_taken
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -30,17 +32,31 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:60] or "etablissement"
 
 
-def _rate_limit_key(request: Request, email: str) -> str:
+def client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
-    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
-    return f"{ip}:{email.lower()}"
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _rate_limit_key(request: Request, email: str) -> str:
+    return f"{client_ip(request)}:{email.lower()}"
+
+
+def token_out(user: User, org: Organization) -> TokenOut:
+    return TokenOut(
+        access_token=create_access_token(user.id, org.id, user.role.value),
+        user=UserOut.model_validate(user),
+        organization=org.name,
+        organization_kind=org.kind,
+    )
 
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
     """Crée un établissement et son compte administrateur."""
     slug = _slugify(payload.organization_name)
-    if db.scalar(select(User).where(func.lower(User.email) == payload.email.lower())):
+    if email_taken(db, payload.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
     if db.scalar(select(Organization).where(Organization.slug == slug)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Un établissement porte déjà ce nom")
@@ -59,11 +75,29 @@ def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
     log(db, user, org.id, "organization.created", "organization", org.id)
     db.commit()
     db.refresh(user)
-    return TokenOut(
-        access_token=create_access_token(user.id, org.id, user.role.value),
-        user=UserOut.model_validate(user),
-        organization=org.name,
+    return token_out(user, org)
+
+
+@router.post("/register-teacher", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+def register_teacher(payload: RegisterTeacher, db: DbSession) -> TokenOut:
+    """Inscription d'un enseignant seul, sans passer par un établissement : un
+    espace personnel est créé pour lui, sur l'offre gratuite."""
+    if email_taken(db, payload.email):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
+    org = create_personal_space(db, payload.full_name.strip())
+    user = User(
+        organization_id=org.id,
+        email=payload.email.lower(),
+        password_hash=hash_password(payload.password),
+        full_name=payload.full_name.strip(),
+        role=Role.TEACHER,
     )
+    db.add(user)
+    db.flush()
+    log(db, user, org.id, "auth.teacher_registered", "user", user.id)
+    db.commit()
+    db.refresh(user)
+    return token_out(user, org)
 
 
 @router.post("/login", response_model=TokenOut)
@@ -88,11 +122,7 @@ def login(payload: LoginPayload, request: Request, db: DbSession) -> TokenOut:
     org = db.get(Organization, user.organization_id)
     log(db, user, org.id, "auth.login", "user", user.id)
     db.commit()
-    return TokenOut(
-        access_token=create_access_token(user.id, org.id, user.role.value),
-        user=UserOut.model_validate(user),
-        organization=org.name,
-    )
+    return token_out(user, org)
 
 
 @router.post("/forgot-password")
@@ -152,4 +182,5 @@ def me(user: CurrentUser, db: DbSession) -> TokenOut:
         access_token="",
         user=UserOut.model_validate(user),
         organization=org.name,
+        organization_kind=org.kind,
     )

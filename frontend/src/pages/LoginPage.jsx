@@ -76,7 +76,9 @@ export default function LoginPage() {
             <Link to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
           </div>
           <div className="auth-footer">
-            Pas encore d'établissement ? <Link to="/inscription">Créer un compte</Link>
+            Enseignant ? <Link to="/inscription">Créer votre espace</Link>
+            <br />
+            Étudiant avec un code ? <Link to="/rejoindre">Rejoindre votre classe</Link>
           </div>
         </form>
       </div>

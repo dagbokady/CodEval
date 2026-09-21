@@ -1645,3 +1645,273 @@ def test_notation_du_cours_d_algorithmique():
     for dangereux in ['"a".format', "x.__class__", "_donnees"]:
         with pytest.raises(AlgoError):
             transpile(_json.dumps({"corps": [e(dangereux)]}), tout)
+
+
+# ── Envoi du travail d'un étudiant qui n'a pas soumis ─────────────────────
+
+
+def _running_exam(context, title: str) -> tuple[int, int]:
+    t = auth(context["teacher"])
+    eid = client.post(
+        "/api/evaluations",
+        headers=t,
+        json={
+            "title": title,
+            "language": "python",
+            "duration_minutes": 30,
+            "classroom_id": context["classroom"],
+            "subject_id": context["subject"],
+            "total_points": 10,
+            "rules": {"allow_early_submit": False},
+        },
+    ).json()["id"]
+    exercise = client.put(
+        f"/api/evaluations/{eid}/exercises",
+        headers=t,
+        json=[{"title": "Somme", "language": "python", "points": 10, "tests": []}],
+    ).json()["exercises"][0]["id"]
+    client.post(f"/api/evaluations/{eid}/publish", headers=t)
+    assert client.post(f"/api/evaluations/{eid}/start", headers=t).status_code == 200
+    assert client.get(f"/api/me/evaluations/{eid}", headers=auth(context["student"])).status_code == 200
+    return eid, exercise
+
+
+def _shift_closure(eid: int, seconds_ago: int) -> None:
+    """Fait comme si l'épreuve avait été close il y a `seconds_ago` secondes."""
+    from datetime import timedelta
+
+    from app.models import Evaluation, Participation, utcnow
+
+    db = SessionLocal()
+    evaluation = db.get(Evaluation, eid)
+    moment = utcnow() - timedelta(seconds=seconds_ago)
+    evaluation.closed_at = moment
+    db.execute(
+        Participation.__table__.update()
+        .where(Participation.evaluation_id == eid)
+        .values(frozen_at=moment)
+    )
+    db.commit()
+    db.close()
+
+
+def _expire(eid: int, seconds_ago: int) -> None:
+    """Place l'échéance de l'épreuve dans le passé, sans que personne ne l'ait constatée."""
+    from datetime import timedelta
+
+    from app.models import Evaluation, utcnow
+
+    db = SessionLocal()
+    db.get(Evaluation, eid).ends_at = utcnow() - timedelta(seconds=seconds_ago)
+    db.commit()
+    db.close()
+
+
+def test_status_pulse_follows_extension_and_closure(context):
+    t, s = auth(context["teacher"]), auth(context["student"])
+    eid, _ = _running_exam(context, "Pouls de l'épreuve")
+    pulse = client.get(f"/api/me/evaluations/{eid}/status", headers=s).json()
+    assert pulse["status"] == "running" and pulse["seconds_left"] > 0 and not pulse["frozen"]
+
+    before = pulse["seconds_left"]
+    client.post(f"/api/evaluations/{eid}/extend", headers=t, json={"extra_minutes": 10})
+    assert client.get(f"/api/me/evaluations/{eid}/status", headers=s).json()["seconds_left"] >= before + 590
+
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+    pulse = client.get(f"/api/me/evaluations/{eid}/status", headers=s).json()
+    assert pulse["status"] == "closed" and pulse["frozen"]
+    assert pulse["upload_seconds_left"] > 0
+
+
+def test_teacher_closure_keeps_unfinished_work(context):
+    """L'enseignant clôt avant la fin : le dernier état de l'étudiant doit arriver."""
+    t, s = auth(context["teacher"]), auth(context["student"])
+    eid, exercise = _running_exam(context, "Clôture anticipée")
+    client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+               json={"code": "print(1", "version": 0})
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+
+    final = client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                       json={"code": "print(1)", "version": 1})
+    assert final.status_code == 200, final.text
+    assert final.json()["closed"] is True
+
+    # Corriger maintenant noterait une copie peut-être incomplète.
+    refused = client.post(f"/api/evaluations/{eid}/corrections", headers=t)
+    assert refused.status_code == 409 and "relancez" in refused.json()["detail"]
+
+    _shift_closure(eid, 10_000)
+    assert client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                      json={"code": "print(2)", "version": 2}).status_code == 409
+    assert client.post(f"/api/evaluations/{eid}/corrections", headers=t).status_code == 202
+
+    detail = client.get(f"/api/evaluations/{eid}/results", headers=t)
+    assert detail.status_code == 200
+    from app.models import Submission
+
+    db = SessionLocal()
+    code = db.scalar(Submission.__table__.select().with_only_columns(Submission.code)
+                     .where(Submission.exercise_id == exercise))
+    db.close()
+    assert code == "print(1)"
+
+
+def test_final_upload_after_expiry_is_measured_from_the_deadline(context):
+    s = auth(context["student"])
+
+    # Échéance passée depuis 30 s : l'envoi final est dans la fenêtre de tolérance.
+    eid, exercise = _running_exam(context, "Fin du temps récente")
+    _expire(eid, 30)
+    res = client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                     json={"code": "print('fini')", "version": 0})
+    assert res.status_code == 200, res.text
+    assert res.json()["closed"] is True and res.json()["seconds_left"] == 0
+
+    # Échéance passée depuis une heure, jamais constatée : la fenêtre est close,
+    # même si c'est cette requête qui découvre la fin de l'épreuve.
+    eid, exercise = _running_exam(context, "Fin du temps ancienne")
+    _expire(eid, 3600)
+    res = client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                     json={"code": "print('trop tard')", "version": 0})
+    assert res.status_code == 409
+
+
+def test_no_upload_once_correction_started(context):
+    t, s = auth(context["teacher"]), auth(context["student"])
+    eid, exercise = _running_exam(context, "Correction lancée")
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+    _shift_closure(eid, 10_000)
+    assert client.post(f"/api/evaluations/{eid}/corrections", headers=t).status_code == 202
+    # Même revenue dans la fenêtre, une copie ne change plus sous la correction.
+    _shift_closure(eid, 5)
+    assert client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                      json={"code": "print(3)", "version": 0}).status_code == 409
+
+
+def test_scheduler_closes_expired_sessions(context):
+    import asyncio
+
+    from app.scheduler import _tick
+
+    eid, _ = _running_exam(context, "Clôture par le planificateur")
+    _expire(eid, 5)
+    asyncio.run(_tick())
+    monitor = client.get(f"/api/evaluations/{eid}/session", headers=auth(context["teacher"]))
+    assert monitor.json()["status"] == "closed"
+
+
+def test_communaute_publier_recuperer_et_moderer(context):
+    """Communauté : un sujet publié par un établissement resservi par un autre."""
+    t, a = auth(context["teacher"]), auth(context["admin"])
+
+    source = client.post(
+        "/api/evaluations",
+        headers=t,
+        json={"title": "Sujet partagé", "language": "python", "duration_minutes": 60,
+              "subject_id": context["subject"], "total_points": 20},
+    ).json()
+    client.put(
+        f"/api/evaluations/{source['id']}/exercises",
+        headers=t,
+        json=[{"title": "Somme", "language": "python", "points": 20,
+               "tests": [{"name": "T1", "stdin": "1 2\n", "expected_stdout": "3",
+                          "points": 20}]}],
+    )
+    # Seule la banque se publie : une épreuve ordinaire est refusée.
+    sources = client.get("/api/community/sources", headers=t).json()
+    assert source["id"] not in [e["id"] for e in sources["evaluations"]]
+    res = client.post("/api/community", headers=t,
+                      json={"source_type": "evaluation", "source_id": source["id"]})
+    assert res.status_code == 404
+
+    template = client.post(f"/api/evaluations/{source['id']}/save-as-template", headers=t).json()
+    sources = client.get("/api/community/sources", headers=t).json()
+    assert template["id"] in [e["id"] for e in sources["evaluations"]]
+
+    res = client.post(
+        "/api/community",
+        headers=t,
+        json={"source_type": "evaluation", "source_id": template["id"],
+              "description": "Contrôle de rentrée", "tags": ["boucles"]},
+    )
+    assert res.status_code == 201, res.text
+    subject_item = res.json()
+    assert subject_item["item_type"] == "subject"
+    assert subject_item["exercises_count"] == 1
+    assert subject_item["subject_name"] == "Algo"
+
+    # Publier est un instantané : retoucher l'original ne change pas la publication.
+    client.put(f"/api/evaluations/{template['id']}/exercises", headers=t, json=[])
+    detail = client.get(f"/api/community/{subject_item['id']}", headers=t).json()
+    assert detail["content"]["exercises"][0]["tests"][0]["expected_stdout"] == "3"
+
+    bank = client.post(
+        "/api/bank/exercises",
+        headers=t,
+        json={"title": "Maximum", "language": "c", "points": 4,
+              "tests": [{"name": "T", "stdin": "3 9\n", "expected_stdout": "9", "points": 4}]},
+    ).json()
+    exercise_item = client.post(
+        "/api/community", headers=t,
+        json={"source_type": "bank_exercise", "source_id": bank["id"]},
+    ).json()
+    assert exercise_item["title"] == "Maximum"
+
+    # Un autre établissement voit la communauté et en tire des copies.
+    other_admin = client.post(
+        "/api/auth/register",
+        json={"organization_name": "Autre École", "full_name": "Admin Deux",
+              "email": "admin2@autre.ci", "password": "motdepasse1"},
+    ).json()["access_token"]
+    client.post("/api/users", headers=auth(other_admin),
+                json={"email": "prof2@autre.ci", "full_name": "Prof Deux", "role": "teacher",
+                      "password": "motdepasse1"})
+    other = auth(client.post("/api/auth/login", json={
+        "email": "prof2@autre.ci", "password": "motdepasse1"}).json()["access_token"])
+
+    listing = client.get("/api/community", headers=other).json()
+    ids = [item["id"] for item in listing["items"]]
+    assert subject_item["id"] in ids and exercise_item["id"] in ids
+    assert all(not item["can_delete"] for item in listing["items"])
+    assert client.get("/api/community?item_type=exercise", headers=other).json()["total"] >= 1
+
+    # On ne publie pas le travail d'un autre établissement.
+    res = client.post("/api/community", headers=other,
+                      json={"source_type": "bank_exercise", "source_id": bank["id"]})
+    assert res.status_code == 404
+
+    res = client.post(f"/api/community/{exercise_item['id']}/to-bank", headers=other)
+    assert res.status_code == 201, res.text
+    assert res.json()["target"] == "bank_exercise"
+    copy = client.get(f"/api/bank/exercises/{res.json()['id']}", headers=other).json()
+    assert copy["tests"][0]["expected_stdout"] == "9"
+
+    res = client.post(f"/api/community/{subject_item['id']}/to-bank", headers=other)
+    assert res.json()["target"] == "template"
+    templates = client.get("/api/evaluations/templates", headers=other).json()
+    assert res.json()["id"] in [item["id"] for item in templates["items"]]
+
+    res = client.post(f"/api/community/{subject_item['id']}/use", headers=other,
+                      json={"title": "Contrôle repris"})
+    assert res.status_code == 201, res.text
+    evaluation = client.get(f"/api/evaluations/{res.json()['evaluation_id']}",
+                            headers=other).json()
+    assert evaluation["status"] == "draft"
+    assert evaluation["title"] == "Contrôle repris"
+    assert evaluation["subject_id"] is None  # « Algo » n'existe pas chez eux
+    assert evaluation["exercises"][0]["tests"][0]["expected_stdout"] == "3"
+    assert client.get(f"/api/community/{subject_item['id']}", headers=other).json()["uses"] == 2
+
+    # La recherche couvre les mots-clés ; « les plus repris » passe en tête.
+    found = client.get("/api/community?q=boucles", headers=other).json()
+    assert [item["id"] for item in found["items"]] == [subject_item["id"]]
+    popular = client.get("/api/community?sort=popular", headers=other).json()["items"]
+    assert popular[0]["id"] == subject_item["id"]
+
+    # L'administration publie et modère ce qui vient de son établissement.
+    assert client.post(f"/api/community/{exercise_item['id']}/use", headers=a,
+                       json={}).status_code == 403
+    assert client.delete(f"/api/community/{subject_item['id']}",
+                         headers=auth(other_admin)).status_code == 403
+    assert client.delete(f"/api/community/{subject_item['id']}", headers=a).status_code == 204
+    assert client.delete(f"/api/community/{exercise_item['id']}", headers=t).status_code == 204

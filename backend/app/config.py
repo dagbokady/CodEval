@@ -22,9 +22,10 @@ class Settings(BaseSettings):
     sandbox_compile_timeout: int = 20
 
     worker_poll_seconds: float = 2.0
-    # Tolérance accordée à l'envoi final déclenché à l'expiration du temps :
-    # le client pousse son travail au moment où la session se ferme.
-    autosave_grace_seconds: int = 60
+    # Tolérance accordée à l'envoi final déclenché à la clôture (fin du temps,
+    # clôture par l'enseignant, verrouillage) : le client pousse son travail au
+    # moment où la session se ferme, parfois après une coupure réseau.
+    autosave_grace_seconds: int = 120
 
     # Limite de tentatives de connexion
     login_max_attempts: int = 5

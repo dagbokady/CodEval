@@ -30,7 +30,7 @@ export default function ClassroomAdminDetailPage() {
   const students = useClassroomStudents(classroomId);
   const teachers = useClassroomTeachers(classroomId);
 
-  if (classroom.isPending) return <Loading />;
+  if (classroom.isPending) return <Loading variant="page" />;
   if (classroom.error) {
     return (
       <div className="content">
@@ -100,7 +100,7 @@ function StudentsTab({ classroomId, students }) {
       {students.isPending ? (
         <Loading />
       ) : list.length === 0 ? (
-        <EmptyState title="Aucun étudiant inscrit">
+        <EmptyState compact title="Aucun étudiant inscrit">
           Inscrivez des étudiants existants, ou créez leur compte directement dans cette classe.
         </EmptyState>
       ) : (
@@ -237,9 +237,13 @@ function EnrollDialog({ open, classroomId, enrolled, onClose }) {
         onChange={(e) => setSearch(e.target.value)}
       />
       {candidates.isPending ? (
-        <Loading />
+        <Loading variant="inline" />
       ) : available.length === 0 ? (
-        <p className="sub" style={{ marginBottom: 12 }}>Aucun étudiant disponible.</p>
+        <EmptyState compact variant={search ? 'search' : 'done'} title="Aucun étudiant disponible">
+          {search
+            ? 'Aucun étudiant ne correspond à cette recherche.'
+            : 'Tous les étudiants actifs sont déjà inscrits dans cette classe.'}
+        </EmptyState>
       ) : (
         <div className="admin-pick">
           {available.map((s) => (
@@ -312,7 +316,7 @@ function TeachersTab({ classroomId, teachers }) {
       {teachers.isPending ? (
         <Loading />
       ) : list.length === 0 ? (
-        <EmptyState title="Aucun enseignement attribué">
+        <EmptyState compact title="Aucun enseignement attribué">
           Attribuez à cette classe un enseignant et la matière qu'il y enseigne.
         </EmptyState>
       ) : (

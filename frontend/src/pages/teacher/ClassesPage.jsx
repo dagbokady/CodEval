@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useClassroomEvaluations, useClassrooms } from '../../api/hooks';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../auth';
+import { useClassroomEvaluations, useClassrooms, usePlan } from '../../api/hooks';
+import { ClassroomDialog } from '../admin/ClassroomsAdminPage';
 import { Alert, Button, EmptyState, Loading, PageHeader, Status } from '../../components/ui';
 import { STATUS_LABELS, formatPercent, formatSchedule, primaryAction } from '../../format';
 import { summarize } from '../../classroomSummary';
@@ -15,9 +18,15 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
  */
 export default function ClassesPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { organizationKind } = useAuth();
+  // Seul dans son espace, l'enseignant ouvre lui-même ses classes.
+  const personal = organizationKind === 'personal';
+  const plan = usePlan();
   const classrooms = useClassrooms();
   const evaluations = useClassroomEvaluations();
   const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const byClassroom = useMemo(() => {
     const map = new Map();
@@ -28,7 +37,7 @@ export default function ClassesPage() {
     return map;
   }, [evaluations.data]);
 
-  if (classrooms.isPending) return <Loading />;
+  if (classrooms.isPending) return <Loading variant="page" />;
 
   const list = classrooms.data ?? [];
   const query = search.trim().toLowerCase();
@@ -36,10 +45,24 @@ export default function ClassesPage() {
     ? list.filter((c) => `${c.name} ${c.level ?? ''}`.toLowerCase().includes(query))
     : list;
   const students = list.reduce((sum, c) => sum + (c.students_count ?? 0), 0);
+  const maxClassrooms = plan.data?.limits?.classrooms;
+  const full = maxClassrooms !== undefined && list.length >= maxClassrooms;
+  // Liste vide : l'état vide porte déjà le bouton de création.
+  const newClassroom = personal && list.length > 0 && (
+    <Button
+      variant="secondary"
+      disabled={full}
+      title={full ? `L'offre gratuite est limitée à ${maxClassrooms} classes` : undefined}
+      onClick={() => setCreating(true)}
+    >
+      + Nouvelle classe
+    </Button>
+  );
 
   return (
     <>
       <PageHeader breadcrumb="Espace enseignant" title="Mes classes">
+        {newClassroom}
         {list.length > 0 && (
           <Button onClick={() => navigate('/evaluations/nouvelle')}>+ Nouvelle évaluation</Button>
         )}
@@ -49,15 +72,27 @@ export default function ClassesPage() {
         {classrooms.error && <Alert>{classrooms.error.message}</Alert>}
 
         {!classrooms.error && list.length === 0 ? (
-          <EmptyState title="Aucune classe">
-            Les classes et leurs effectifs sont préparés à l'ouverture de l'année. Elles
-            apparaîtront ici dès qu'on vous en aura confié une.
-          </EmptyState>
+          personal ? (
+            <EmptyState
+              title="Aucune classe"
+              action={<Button onClick={() => setCreating(true)}>+ Créer ma première classe</Button>}
+            >
+              Créez une classe, puis donnez son code d'accès à vos apprenants : ils s'y
+              inscrivent eux-mêmes.
+            </EmptyState>
+          ) : (
+            <EmptyState title="Aucune classe">
+              Les classes et leurs effectifs sont préparés à l'ouverture de l'année. Elles
+              apparaîtront ici dès qu'on vous en aura confié une.
+            </EmptyState>
+          )
         ) : (
           <>
             <div className="section-head">
               <p className="sub">
                 {plural(list.length, 'classe')} · {plural(students, 'apprenant')}
+                {maxClassrooms !== undefined &&
+                  ` · offre gratuite : ${list.length} / ${maxClassrooms} classes`}
               </p>
               {list.length > 6 && (
                 <input
@@ -102,6 +137,17 @@ export default function ClassesPage() {
           </>
         )}
       </div>
+
+      {creating && (
+        <ClassroomDialog
+          classroom={{}}
+          onClose={() => {
+            setCreating(false);
+            queryClient.invalidateQueries({ queryKey: ['plan'] });
+          }}
+          onCreated={(saved) => navigate(`/classes/${saved.id}`)}
+        />
+      )}
     </>
   );
 }

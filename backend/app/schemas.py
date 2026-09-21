@@ -21,6 +21,29 @@ class RegisterOrg(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class RegisterTeacher(BaseModel):
+    full_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+
+class JoinClassPayload(BaseModel):
+    code: str = Field(min_length=4, max_length=20)
+
+
+class JoinClassSignup(JoinClassPayload):
+    full_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    matricule: str | None = Field(default=None, max_length=60)
+
+
+class JoinClassPreview(BaseModel):
+    classroom_name: str
+    level: str | None = None
+    organization_name: str
+
+
 class LoginPayload(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
@@ -41,6 +64,7 @@ class TokenOut(BaseModel):
     token_type: str = "bearer"
     user: UserOut
     organization: str
+    organization_kind: str = "institution"
 
 
 class ForgotPasswordPayload(BaseModel):
@@ -125,6 +149,18 @@ class ClassroomDetailOut(ORMModel):
     students_count: int = 0
     subject_name: str | None = None
     created_at: datetime | None = None
+    join_code: str | None = None
+    join_code_expires_at: datetime | None = None
+
+
+class JoinCodePayload(BaseModel):
+    # Nul : le code reste valable jusqu'à ce qu'on le ferme.
+    expires_in_days: int | None = Field(default=None, ge=1, le=365)
+
+
+class JoinCodeOut(BaseModel):
+    join_code: str | None
+    join_code_expires_at: datetime | None = None
 
 
 class EnrollPayload(BaseModel):
@@ -154,6 +190,14 @@ class OrganizationOut(ORMModel):
 
 class OrganizationUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
+
+
+class PlanOut(BaseModel):
+    kind: str
+    plan: str
+    # Nul : aucune limite.
+    limits: dict | None = None
+    usage: dict
 
 
 class AuditEntryOut(BaseModel):
@@ -315,6 +359,44 @@ class BankExerciseOut(ORMModel):
     author_name: str | None = None
     subject_name: str | None = None
     tests: list[TestCaseOut] = []
+
+
+# ----- Communauté -----
+class CommunityPublishIn(BaseModel):
+    """Publier dans la communauté un exercice de la banque ou une épreuve."""
+
+    source_type: Literal["bank_exercise", "evaluation"]
+    source_id: int
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    tags: list[str] = Field(default_factory=list, max_length=10)
+
+
+class CommunityUseIn(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    classroom_id: int | None = None
+
+
+class CommunityItemOut(BaseModel):
+    id: int
+    item_type: str
+    title: str
+    description: str
+    language: str
+    subject_name: str | None
+    tags: list[str]
+    exercises_count: int
+    total_points: float
+    uses: int
+    created_at: datetime
+    author_id: int
+    author_name: str | None = None
+    organization_name: str | None = None
+    # Auteur, ou administrateur de l'établissement de l'auteur.
+    can_delete: bool = False
+    # Type d'un exercice seul (QCM, code…), lisible sans charger le contenu.
+    exercise_kind: str | None = None
+    content: dict | None = None
 
 
 class EvaluationBase(BaseModel):

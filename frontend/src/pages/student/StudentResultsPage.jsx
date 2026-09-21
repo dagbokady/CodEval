@@ -23,7 +23,7 @@ export default function StudentResultsPage() {
     return [...noms].sort((a, b) => a.localeCompare(b, 'fr'));
   }, [items]);
 
-  if (results.isPending) return <Loading />;
+  if (results.isPending) return <Loading variant="page" />;
 
   const retenues =
     matiere === TOUTES

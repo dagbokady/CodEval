@@ -143,6 +143,18 @@ class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
 
+class OrganizationKind(str, enum.Enum):
+    # Espace d'un enseignant inscrit seul : il y gère lui-même classes et matières.
+    PERSONAL = "personal"
+    # Établissement : une administration, plusieurs enseignants.
+    INSTITUTION = "institution"
+
+
+class Plan(str, enum.Enum):
+    FREE = "free"  # Offre gratuite, bornée (voir `plans.FREE_LIMITS`)
+    PRO = "pro"    # Sans limite
+
+
 class Organization(Base, TimestampMixin):
     __tablename__ = "organizations"
 
@@ -150,6 +162,12 @@ class Organization(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(160))
     slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     settings: Mapped[dict] = mapped_column(JSONColumn, default=dict)
+    kind: Mapped[str] = mapped_column(String(20), default=OrganizationKind.INSTITUTION.value)
+    plan: Mapped[str] = mapped_column(String(20), default=Plan.PRO.value)
+
+    @property
+    def is_personal(self) -> bool:
+        return self.kind == OrganizationKind.PERSONAL.value
 
 
 class User(Base, TimestampMixin):
@@ -184,6 +202,10 @@ class Classroom(Base, TimestampMixin):
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
     level: Mapped[str | None] = mapped_column(String(60), default=None)
+    # Code que l'enseignant donne à sa classe pour qu'elle s'inscrive. Il ne sert
+    # qu'à entrer : le fermer ou le changer laisse les inscrits en place.
+    join_code: Mapped[str | None] = mapped_column(String(16), default=None, unique=True, index=True)
+    join_code_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
 
 
 class Enrollment(Base):
@@ -344,6 +366,35 @@ class BankTestCase(Base):
     args: Mapped[list] = mapped_column(JSONList, default=list)
 
     exercise: Mapped[BankExercise] = relationship(back_populates="tests")
+
+
+class CommunityItem(Base, TimestampMixin):
+    """Exercice ou sujet complet publié pour toute la plateforme.
+
+    La publication est un instantané : le contenu (énoncés, jeux de tests,
+    barèmes) est recopié dans `content`, si bien que retoucher ou supprimer
+    l'original ne change rien à ce qu'ont déjà récupéré les autres. À l'inverse,
+    ce qu'on tire de la communauté (banque, évaluation) en est une copie.
+    """
+
+    __tablename__ = "community_items"
+    __table_args__ = (Index("ix_community_type_created", "item_type", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    author_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # « exercise » : un exercice seul. « subject » : une épreuve entière.
+    item_type: Mapped[str] = mapped_column(String(20), default="exercise")
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    language: Mapped[str] = mapped_column(String(30), default="c")
+    # Nom, pas identifiant : les matières appartiennent à chaque établissement.
+    subject_name: Mapped[str | None] = mapped_column(String(120), default=None)
+    tags: Mapped[list] = mapped_column(JSONList, default=list)
+    content: Mapped[dict] = mapped_column(JSONColumn, default=dict)
+    exercises_count: Mapped[int] = mapped_column(Integer, default=1)
+    total_points: Mapped[float] = mapped_column(Float, default=0.0)
+    uses: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Participation(Base):

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import CodeMirror from '@uiw/react-codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
-import { api } from '../../api/client';
+import { api, sendOnLeave } from '../../api/client';
 import AlgoEditor from '../../components/AlgoEditor';
 import MatchingBoard from '../../components/MatchingBoard';
 import { Alert, Button, Loading } from '../../components/ui';
@@ -21,13 +21,15 @@ import { answersOf, packAnswers, questionsOf } from '../../questions';
 import { useServerCountdown } from '../../useNow';
 import { useTheme } from '../../theme';
 import {
-  clearDrafts, restoreDrafts, writeDraft,
+  clearDrafts, markSynced, restoreDrafts, unsentDrafts, writeDraft,
   pushOfflineIncident, readOfflineIncidents, clearOfflineIncidents,
-  writeFinalSnapshot, readFinalSnapshot, clearFinalSnapshot,
 } from '../../examStorage';
 
 const EXTENSIONS = { c: [cpp()], cpp: [cpp()], python: [python()] };
 const LOCAL_SAVE_MS = 400; // écriture dans le navigateur, sans appel réseau
+const SYNC_MS = 15000; // envoi en arrière-plan de ce qui a changé
+const PULSE_MS = 20000; // état de l'épreuve : prolongation, clôture, verrouillage
+const RETRY_MS = 5000; // nouvel essai d'un envoi final resté en attente
 const REPORT_THROTTLE_MS = 1500; // un même incident n'est compté qu'une fois
 // Une sortie n'est retenue que si elle dure : un clic dans la barre d'adresse, une
 // notification système ou une boîte de dialogue ne doivent pas pénaliser l'apprenant.
@@ -58,7 +60,7 @@ export default function ExamPage() {
     refetchInterval: (query) => (isNotOpenYet(query.state.error) ? 5000 : false),
   });
 
-  if (exam.isPending) return <Loading label="Ouverture de l'épreuve…" />;
+  if (exam.isPending) return <Loading variant="screen" label="Ouverture de l'épreuve…" />;
   if (exam.error) {
     if (isNotOpenYet(exam.error)) {
       return (
@@ -107,6 +109,7 @@ export default function ExamPage() {
               <div className="exam-done-mark" aria-hidden="true">✓</div>
               <h1>Épreuve terminée</h1>
               <p>{exam.error.message}</p>
+              <LeftoverUpload evaluationId={evaluationId} />
               <Button onClick={() => navigate('/mes-evaluations', { replace: true })}>
                 Retour à mes évaluations
               </Button>
@@ -127,6 +130,73 @@ export default function ExamPage() {
   return <Exam evaluationId={evaluationId} data={exam.data} />;
 }
 
+/**
+ * L'épreuve est close alors que ce poste garde du travail jamais transmis (le
+ * navigateur a planté, la page a été fermée avant l'envoi) : on le pousse tant
+ * que le serveur l'accepte encore, et l'on dit franchement ce qu'il en est.
+ */
+function LeftoverUpload({ evaluationId }) {
+  const [state, setState] = useState(() =>
+    unsentDrafts(evaluationId).length ? 'sending' : 'none',
+  );
+
+  useEffect(() => {
+    const drafts = unsentDrafts(evaluationId);
+    if (!drafts.length) return undefined;
+    let cancelled = false;
+    (async () => {
+      const refused = [];
+      let failed = false;
+      for (const { exerciseId, code } of drafts) {
+        try {
+          await api(`/api/me/evaluations/${evaluationId}/exercises/${exerciseId}`, {
+            method: 'PUT',
+            body: { code, version: 0 },
+          });
+          markSynced(evaluationId, exerciseId, code);
+        } catch (err) {
+          if (err.status === 404) markSynced(evaluationId, exerciseId, code);
+          else if (err.status === 409) refused.push({ exerciseId, code });
+          else failed = true;
+        }
+      }
+      // Un refus ne dit pas que le travail manque : l'envoi de départ de la page
+      // a pu arriver. La copie déposée fait foi.
+      if (refused.length) {
+        try {
+          const copy = await api(`/api/me/results/${evaluationId}`);
+          const answers = Object.fromEntries(
+            copy.exercises.map((item) => [item.exercise_id, item.answer]),
+          );
+          refused
+            .filter(({ exerciseId, code }) => answers[exerciseId] === code)
+            .forEach(({ exerciseId, code }) => markSynced(evaluationId, exerciseId, code));
+        } catch {
+          /* copie illisible : on s'en tient aux brouillons restants */
+        }
+      }
+      if (cancelled) return;
+      if (failed) setState('failed');
+      else setState(unsentDrafts(evaluationId).length ? 'refused' : 'sent');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [evaluationId]);
+
+  if (state === 'none') return null;
+  if (state === 'sending') return <p aria-live="polite">Envoi du travail resté sur ce poste…</p>;
+  if (state === 'sent') return <p>Le travail resté sur ce poste vient d'être transmis au serveur.</p>;
+  return (
+    <p style={{ color: 'var(--exam-timer)' }} role="alert">
+      {state === 'failed'
+        ? "Du travail resté sur ce poste n'a pas pu être envoyé : vérifiez la connexion puis rechargez la page."
+        : "Du travail resté sur ce poste n'a pas été transmis avant la fermeture de l'épreuve."}{' '}
+      Prévenez votre enseignant, sans effacer les données du navigateur.
+    </p>
+  );
+}
+
 function Exam({ evaluationId, data }) {
   const navigate = useNavigate();
   const { organization } = useAuth();
@@ -138,6 +208,9 @@ function Exam({ evaluationId, data }) {
   const [sentAt, setSentAt] = useState(null);
   const [sending, setSending] = useState(false);
   const [hasPending, setHasPending] = useState(false);
+  // Le serveur a définitivement refusé une partie du travail (épreuve close
+  // depuis trop longtemps) : elle reste sur le poste, l'apprenant doit le savoir.
+  const [refused, setRefused] = useState(false);
   const [submittedAt, setSubmittedAt] = useState(data.submitted_at);
   const [error, setError] = useState(null);
   const [incidents, setIncidents] = useState(data.incidents ?? 0);
@@ -169,6 +242,10 @@ function Exam({ evaluationId, data }) {
         .map((item) => item.id),
     ),
   );
+  // Les envois lisent toujours la dernière frappe, même lancés par une minuterie.
+  const editsRef = useRef(edits);
+  const inflight = useRef(Promise.resolve(true));
+  const ending = useRef(false);
   const localTimer = useRef(null);
   const lastReport = useRef(0);
   const leaveTimer = useRef(null);
@@ -186,6 +263,10 @@ function Exam({ evaluationId, data }) {
     (exerciseId) => edits[exerciseId] ?? data.drafts[exerciseId] ?? '',
     [edits, data.drafts],
   );
+  const latestCode = useCallback(
+    (exerciseId) => editsRef.current[exerciseId] ?? data.drafts[exerciseId] ?? '',
+    [data.drafts],
+  );
   const answered = useCallback(
     (exerciseId) =>
       Boolean(edits[exerciseId]?.trim()) || data.saved_exercise_ids.includes(exerciseId),
@@ -194,72 +275,122 @@ function Exam({ evaluationId, data }) {
 
   // Le décompte vient du serveur et avance sur une horloge monotone : changer
   // l'heure du poste n'a aucun effet sur le temps restant.
-  const { secondsLeft, resync } = useServerCountdown(data.seconds_left, !submittedAt && !locked);
+  const { secondsLeft, resync } = useServerCountdown(
+    data.seconds_left,
+    !submittedAt && !locked && !finished,
+  );
 
+  /** Un envoi : « ok », « stale » (à renvoyer), « refused » (définitif), « failed » (à retenter). */
   const send = useCallback(
-    async (exerciseId, code, { quiet = false } = {}) => {
+    async (exerciseId, code) => {
       try {
         const res = await api(`/api/me/evaluations/${evaluationId}/exercises/${exerciseId}`, {
           method: 'PUT',
           body: { code, version: versions.current[exerciseId] ?? 0 },
         });
         versions.current[exerciseId] = res.version;
+        // Une version plus récente existe (autre onglet) : le code n'a pas été
+        // enregistré. On le renvoie avec la bonne version au prochain passage.
+        if (res.stale) return 'stale';
+        markSynced(evaluationId, exerciseId, code);
         setSentAt(res.saved_at);
-        resync(res.seconds_left);
-        setError(null);
-        return true;
+        if (!res.closed) resync(res.seconds_left);
+        return 'ok';
       } catch (err) {
-        // En resynchronisation, un refus définitif (exercice disparu, copie déjà
-        // rendue, épreuve close) n'est pas une erreur à montrer ni à retenter.
-        if (quiet && (err.status === 404 || err.status === 409)) return true;
-        setError(err.message);
-        return false;
+        if (err.status === 404) return 'ok'; // exercice retiré de l'épreuve : rien à garder
+        if (err.status === 409) return 'refused';
+        return 'failed';
       }
     },
     [evaluationId, resync],
   );
 
-  /** Envoi de la production au serveur : soumission, fin du temps, ou départ de la page. */
-  const flush = useCallback(async () => {
-    if (dirty.current.size === 0) return true;
-    const pending = [...dirty.current];
-    dirty.current.clear();
-    setSending(true);
-    let complete = true;
-    for (const exerciseId of pending) {
-      const ok = await send(exerciseId, codeOf(exerciseId));
-      if (!ok) {
-        dirty.current.add(exerciseId);
-        complete = false;
+  /**
+   * Transmet au serveur tout ce qui n'y est pas encore. Les envois sont mis en
+   * file : une minuterie et une soumission ne se croisent jamais.
+   */
+  const flush = useCallback(() => {
+    const run = async () => {
+      if (dirty.current.size === 0) {
+        setHasPending(false);
+        return true;
       }
+      const pending = [...dirty.current];
+      dirty.current.clear();
+      setSending(true);
+      let complete = true;
+      for (const exerciseId of pending) {
+        const outcome = await send(exerciseId, latestCode(exerciseId));
+        if (outcome === 'ok') continue;
+        complete = false;
+        if (outcome === 'refused') setRefused(true);
+        else dirty.current.add(exerciseId);
+      }
+      setSending(false);
+      setHasPending(dirty.current.size > 0);
+      return complete;
+    };
+    inflight.current = inflight.current.then(run, run);
+    return inflight.current;
+  }, [latestCode, send]);
+
+  /**
+   * Fin de l'épreuve pour ce poste (temps écoulé, clôture par l'enseignant,
+   * annulation) : l'écran de fin s'affiche et le dernier état part au serveur.
+   */
+  const finish = useCallback(
+    async (reason) => {
+      if (ending.current) return;
+      ending.current = true;
+      guardSuspended.current = true;
+      setConfirmSubmit(false);
+      setPaused(false);
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+      setFinished({ reason, at: new Date().toISOString() });
+      const complete = await flush();
+      if (complete) clearDrafts(evaluationId, data.exercises.map((item) => item.id));
+    },
+    [evaluationId, data.exercises, flush],
+  );
+
+  /**
+   * Interroge le serveur sur l'état de l'épreuve : une prolongation, une
+   * clôture anticipée ou un verrouillage se voient sans attendre le décompte.
+   */
+  const checkPulse = useCallback(async () => {
+    let pulse;
+    try {
+      pulse = await api(`/api/me/evaluations/${evaluationId}/status`);
+    } catch {
+      return null; // hors ligne : on garde l'état connu
     }
-    setSending(false);
-    setHasPending(dirty.current.size > 0);
-    return complete;
-  }, [codeOf, send]);
+    if (pulse.submitted_at) {
+      setSubmittedAt(pulse.submitted_at);
+      if (!ending.current) {
+        ending.current = true;
+        setFinished({ reason: 'submitted', at: pulse.submitted_at });
+      }
+    } else if (pulse.status === 'running' && !pulse.frozen) {
+      resync(pulse.seconds_left);
+    } else if (pulse.status === 'running') {
+      // Verrouillée ailleurs (autre onglet, incidents hors ligne) : on pousse le travail.
+      await flush();
+      setLocked(true);
+      setPaused(false);
+    } else if (pulse.status === 'cancelled') {
+      finish('cancelled');
+    } else {
+      finish(pulse.seconds_left > 0 ? 'closed' : 'expired');
+    }
+    return pulse;
+  }, [evaluationId, finish, flush, resync]);
 
   // ── Synchronisation au retour en ligne ──────────────────────────────
   const syncPending = useCallback(async () => {
-    // 1. Snapshot final (timer expiré hors ligne) : envoyer chaque exercice
-    const snapshot = readFinalSnapshot(evaluationId);
-    if (snapshot && submittedAt) {
-      // Copie déjà rendue : le serveur refuserait chaque envoi.
-      clearFinalSnapshot(evaluationId);
-    } else if (snapshot) {
-      let allSent = true;
-      // Un instantané peut dater d'une version antérieure de l'épreuve : ses
-      // exercices n'existent plus, et les renvoyer affichait « Exercice introuvable ».
-      const known = new Set(data.exercises.map((item) => String(item.id)));
-      for (const [exerciseId, code] of Object.entries(snapshot.edits ?? {})) {
-        if (!known.has(String(exerciseId))) continue;
-        if (code == null || !code.trim()) continue;
-        const ok = await send(exerciseId, code, { quiet: true });
-        if (!ok) allSent = false;
-      }
-      if (allSent) {
-        clearFinalSnapshot(evaluationId);
-        clearDrafts(evaluationId, data.exercises.map((item) => item.id));
-      }
+    // 1. Travail resté sur le poste (coupure réseau, page rechargée)
+    const complete = await flush();
+    if (complete && ending.current) {
+      clearDrafts(evaluationId, data.exercises.map((item) => item.id));
     }
 
     // 2. Incidents cumulés hors ligne
@@ -273,6 +404,8 @@ function Exam({ evaluationId, data }) {
         setIncidents(res.incidents);
         clearOfflineIncidents(evaluationId);
         if (res.locked) {
+          // Verrouillage : envoyer tout le travail au serveur avant de figer
+          await flush();
           setLocked(true);
           setPaused(false);
           if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -280,7 +413,9 @@ function Exam({ evaluationId, data }) {
       } catch { /* sera retenté au prochain retour en ligne */ }
     }
 
-  }, [evaluationId, data.exercises, send, submittedAt]);
+    // 3. L'épreuve a pu être prolongée ou close pendant la coupure
+    if (!ending.current) await checkPulse();
+  }, [evaluationId, data.exercises, flush, checkPulse]);
 
   // Suivi de l'état de connexion et synchronisation au retour en ligne
   useEffect(() => {
@@ -298,6 +433,37 @@ function Exam({ evaluationId, data }) {
       window.removeEventListener('offline', goOffline);
     };
   }, [syncPending]);
+
+  // Envoi en arrière-plan : un poste qui s'éteint, un navigateur qui plante ou
+  // une page fermée ne font perdre que les dernières secondes de frappe.
+  useEffect(() => {
+    if (submittedAt || finished || locked) return undefined;
+    const timer = setInterval(async () => {
+      if (dirty.current.size === 0 || !navigator.onLine) return;
+      const complete = await flush();
+      if (!complete) checkPulse();
+    }, SYNC_MS);
+    return () => clearInterval(timer);
+  }, [submittedAt, finished, locked, flush, checkPulse]);
+
+  // Pouls de l'épreuve, même sans frappe : prolongation, clôture, présence.
+  useEffect(() => {
+    if (submittedAt || finished) return undefined;
+    const timer = setInterval(() => {
+      if (navigator.onLine) checkPulse();
+    }, PULSE_MS);
+    return () => clearInterval(timer);
+  }, [submittedAt, finished, checkPulse]);
+
+  // Travail non transmis après la fin ou le verrouillage : on retente jusqu'à
+  // réussite ou refus définitif du serveur, sans que l'apprenant ait à agir.
+  useEffect(() => {
+    if (!(finished || locked) || !hasPending || refused || submittedAt) return undefined;
+    const timer = setInterval(() => {
+      if (navigator.onLine) syncPending();
+    }, RETRY_MS);
+    return () => clearInterval(timer);
+  }, [finished, locked, hasPending, refused, submittedAt, syncPending]);
 
   // Signalement au serveur : c'est lui qui compte les incidents et qui verrouille.
   const report = useCallback(
@@ -336,19 +502,23 @@ function Exam({ evaluationId, data }) {
     [evaluationId, flush, guarded, locked, submittedAt, awaitingFullscreen],
   );
 
-  // Filet de sécurité : si la page est quittée, on écrit un snapshot local.
-  // L'envoi au serveur n'a lieu qu'à la soumission, fin de temps, ou verrouillage.
+  // Départ de la page (fermeture, rechargement, navigation) : le travail non
+  // transmis est écrit sur le poste et envoyé une dernière fois au serveur.
   useEffect(() => {
     const onLeave = () => {
-      const allEdits = {};
-      data.exercises.forEach((item) => {
-        allEdits[item.id] = codeOf(item.id);
+      if (submittedAt) return;
+      clearTimeout(localTimer.current);
+      dirty.current.forEach((exerciseId) => {
+        const code = latestCode(exerciseId);
+        writeDraft(evaluationId, exerciseId, code);
+        sendOnLeave(`/api/me/evaluations/${evaluationId}/exercises/${exerciseId}`, {
+          body: { code, version: versions.current[exerciseId] ?? 0 },
+        });
       });
-      writeFinalSnapshot(evaluationId, allEdits);
     };
     window.addEventListener('pagehide', onLeave);
     return () => window.removeEventListener('pagehide', onLeave);
-  }, [evaluationId, data.exercises, codeOf]);
+  }, [evaluationId, latestCode, submittedAt]);
 
   // Surveillance de l'environnement d'épreuve : plein écran, onglet, focus.
   useEffect(() => {
@@ -475,44 +645,31 @@ function Exam({ evaluationId, data }) {
     };
   }, [rules.fullscreen, locked, submittedAt]);
 
-  // Clôture automatique : le travail est poussé puis l'accès en écriture cesse.
+  // Fin du décompte : on vérifie d'abord auprès du serveur (une prolongation a
+  // pu être accordée), puis le travail est poussé et l'accès en écriture cesse.
   useEffect(() => {
-    if (secondsLeft !== 0 || submittedAt || locked) return;
-
-    // Sauvegarder le snapshot final en local dans tous les cas
-    const allEdits = {};
-    data.exercises.forEach((item) => {
-      allEdits[item.id] = codeOf(item.id);
-    });
-    writeFinalSnapshot(evaluationId, allEdits);
-
-    // L'écran de fin reste affiché : il confirme la remise et, hors ligne, il
-    // demande de garder la page ouverte jusqu'à l'envoi.
-    guardSuspended.current = true;
-    const markExpired = () => {
-      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-      setFinished({ reason: 'expired', at: new Date().toISOString() });
+    if (secondsLeft !== 0 || submittedAt || locked || ending.current) return;
+    let cancelled = false;
+    (async () => {
+      const pulse = navigator.onLine ? await checkPulse() : null;
+      if (cancelled || ending.current) return;
+      if (pulse?.status === 'running' && !pulse.frozen && pulse.seconds_left > 0) return;
+      finish('expired');
+    })();
+    return () => {
+      cancelled = true;
     };
-    if (navigator.onLine) {
-      flush().then((complete) => {
-        if (complete) {
-          clearDrafts(evaluationId, data.exercises.map((item) => item.id));
-          clearFinalSnapshot(evaluationId);
-        }
-        markExpired();
-      });
-    } else {
-      queueMicrotask(markExpired);
-    }
-  }, [secondsLeft, submittedAt, locked, flush, evaluationId, data.exercises, codeOf]);
+  }, [secondsLeft, submittedAt, locked, checkPulse, finish]);
 
   const onChange = useCallback(
     (value) => {
       if (!current) return;
+      editsRef.current = { ...editsRef.current, [current]: value };
       setEdits((prev) => ({ ...prev, [current]: value }));
       dirty.current.add(current);
       setHasPending(true);
-      // Aucune requête à la frappe : le brouillon reste sur le poste.
+      // Aucune requête à la frappe : le brouillon est écrit sur le poste, l'envoi
+      // au serveur suit en arrière-plan.
       clearTimeout(localTimer.current);
       localTimer.current = setTimeout(() => {
         writeDraft(evaluationId, current, value);
@@ -575,24 +732,31 @@ function Exam({ evaluationId, data }) {
     };
     const complete = await flush();
     if (!complete) {
-      // Le brouillon local reste en place : rien n'est effacé tant que le serveur n'a pas reçu.
+      // Refus du serveur : l'épreuve a été close entre-temps, le pouls l'affiche.
       resumeGuard();
-      setError("L'envoi de votre travail a échoué : vérifiez la connexion avant de soumettre.");
+      const pulse = await checkPulse();
+      if (pulse && pulse.status !== 'running') return;
+      // Le brouillon local reste en place : rien n'est effacé tant que le serveur n'a pas reçu.
+      setError(
+        "L'envoi de votre travail a échoué : vérifiez la connexion avant de soumettre. " +
+          'Votre travail reste enregistré sur ce poste.',
+      );
       return;
     }
     try {
       const res = await api(`/api/me/evaluations/${evaluationId}/submit`, { method: 'POST' });
       clearDrafts(evaluationId, data.exercises.map((item) => item.id));
+      ending.current = true;
       setSubmittedAt(res.submitted_at);
       setFinished({ reason: 'submitted', at: res.submitted_at });
       leaveFullscreen();
     } catch (err) {
+      resumeGuard();
       if (err.status === 409) {
-        setFinished({ reason: 'submitted', at: new Date().toISOString() });
-        leaveFullscreen();
+        // Session close pendant la soumission : le travail vient d'être transmis.
+        await checkPulse();
         return;
       }
-      resumeGuard();
       setError(err.message);
     }
   }
@@ -618,16 +782,17 @@ function Exam({ evaluationId, data }) {
             <div className="exam-done-mark" aria-hidden="true">
               ✓
             </div>
-            <h1>
-              {finished.reason === 'expired' ? 'Temps écoulé' : 'Travail soumis'}
-            </h1>
-            <p>
-              {finished.reason === 'expired'
-                ? online
-                  ? "Le temps imparti est écoulé. Votre travail a été enregistré et transmis ; il ne peut plus être modifié."
-                  : "Le temps imparti est écoulé. Votre travail a été sauvegardé localement et sera transmis automatiquement dès le retour de la connexion. Ne fermez pas cette page."
-                : 'Votre copie a été transmise à votre enseignant. Elle ne peut plus être modifiée.'}
-            </p>
+            <h1>{FINISHED_TITLES[finished.reason] ?? 'Épreuve terminée'}</h1>
+            <p>{FINISHED_LEADS[finished.reason]}</p>
+            {finished.reason !== 'submitted' && (
+              <DeliveryNotice
+                sending={sending}
+                pending={hasPending}
+                refused={refused}
+                online={online}
+                onRetry={syncPending}
+              />
+            )}
             <dl className="exam-done-facts">
               <div>
                 <dt>Épreuve</dt>
@@ -640,7 +805,7 @@ function Exam({ evaluationId, data }) {
                 </dd>
               </div>
               <div>
-                <dt>{finished.reason === 'expired' ? 'Clôture' : 'Soumission'}</dt>
+                <dt>{finished.reason === 'submitted' ? 'Soumission' : 'Clôture'}</dt>
                 <dd>{formatDateTime(finished.at)}</dd>
               </div>
             </dl>
@@ -803,7 +968,13 @@ function Exam({ evaluationId, data }) {
                         : 'Aucune modification'}
                   </span>
                   <span>
-                    {sentAt ? `Transmis au serveur · ${formatRelative(sentAt)}` : 'Envoi à la soumission uniquement'}
+                    {hasPending
+                      ? 'Modifications en attente d’envoi'
+                      : sentAt
+                        ? `Transmis au serveur · ${formatRelative(sentAt)}`
+                        : data.saved_exercise_ids.length
+                          ? 'Travail déjà transmis au serveur'
+                          : 'Rien à transmettre pour l’instant'}
                   </span>
                 </div>
               </div>
@@ -813,7 +984,8 @@ function Exam({ evaluationId, data }) {
       </div>
 
       <footer className="exam-footer">
-        Votre travail est enregistré localement. Il sera transmis au serveur à la soumission ou à la fin du temps.
+        Votre travail est enregistré sur ce poste et transmis automatiquement au serveur, même si
+        vous ne soumettez pas avant la fin du temps.
         {blockPaste && ' Le copier-coller est désactivé.'}
       </footer>
 
@@ -826,14 +998,13 @@ function Exam({ evaluationId, data }) {
               {incidents > 1 ? ' ont' : ' a'} été détectée{incidents > 1 ? 's' : ''}. Votre copie a
               été figée et l'incident transmis à l'enseignant.
             </p>
-            {hasPending ? (
-              <p style={{ color: 'var(--exam-timer)' }}>
-                Une partie de votre travail n'a pas pu être envoyée. Elle reste enregistrée sur ce
-                poste : signalez-le à votre enseignant sans effacer les données du navigateur.
-              </p>
-            ) : (
-              <p>Votre dernier état de travail a bien été transmis au serveur.</p>
-            )}
+            <DeliveryNotice
+              sending={sending}
+              pending={hasPending}
+              refused={refused}
+              online={online}
+              onRetry={syncPending}
+            />
             <Button onClick={() => navigate('/mes-evaluations', { replace: true })}>
               Retour à mes évaluations
             </Button>
@@ -911,6 +1082,52 @@ function Exam({ evaluationId, data }) {
   );
 }
 
+const FINISHED_TITLES = {
+  submitted: 'Travail soumis',
+  expired: 'Temps écoulé',
+  closed: 'Épreuve close',
+  cancelled: 'Épreuve annulée',
+};
+
+const FINISHED_LEADS = {
+  submitted: 'Votre copie a été transmise à votre enseignant. Elle ne peut plus être modifiée.',
+  expired: 'Le temps imparti est écoulé : votre copie ne peut plus être modifiée.',
+  closed: "Votre enseignant a clos l'épreuve : votre copie ne peut plus être modifiée.",
+  cancelled: "Votre enseignant a annulé l'épreuve : elle ne compte pas dans vos résultats.",
+};
+
+/**
+ * Où en est l'envoi du dernier état de la copie. L'apprenant qui n'a pas
+ * soumis doit savoir, sans ambiguïté, si son travail est arrivé au serveur.
+ */
+function DeliveryNotice({ sending, pending, refused, online, onRetry }) {
+  if (refused) {
+    return (
+      <p style={{ color: 'var(--exam-timer)' }} role="alert">
+        Une partie de votre travail n'a pas pu être transmise avant la fermeture de l'épreuve. Elle
+        reste enregistrée sur ce poste : prévenez votre enseignant, sans effacer les données du
+        navigateur.
+      </p>
+    );
+  }
+  if (sending) return <p aria-live="polite">Envoi de votre travail au serveur…</p>;
+  if (pending) {
+    return (
+      <div role="alert">
+        <p style={{ color: 'var(--exam-timer)' }}>
+          {online
+            ? "Votre travail n'est pas encore arrivé au serveur : nouvel essai automatique dans quelques secondes."
+            : 'Connexion perdue : votre travail est gardé sur ce poste et sera transmis dès le retour du réseau.'}{' '}
+          Ne fermez pas cette page.
+        </p>
+        <Button variant="secondary" onClick={onRetry}>
+          Réessayer maintenant
+        </Button>
+      </div>
+    );
+  }
+  return <p>Votre travail a bien été transmis au serveur.</p>;
+}
 
 /**
  * La feuille de composition, à gauche de l'écran : le sujet tel qu'il est

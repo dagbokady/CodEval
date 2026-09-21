@@ -5,7 +5,7 @@ import { Loading } from './ui';
 export function Protected({ roles, children }) {
   const { status, user } = useAuth();
   const location = useLocation();
-  if (status === 'loading') return <Loading label="Vérification de la session…" />;
+  if (status === 'loading') return <Loading variant="screen" label="Vérification de la session…" />;
   if (status !== 'authenticated') {
     return <Navigate to="/connexion" state={{ from: location }} replace />;
   }
@@ -15,7 +15,7 @@ export function Protected({ roles, children }) {
 
 export function Landing() {
   const { status, user } = useAuth();
-  if (status === 'loading') return <Loading />;
+  if (status === 'loading') return <Loading variant="screen" />;
   return (
     <Navigate to={status === 'authenticated' ? HOME_BY_ROLE[user.role] : '/connexion'} replace />
   );

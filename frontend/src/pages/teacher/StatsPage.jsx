@@ -54,7 +54,7 @@ export default function StatsPage() {
         {evaluations.isPending && <Loading />}
         {!evaluations.isPending && !items.length && (
           <EmptyState title="Aucune évaluation corrigée">
-            Les indicateurs apparaitront des la premiere campagne de correction terminee.
+            Les indicateurs apparaîtront dès la première campagne de correction terminée.
           </EmptyState>
         )}
         {stats && (

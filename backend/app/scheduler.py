@@ -1,4 +1,4 @@
-"""Tâche de fond : lancement automatique des évaluations programmées."""
+"""Tâche de fond : lancement et clôture automatiques des évaluations."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from sqlalchemy import select, text
 
 from .db import SessionLocal, _is_sqlite
 from .models import Evaluation, EvaluationStatus, User, utcnow
-from .services import start_session
+from .services import close_if_expired, start_session
 
 logger = logging.getLogger("codeval.scheduler")
 
@@ -61,6 +61,23 @@ async def _tick() -> int:
                     logger.exception(
                         "Échec du lancement auto de l'évaluation %d", evaluation.id
                     )
+                    db.rollback()
+            # Clôture à l'échéance même si aucun apprenant n'interroge le serveur :
+            # l'enseignant voit l'épreuve terminée et peut lancer la correction.
+            expired = list(
+                db.scalars(
+                    select(Evaluation).where(
+                        Evaluation.status == EvaluationStatus.RUNNING,
+                        Evaluation.ends_at.isnot(None),
+                        Evaluation.ends_at <= now,
+                    )
+                )
+            )
+            for evaluation in expired:
+                try:
+                    close_if_expired(db, evaluation)
+                except Exception:
+                    logger.exception("Échec de la clôture auto de l'évaluation %d", evaluation.id)
                     db.rollback()
         finally:
             _release_advisory_lock(db)

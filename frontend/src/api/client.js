@@ -54,3 +54,25 @@ export async function api(path, { method = 'GET', body, signal, raw = false } = 
   if (res.status === 204) return null;
   return res.json();
 }
+
+/**
+ * Envoi qui survit à la fermeture de la page (`keepalive`). Le navigateur borne
+ * la taille de ces requêtes : au-delà, l'envoi échoue en silence et le
+ * brouillon local prend le relais.
+ */
+export function sendOnLeave(path, { method = 'PUT', body } = {}) {
+  const token = getToken();
+  try {
+    fetch(`${BASE}${path}`, {
+      method,
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    }).catch(() => {});
+  } catch {
+    /* corps trop volumineux pour un envoi de départ */
+  }
+}

@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useClassroomEvaluations } from '../../api/hooks';
+import { useAction, useClassroomEvaluations } from '../../api/hooks';
+import { useAuth } from '../../auth';
+import { formatJoinCode, joinLink } from '../../joinCode';
 import {
   Alert,
   Button,
@@ -25,6 +27,7 @@ import {
 import { summarize } from '../../classroomSummary';
 
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+const expiryFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 
 const EVAL_FILTERS = [
   { value: 'upcoming', label: 'À venir' },
@@ -40,6 +43,8 @@ const EVAL_FILTERS = [
 export default function ClassDetailPage() {
   const { classroomId } = useParams();
   const navigate = useNavigate();
+  const { organizationKind } = useAuth();
+  const personal = organizationKind === 'personal';
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('onglet');
   const tab = ['apprenants', 'evaluations'].includes(requested) ? requested : 'apercu';
@@ -58,7 +63,7 @@ export default function ClassDetailPage() {
   });
   const evaluations = useClassroomEvaluations(classroomId);
 
-  if (classroom.isPending) return <Loading />;
+  if (classroom.isPending) return <Loading variant="page" />;
   if (classroom.error) {
     return (
       <div className="content">
@@ -116,9 +121,11 @@ export default function ClassDetailPage() {
 
         {tab === 'apprenants' && (
           <StudentsTab
+            classroom={cls}
             students={studentList}
             pending={students.isPending}
             error={students.error}
+            canRemove={personal}
           />
         )}
 
@@ -234,13 +241,17 @@ function Overview({
         </div>
 
         <aside className="classe-aside">
+          <JoinCodePanel classroom={classroom} />
           <header className="section-head">
             <h2 className="section-title">Apprenants</h2>
             <span className="section-count">{classroom.students_count}</span>
           </header>
           {studentsPending && <Loading />}
           {!studentsPending && students.length === 0 && (
-            <p className="sub classe-vide">Aucun apprenant inscrit.</p>
+            <EmptyState compact title="Aucun apprenant inscrit">
+              Donnez le code d'accès à vos apprenants : ils s'inscrivent eux-mêmes dans la
+              classe.
+            </EmptyState>
           )}
           <ul className="classe-roster">
             {roster.map((student) => (
@@ -317,8 +328,108 @@ function EvaluationList({ items, showRate = false }) {
   );
 }
 
-function StudentsTab({ students, pending, error }) {
+/**
+ * Le code que l'enseignant donne à sa classe. Il ne sert qu'à entrer : le
+ * changer ou le fermer laisse les apprenants déjà inscrits à leur place.
+ */
+function JoinCodePanel({ classroom }) {
+  const [error, setError] = useState(null);
+  const [copied, setCopied] = useState(null);
+  const invalidate = [['classroom', String(classroom.id)]];
+  const open = useAction(
+    () => api(`/api/classrooms/${classroom.id}/join-code`, { method: 'POST', body: {} }),
+    invalidate,
+  );
+  const close = useAction(
+    () => api(`/api/classrooms/${classroom.id}/join-code`, { method: 'DELETE' }),
+    invalidate,
+  );
+  const busy = open.isPending || close.isPending;
+  const code = classroom.join_code;
+
+  async function run(action) {
+    setError(null);
+    setCopied(null);
+    try {
+      await action.mutateAsync();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function copy(what, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(what);
+    } catch {
+      setError('Copie impossible : sélectionnez le texte à la main.');
+    }
+  }
+
+  return (
+    <section className="join-code-panel">
+      <header className="section-head">
+        <h2 className="section-title">Code d'accès</h2>
+      </header>
+      <Alert>{error}</Alert>
+      {code ? (
+        <>
+          <span className="join-code-value">{formatJoinCode(code)}</span>
+          <span className="sub">
+            {classroom.join_code_expires_at
+              ? `Valable jusqu'au ${expiryFmt.format(new Date(classroom.join_code_expires_at))}`
+              : 'Valable jusqu’à ce que vous le fermiez'}
+            {' · '}à saisir sur {location.host}/rejoindre
+          </span>
+          <div className="join-code-actions">
+            <Button size="small" onClick={() => copy('code', formatJoinCode(code))}>
+              {copied === 'code' ? 'Code copié' : 'Copier le code'}
+            </Button>
+            <Button size="small" variant="secondary" onClick={() => copy('lien', joinLink(code))}>
+              {copied === 'lien' ? 'Lien copié' : 'Copier le lien'}
+            </Button>
+            <Button size="small" variant="secondary" disabled={busy} onClick={() => run(open)}>
+              Changer le code
+            </Button>
+            <Button size="small" variant="secondary" disabled={busy} onClick={() => run(close)}>
+              Fermer
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="sub">
+            Aucun code ouvert : personne ne peut rejoindre la classe par soi-même.
+          </p>
+          <div className="join-code-actions">
+            <Button size="small" disabled={busy} onClick={() => run(open)}>
+              Créer un code d'accès
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function StudentsTab({ classroom, students, pending, error, canRemove }) {
   const [search, setSearch] = useState('');
+  const [removeError, setRemoveError] = useState(null);
+  const remove = useAction(
+    (studentId) =>
+      api(`/api/classrooms/${classroom.id}/students/${studentId}`, { method: 'DELETE' }),
+    [['classroom-students', String(classroom.id)], ['classroom', String(classroom.id)]],
+  );
+
+  async function removeStudent(student) {
+    if (!window.confirm(`Retirer ${student.full_name} de la classe ${classroom.name} ?`)) return;
+    setRemoveError(null);
+    try {
+      await remove.mutateAsync(student.id);
+    } catch (err) {
+      setRemoveError(err.message);
+    }
+  }
   const query = search.trim().toLowerCase();
   const shown = query
     ? students.filter((s) =>
@@ -343,7 +454,9 @@ function StudentsTab({ students, pending, error }) {
         )}
       </header>
 
+      <JoinCodePanel classroom={classroom} />
       {error && <Alert>{error.message}</Alert>}
+      <Alert>{removeError}</Alert>
       {pending && <Loading />}
 
       {!pending && students.length === 0 && (
@@ -362,6 +475,7 @@ function StudentsTab({ students, pending, error }) {
                 <th>Matricule</th>
                 <th>E-mail</th>
                 <th>Compte</th>
+                {canRemove && <th aria-label="Actions" />}
               </tr>
             </thead>
             <tbody>
@@ -377,6 +491,18 @@ function StudentsTab({ students, pending, error }) {
                       {student.is_active ? 'Actif' : 'Désactivé'}
                     </Status>
                   </td>
+                  {canRemove && (
+                    <td className="actions">
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={remove.isPending}
+                        onClick={() => removeStudent(student)}
+                      >
+                        Retirer
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

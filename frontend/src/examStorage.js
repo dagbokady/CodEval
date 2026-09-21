@@ -1,12 +1,14 @@
 /**
  * Brouillons d'épreuve conservés sur le poste de l'apprenant.
  *
- * La frappe n'écrit que dans le navigateur : aucune requête réseau tant que le
- * travail n'est pas envoyé. Le serveur ne reçoit la production qu'à la
- * soumission, à l'expiration du temps, ou lorsque la page est quittée.
+ * La frappe écrit d'abord dans le navigateur ; le travail part ensuite au
+ * serveur en arrière-plan, à intervalles réguliers, puis à la soumission, à la
+ * clôture et au départ de la page. Un brouillon garde la trace de son envoi :
+ * s'il n'a pas été transmis, il sera renvoyé à la prochaine occasion.
  */
 
-const key = (evaluationId, exerciseId) => `codeval.exam.${evaluationId}.${exerciseId}`;
+const prefix = (evaluationId) => `codeval.exam.${evaluationId}.`;
+const key = (evaluationId, exerciseId) => `${prefix(evaluationId)}${exerciseId}`;
 
 function readDraft(evaluationId, exerciseId) {
   try {
@@ -21,12 +23,41 @@ export function writeDraft(evaluationId, exerciseId, code) {
   try {
     localStorage.setItem(
       key(evaluationId, exerciseId),
-      JSON.stringify({ code, at: new Date().toISOString() }),
+      JSON.stringify({ code, at: new Date().toISOString(), synced: false }),
     );
     return true;
   } catch {
     return false; // navigation privée ou quota atteint : on continue en mémoire
   }
+}
+
+/** Le serveur a reçu ce code : le brouillon n'est plus « en attente d'envoi ». */
+export function markSynced(evaluationId, exerciseId, code) {
+  const draft = readDraft(evaluationId, exerciseId);
+  if (!draft || draft.code !== code) return;
+  try {
+    localStorage.setItem(key(evaluationId, exerciseId), JSON.stringify({ ...draft, synced: true }));
+  } catch {
+    /* rien à faire */
+  }
+}
+
+/** Brouillons restés sur le poste sans avoir été transmis au serveur. */
+export function unsentDrafts(evaluationId) {
+  const found = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const name = localStorage.key(i);
+      if (!name?.startsWith(prefix(evaluationId))) continue;
+      const exerciseId = name.slice(prefix(evaluationId).length);
+      if (!/^\d+$/.test(exerciseId)) continue;
+      const draft = readDraft(evaluationId, exerciseId);
+      if (draft && draft.synced === false) found.push({ exerciseId: Number(exerciseId), code: draft.code });
+    }
+  } catch {
+    /* stockage indisponible */
+  }
+  return found;
 }
 
 export function clearDrafts(evaluationId, exerciseIds) {
@@ -72,27 +103,4 @@ export function readOfflineIncidents(evaluationId) {
 
 export function clearOfflineIncidents(evaluationId) {
   try { localStorage.removeItem(incidentsKey(evaluationId)); } catch { /* */ }
-}
-
-// ── Snapshot final (timer expiré hors ligne) ──────────────────────────
-const snapshotKey = (evaluationId) => `codeval.exam.${evaluationId}.finalSnapshot`;
-
-export function writeFinalSnapshot(evaluationId, editsMap) {
-  try {
-    localStorage.setItem(
-      snapshotKey(evaluationId),
-      JSON.stringify({ edits: editsMap, at: new Date().toISOString() }),
-    );
-  } catch { /* */ }
-}
-
-export function readFinalSnapshot(evaluationId) {
-  try {
-    const raw = localStorage.getItem(snapshotKey(evaluationId));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
-export function clearFinalSnapshot(evaluationId) {
-  try { localStorage.removeItem(snapshotKey(evaluationId)); } catch { /* */ }
 }

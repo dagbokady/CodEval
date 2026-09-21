@@ -54,7 +54,7 @@ export default function AuditPage() {
         {audit.isPending ? (
           <Loading />
         ) : items.length === 0 ? (
-          <EmptyState title="Aucune opération">Rien n'a encore été journalisé pour ce type.</EmptyState>
+          <EmptyState variant={category ? 'search' : 'empty'} title="Aucune opération">Rien n'a encore été journalisé pour ce type.</EmptyState>
         ) : (
           <>
             <div className="table-wrap">

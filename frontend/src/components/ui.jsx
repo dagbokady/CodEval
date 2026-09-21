@@ -40,9 +40,10 @@ export function Status({ tone = 'neutral', children, className, ...props }) {
 
 /**
  * Menu d'actions secondaires d'une ligne : « ⋯ », puis la liste. Se ferme au
- * clic extérieur, à Échap et après un choix.
+ * clic extérieur, à Échap et après un choix. Avec `trigger`, le déclencheur est
+ * un bouton secondaire qui porte ce libellé (« Exporter ▾ »).
  */
-export function Menu({ label = 'Plus d’actions', items }) {
+export function Menu({ label = 'Plus d’actions', items, trigger }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -66,9 +67,9 @@ export function Menu({ label = 'Plus d’actions', items }) {
     <div className="menu" ref={ref}>
       <button
         type="button"
-        className="icon-btn"
-        aria-label={label}
-        title={label}
+        className={trigger ? 'btn secondary menu-trigger' : 'icon-btn'}
+        aria-label={trigger ? undefined : label}
+        title={trigger ? undefined : label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={(event) => {
@@ -76,11 +77,20 @@ export function Menu({ label = 'Plus d’actions', items }) {
           setOpen((value) => !value);
         }}
       >
-        <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
-          <circle cx="3.5" cy="8" r="1.25" />
-          <circle cx="8" cy="8" r="1.25" />
-          <circle cx="12.5" cy="8" r="1.25" />
-        </svg>
+        {trigger ? (
+          <>
+            {trigger}
+            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <path d="M4 6l4 4 4-4" />
+            </svg>
+          </>
+        ) : (
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+            <circle cx="3.5" cy="8" r="1.25" />
+            <circle cx="8" cy="8" r="1.25" />
+            <circle cx="12.5" cy="8" r="1.25" />
+          </svg>
+        )}
       </button>
       {open && (
         <div className="menu-list" role="menu">
@@ -172,18 +182,140 @@ export function Alert({ tone = 'error', children }) {
   );
 }
 
-export function Loading({ label = 'Chargement…' }) {
+// Largeurs des lignes fantômes : variées, pour qu'on lise une liste et non un bloc.
+const SKELETON_ROWS = [
+  ['46%', '28%', 72],
+  ['38%', '22%', 56],
+  ['52%', '31%', 64],
+  ['34%', '19%', 48],
+  ['44%', '26%', 60],
+];
+
+function SkeletonList({ rows = 5 }) {
   return (
-    <div className="loading" role="status">
-      <span className="spinner" aria-hidden="true" />
-      {label}
+    <div className="loading-list" aria-hidden="true">
+      {SKELETON_ROWS.slice(0, rows).map(([title, sub, side]) => (
+        <div className="loading-row" key={title + sub}>
+          <div className="loading-row-text">
+            <Skeleton width={title} height={12} />
+            <Skeleton width={sub} height={10} />
+          </div>
+          <Skeleton width={side} height={20} />
+        </div>
+      ))}
     </div>
   );
 }
 
-export function EmptyState({ title, children, action }) {
+/**
+ * État de chargement, à la forme de ce qui arrive : la page ne saute pas à
+ * l'arrivée des données.
+ * - `list` (défaut) : lignes fantômes, à la place d'un tableau ou d'une liste ;
+ * - `page` : en-tête, chiffres clés et liste, quand toute la page attend ;
+ * - `inline` : roue et libellé, dans une boîte de dialogue ou un petit bloc ;
+ * - `screen` : plein écran, hors de la coquille (session, épreuve).
+ * Le libellé est lu par les lecteurs d'écran ; il n'est visible qu'en `inline`
+ * et `screen`. L'état n'apparaît qu'après un court délai : un chargement
+ * instantané ne fait pas clignoter la page.
+ */
+export function Loading({ label = 'Chargement…', variant = 'list' }) {
+  if (variant === 'inline') {
+    return (
+      <div className="loading" role="status">
+        <span className="spinner" aria-hidden="true" />
+        {label}
+      </div>
+    );
+  }
+  if (variant === 'screen') {
+    return (
+      <div className="loading-screen" role="status">
+        <span className="loading-screen-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span className="loading-screen-label">{label}</span>
+        <span className="loading-bar" aria-hidden="true" />
+      </div>
+    );
+  }
+  if (variant === 'page') {
+    return (
+      <div className="loading-page" role="status">
+        <span className="visually-hidden">{label}</span>
+        <div className="loading-page-head" aria-hidden="true">
+          <Skeleton width={120} height={11} />
+          <Skeleton width={260} height={22} />
+        </div>
+        <div className="loading-page-stats" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div className="loading-stat" key={i}>
+              <Skeleton width="45%" height={10} />
+              <Skeleton width="30%" height={22} />
+            </div>
+          ))}
+        </div>
+        <SkeletonList />
+      </div>
+    );
+  }
   return (
-    <div className="empty">
+    <div className="loading-block" role="status">
+      <span className="visually-hidden">{label}</span>
+      <SkeletonList />
+    </div>
+  );
+}
+
+const EMPTY_ICONS = {
+  // Bac vide : rien n'a encore été créé.
+  empty: (
+    <>
+      <path d="M4 14l2.6-6.2A1.5 1.5 0 018 7h12a1.5 1.5 0 011.4.8L24 14" />
+      <path d="M4 14v6.5A1.5 1.5 0 005.5 22h17a1.5 1.5 0 001.5-1.5V14h-6l-1.5 2.5h-5L10 14H4z" />
+    </>
+  ),
+  // Loupe : des éléments existent, les filtres les écartent tous.
+  search: (
+    <>
+      <circle cx="12.5" cy="12.5" r="6.5" />
+      <path d="M17.5 17.5L23 23M10 12.5h5" />
+    </>
+  ),
+  // Coche : la liste est vide parce que tout est fait.
+  done: (
+    <>
+      <circle cx="14" cy="14" r="9.5" />
+      <path d="M9.5 14.2l3 3 6-6.4" />
+    </>
+  ),
+  // Page barrée : l'élément demandé n'existe pas ou plus.
+  missing: (
+    <>
+      <path d="M8 4h8l5 5v13.5A1.5 1.5 0 0119.5 24h-11A1.5 1.5 0 017 22.5v-17A1.5 1.5 0 018.5 4z" />
+      <path d="M16 4v5h5M11.5 14.5l5 5M16.5 14.5l-5 5" />
+    </>
+  ),
+};
+
+/**
+ * Liste ou page sans contenu : dire pourquoi, et quoi faire.
+ * `variant` choisit le pictogramme : `empty` (rien encore), `search` (filtres
+ * trop stricts), `done` (tout est traité), `missing` (introuvable).
+ * `compact` réduit les marges, pour une rubrique ou une boîte de dialogue.
+ */
+export function EmptyState({ title, children, action, variant = 'empty', compact = false }) {
+  return (
+    <div className={`empty ${compact ? 'empty--compact' : ''}`.trim()}>
+      <span className={`empty-icon empty-icon--${variant}`} aria-hidden="true">
+        <svg
+          viewBox="0 0 28 28"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {EMPTY_ICONS[variant] ?? EMPTY_ICONS.empty}
+        </svg>
+      </span>
       <h3>{title}</h3>
       {children && <p>{children}</p>}
       {action && <div className="empty-action">{action}</div>}
@@ -300,13 +432,14 @@ export function Disclosure({ summary, hint, children, defaultOpen = false }) {
   );
 }
 
-export function PageHeader({ breadcrumb, title, children }) {
+export function PageHeader({ breadcrumb, title, meta, children }) {
   useDocumentTitle(title);
   return (
     <header className="page-header">
       <div>
         {breadcrumb && <div className="breadcrumb">{breadcrumb}</div>}
         <h1>{title}</h1>
+        {meta && <div className="page-meta">{meta}</div>}
       </div>
       {children && <div className="header-actions">{children}</div>}
     </header>

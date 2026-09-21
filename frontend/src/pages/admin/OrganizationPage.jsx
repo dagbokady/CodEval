@@ -10,7 +10,7 @@ const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long'
 /** Identité de l'établissement. Le nom apparaît sur chaque page et chaque sujet imprimé. */
 export default function OrganizationPage() {
   const organization = useOrganization();
-  if (organization.isPending) return <Loading />;
+  if (organization.isPending) return <Loading variant="page" />;
   return (
     <>
       <PageHeader breadcrumb={<Link to="/admin">Administration</Link>} title="Établissement" />

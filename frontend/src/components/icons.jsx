@@ -79,6 +79,14 @@ export const IconBook = () => (
   </svg>
 );
 
+export const IconCommunity = () => (
+  <svg {...base}>
+    <circle cx="6" cy="6" r="2.5" />
+    <circle cx="12" cy="7" r="2" />
+    <path d="M1.5 14.5a4.5 4.5 0 019 0M10 11.2a3.5 3.5 0 015.5 3.3" />
+  </svg>
+);
+
 export const IconBell = () => (
   <svg {...base}>
     <path d="M4 6.5a4.5 4.5 0 019 0c0 5 2 6.5 2 6.5H2s2-1.5 2-6.5" />
@@ -109,5 +117,42 @@ export const IconAuto = () => (
   <svg {...base}>
     <circle cx="8.5" cy="8.5" r="6.5" />
     <path d="M8.5 2v13a6.5 6.5 0 000-13z" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+export const IconSearch = () => (
+  <svg {...base}>
+    <circle cx="7.5" cy="7.5" r="5" />
+    <path d="M11.2 11.2L15 15" />
+  </svg>
+);
+
+/** Un sujet complet : plusieurs feuilles. */
+export const IconSheets = () => (
+  <svg {...base}>
+    <rect x="4.5" y="1.5" width="10" height="12" rx="1.5" />
+    <path d="M2.5 4.5v9a2 2 0 002 2h7" />
+    <path d="M7.5 5.5h4M7.5 8.5h4" />
+  </svg>
+);
+
+/** Un exercice seul : une feuille. */
+export const IconSheet = () => (
+  <svg {...base}>
+    <rect x="3" y="1.5" width="11" height="14" rx="1.5" />
+    <path d="M6 5.5h5M6 8.5h5M6 11.5h3" />
+  </svg>
+);
+
+export const IconReuse = () => (
+  <svg {...base}>
+    <path d="M13.5 6.5A5.5 5.5 0 003.4 5M3.5 10.5A5.5 5.5 0 0013.6 12" />
+    <path d="M3 2v3.2h3.2M14 15v-3.2h-3.2" />
+  </svg>
+);
+
+export const IconCheck = () => (
+  <svg {...base}>
+    <path d="M3.5 9l3.2 3.2L13.5 5" />
   </svg>
 );

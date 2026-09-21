@@ -14,6 +14,7 @@ import {
   IconClasses,
   IconClock,
   IconCode,
+  IconCommunity,
   IconEvaluations,
   IconHome,
   IconPlus,
@@ -78,6 +79,7 @@ const TEACHER_NAV = [
       { to: '/classes', label: 'Mes classes', icon: <IconClasses /> },
       { to: '/banque', label: "Banque d'exercices", icon: <IconCode />, end: true },
       { to: '/banque/evaluations', label: "Banque d'évaluations", icon: <IconBook /> },
+      { to: '/communaute', label: 'Communauté', icon: <IconCommunity /> },
     ],
   },
   {
@@ -108,6 +110,7 @@ const ADMIN_NAV = [
     items: [
       { to: '/admin/evaluations', label: 'Évaluations', icon: <IconEvaluations /> },
       { to: '/admin/journal', label: "Journal d'activité", icon: <IconClock /> },
+      { to: '/communaute', label: 'Communauté', icon: <IconCommunity /> },
     ],
   },
 ];

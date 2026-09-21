@@ -44,7 +44,7 @@ export default function SessionMonitorPage() {
     [['evaluation', evaluationId], ['session', evaluationId], ['evaluations']],
   );
 
-  if (evaluation.isPending || monitor.isPending) return <Loading />;
+  if (evaluation.isPending || monitor.isPending) return <Loading variant="page" />;
   if (evaluation.error) return <div className="content"><Alert>{evaluation.error.message}</Alert></div>;
 
   const data = monitor.data;

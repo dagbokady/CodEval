@@ -9,7 +9,7 @@ import {
   useLanguages,
   useSubjects,
 } from '../../api/hooks';
-import { Alert, Button, Field, Loading, PageHeader, Tag } from '../../components/ui';
+import { Alert, Button, EmptyState, Field, Loading, PageHeader, Tag } from '../../components/ui';
 import { SubjectSheet } from '../../components/SubjectSheet';
 import { useAuth } from '../../auth';
 import { DEFAULT_ELEMENTS } from '../../algoVocabulary';
@@ -172,7 +172,7 @@ export default function EvaluationEditorPage() {
   const { evaluationId } = useParams();
   const evaluation = useEvaluation(evaluationId);
 
-  if (evaluationId && evaluation.isPending) return <Loading />;
+  if (evaluationId && evaluation.isPending) return <Loading variant="page" />;
   if (evaluation.error) {
     return (
       <div className="content">
@@ -1378,11 +1378,17 @@ function BankPicker({ language, onPick }) {
       </div>
       {bank.isPending && <Loading />}
       {bank.data?.items.length === 0 && (
-        <p className="sub">
-          {langFilter
-            ? `Aucun exercice ${langFilter.toUpperCase()} disponible dans la banque.`
-            : "Aucun exercice disponible dans la banque."}
-        </p>
+        <EmptyState
+          compact
+          variant={search || langFilter ? 'search' : 'empty'}
+          title="Aucun exercice disponible"
+        >
+          {search
+            ? 'Aucun exercice de la banque ne correspond à cette recherche.'
+            : langFilter
+              ? `La banque ne contient aucun exercice ${langFilter.toUpperCase()}.`
+              : 'La banque est vide : enregistrez-y un exercice depuis cet éditeur.'}
+        </EmptyState>
       )}
       <div style={{ display: 'grid', gap: 8 }}>
         {(bank.data?.items ?? []).map((item) => (

@@ -587,9 +587,18 @@ export default function BankPage() {
         <>
         {bank.isPending && <Loading />}
         {bank.data?.items.length === 0 && (
-          <EmptyState title="Aucun exercice dans la banque">
-            Créez un exercice réutilisable, ou enregistrez-en un depuis l'éditeur d'évaluation.
-          </EmptyState>
+          search || scope ? (
+            <EmptyState variant="search" title="Aucun résultat">
+              Aucun exercice ne correspond à cette recherche.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              title="Aucun exercice dans la banque"
+              action={<Button onClick={startCreation}>Créer un exercice</Button>}
+            >
+              Créez un exercice réutilisable, ou enregistrez-en un depuis l'éditeur d'évaluation.
+            </EmptyState>
+          )
         )}
 
         {bank.data?.items.length > 0 && (

@@ -165,7 +165,7 @@ export default function SubmissionDetailPage() {
     ],
   );
 
-  if (detail.isPending) return <Loading />;
+  if (detail.isPending) return <Loading variant="page" />;
   if (detail.error)
     return (
       <div className="content">

@@ -147,7 +147,8 @@ export default function UsersPage() {
           <Loading />
         ) : items.length === 0 ? (
           <EmptyState
-            title="Aucun compte"
+            variant={debounced || role || activeParam || withoutClass ? 'search' : 'empty'}
+            title={debounced || role || activeParam || withoutClass ? 'Aucun résultat' : 'Aucun compte'}
             action={<Button onClick={() => setEditing({ role: role ?? 'student' })}>Créer un compte</Button>}
           >
             {debounced || role || activeParam || withoutClass

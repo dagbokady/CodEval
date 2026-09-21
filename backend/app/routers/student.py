@@ -382,11 +382,16 @@ def autosave(
     close_if_expired(db, evaluation)
     if participation.submitted_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Travail déjà soumis")
+    late = None
     if participation.frozen_at is not None:
         # L'envoi final part au moment où la session se ferme : on l'accepte
-        # pendant une courte fenêtre pour ne pas perdre le travail de l'apprenant.
+        # pendant une courte fenêtre pour ne pas perdre le travail de l'apprenant,
+        # mais jamais une fois la correction lancée sur les copies figées.
         late = (utcnow() - participation.frozen_at).total_seconds()
-        if late > settings.autosave_grace_seconds:
+        if (
+            late > settings.autosave_grace_seconds
+            or evaluation.status not in (EvaluationStatus.RUNNING, EvaluationStatus.CLOSED)
+        ):
             raise HTTPException(status.HTTP_409_CONFLICT, "Épreuve close : production figée")
     elif evaluation.status is not EvaluationStatus.RUNNING:
         raise HTTPException(status.HTTP_409_CONFLICT, "Épreuve close : production figée")
@@ -418,6 +423,11 @@ def autosave(
         submission.updated_at = now
         participation.last_saved_at = now
         participation.last_seen_at = now
+        if late is not None:
+            # Trace de l'envoi reçu après la clôture : l'enseignant peut vérifier.
+            log(db, user, user.organization_id, "submission.late_save", "participation",
+                participation.id, evaluation_id=evaluation_id, exercise_id=exercise_id,
+                seconds_after_close=int(late))
         db.commit()
         return submission
 
@@ -428,13 +438,47 @@ def autosave(
         result = _upsert()
 
     if isinstance(result, dict):
-        return result
+        return {**result, "closed": late is not None}
     submission = result
     return {
         "version": submission.version,
         "saved_at": submission.updated_at,
         "stale": False,
         "seconds_left": seconds_left(evaluation),
+        # Production figée (fin du temps, clôture, verrouillage) : cet envoi est
+        # accepté, mais le client doit cesser de composer.
+        "closed": late is not None,
+    }
+
+
+@router.get("/evaluations/{evaluation_id}/status")
+def exam_status(evaluation_id: int, user: StudentUser, db: DbSession) -> dict:
+    """Pouls de l'épreuve, interrogé régulièrement par le poste de l'apprenant.
+
+    Il apprend ainsi une prolongation, une clôture anticipée ou un verrouillage
+    sans attendre la fin de son propre décompte, et pousse son travail à temps.
+    """
+    evaluation = db.get(Evaluation, evaluation_id)
+    if evaluation is None or evaluation.organization_id != user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Évaluation introuvable")
+    participation = _participation(db, evaluation_id, user.id)
+    close_if_expired(db, evaluation)
+    if evaluation.status is EvaluationStatus.RUNNING:
+        participation.last_seen_at = utcnow()
+        db.commit()
+    grace = 0
+    if participation.frozen_at is not None and participation.submitted_at is None:
+        grace = max(
+            0,
+            int(settings.autosave_grace_seconds
+                - (utcnow() - participation.frozen_at).total_seconds()),
+        )
+    return {
+        "status": evaluation.status.value,
+        "seconds_left": seconds_left(evaluation),
+        "submitted_at": participation.submitted_at,
+        "frozen": participation.frozen_at is not None,
+        "upload_seconds_left": grace,
     }
 
 

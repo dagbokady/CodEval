@@ -6,6 +6,7 @@ import { Loading } from './components/ui';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const JoinPage = lazy(() => import('./pages/JoinPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
@@ -20,6 +21,7 @@ const ClassesPage = lazy(() => import('./pages/teacher/ClassesPage'));
 const ClassDetailPage = lazy(() => import('./pages/teacher/ClassDetailPage'));
 const BankPage = lazy(() => import('./pages/teacher/BankPage'));
 const BankEvaluationsPage = lazy(() => import('./pages/teacher/BankEvaluationsPage'));
+const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const StatsPage = lazy(() => import('./pages/teacher/StatsPage'));
 
 const StudentHomePage = lazy(() => import('./pages/student/StudentHomePage'));
@@ -36,8 +38,12 @@ const EvaluationsAdminPage = lazy(() => import('./pages/admin/EvaluationsAdminPa
 const AuditPage = lazy(() => import('./pages/admin/AuditPage'));
 const OrganizationPage = lazy(() => import('./pages/admin/OrganizationPage'));
 
-function Lazy({ children }) {
-  return <Suspense fallback={<Loading />}>{children}</Suspense>;
+// Hors de la coquille (connexion, épreuve), l'attente occupe tout l'écran ;
+// dedans, elle prend la forme d'une page.
+function Lazy({ children, screen = false }) {
+  return (
+    <Suspense fallback={<Loading variant={screen ? 'screen' : 'page'} />}>{children}</Suspense>
+  );
 }
 
 const teacher = ['teacher'];
@@ -45,15 +51,17 @@ const admin = ['admin'];
 
 export const router = createBrowserRouter([
   { path: '/', element: <Landing /> },
-  { path: '/connexion', element: <Lazy><LoginPage /></Lazy> },
-  { path: '/inscription', element: <Lazy><RegisterPage /></Lazy> },
-  { path: '/mot-de-passe-oublie', element: <Lazy><ForgotPasswordPage /></Lazy> },
-  { path: '/reset-password', element: <Lazy><ResetPasswordPage /></Lazy> },
+  { path: '/connexion', element: <Lazy screen><LoginPage /></Lazy> },
+  { path: '/inscription', element: <Lazy screen><RegisterPage /></Lazy> },
+  { path: '/rejoindre', element: <Lazy screen><JoinPage /></Lazy> },
+  { path: '/rejoindre/:code', element: <Lazy screen><JoinPage /></Lazy> },
+  { path: '/mot-de-passe-oublie', element: <Lazy screen><ForgotPasswordPage /></Lazy> },
+  { path: '/reset-password', element: <Lazy screen><ResetPasswordPage /></Lazy> },
   {
     path: '/epreuve/:evaluationId',
     element: (
       <Protected roles={['student']}>
-        <Lazy><LazyExamPage /></Lazy>
+        <Lazy screen><LazyExamPage /></Lazy>
       </Protected>
     ),
   },
@@ -86,6 +94,10 @@ export const router = createBrowserRouter([
       { path: '/classes/:classroomId', element: <Protected roles={teacher}><Lazy><ClassDetailPage /></Lazy></Protected> },
       { path: '/banque', element: <Protected roles={teacher}><Lazy><BankPage /></Lazy></Protected> },
       { path: '/banque/evaluations', element: <Protected roles={teacher}><Lazy><BankEvaluationsPage /></Lazy></Protected> },
+      {
+        path: '/communaute',
+        element: <Protected roles={['teacher', 'admin']}><Lazy><CommunityPage /></Lazy></Protected>,
+      },
       { path: '/statistiques', element: <Protected roles={teacher}><Lazy><StatsPage /></Lazy></Protected> },
       { path: '/mes-evaluations', element: <Protected roles={['student']}><Lazy><StudentHomePage /></Lazy></Protected> },
       { path: '/mes-resultats', element: <Protected roles={['student']}><Lazy><StudentResultsPage /></Lazy></Protected> },

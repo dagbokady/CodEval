@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import timedelta
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from .audit import log
+from .config import settings
 from .models import (
     Classroom,
     CorrectionResult,
@@ -55,7 +56,10 @@ def seconds_left(evaluation: Evaluation) -> int:
 def close_if_expired(db: Session, evaluation: Evaluation) -> Evaluation:
     """Clôture automatique à l'expiration du temps imparti (CDC V.4)."""
     if evaluation.status is EvaluationStatus.RUNNING and seconds_left(evaluation) == 0:
-        freeze(db, evaluation, reason="expiration")
+        # La clôture date de l'échéance, pas de la première requête qui la
+        # constate : sans cela, la fenêtre de tolérance de l'envoi final
+        # dépendrait du moment où quelqu'un a interrogé le serveur.
+        freeze(db, evaluation, reason="expiration", at=evaluation.ends_at)
     return evaluation
 
 
@@ -63,14 +67,19 @@ def notify(db: Session, user_id: int, title: str, body: str = "", link: str = ""
     db.add(Notification(user_id=user_id, title=title, body=body, link=link))
 
 
-def freeze(db: Session, evaluation: Evaluation, reason: str) -> None:
-    now = utcnow()
+def freeze(db: Session, evaluation: Evaluation, reason: str, at=None) -> None:
+    now = min(at, utcnow()) if at is not None else utcnow()
     evaluation.status = EvaluationStatus.CLOSED
     evaluation.closed_at = now
+    # Mise à jour ORM : les participations déjà chargées par la requête en cours
+    # voient leur gel. Sans cela, l'envoi final qui constate lui-même la fin du
+    # temps lisait une participation « non figée » sur une épreuve close, et
+    # était refusé : le travail de l'apprenant était perdu.
     db.execute(
-        Participation.__table__.update()
+        update(Participation)
         .where(Participation.evaluation_id == evaluation.id, Participation.frozen_at.is_(None))
         .values(frozen_at=now)
+        .execution_options(synchronize_session="evaluate")
     )
     log(db, None, evaluation.organization_id, "session.closed", "evaluation", evaluation.id,
         reason=reason)
@@ -91,6 +100,27 @@ def freeze(db: Session, evaluation: Evaluation, reason: str) -> None:
         f"/evaluations/{evaluation.id}/resultats",
     )
     db.commit()
+
+
+def final_uploads_pending(db: Session, evaluation: Evaluation) -> int:
+    """Secondes pendant lesquelles un envoi final peut encore arriver.
+
+    À la clôture, le navigateur de chaque apprenant pousse son dernier état.
+    Corriger avant la fin de cette fenêtre noterait une copie incomplète ; si
+    toutes les copies ont été rendues, rien n'est plus attendu.
+    """
+    if evaluation.closed_at is None:
+        return 0
+    left = settings.autosave_grace_seconds - (utcnow() - evaluation.closed_at).total_seconds()
+    if left <= 0:
+        return 0
+    unsubmitted = db.scalar(
+        select(func.count(Participation.id)).where(
+            Participation.evaluation_id == evaluation.id,
+            Participation.submitted_at.is_(None),
+        )
+    ) or 0
+    return int(left) + 1 if unsubmitted else 0
 
 
 def sync_participants(db: Session, evaluation: Evaluation) -> int:
@@ -180,6 +210,13 @@ def launch_correction(db: Session, evaluation: Evaluation, actor: User) -> Corre
     )
     if pending is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Une correction est déjà en cours")
+    wait = final_uploads_pending(db, evaluation)
+    if wait:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"Les derniers envois des étudiants peuvent encore arriver : "
+            f"relancez la correction dans {wait} s",
+        )
     last = latest_run(db, evaluation.id)
     run = CorrectionRun(
         evaluation_id=evaluation.id,

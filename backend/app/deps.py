@@ -42,6 +42,17 @@ def require_roles(*roles: Role):
     return _dep
 
 
+def structure_manager(user: CurrentUser) -> User:
+    """Qui gère classes, matières et inscriptions : l'administration d'un
+    établissement, ou l'enseignant seul dans son espace personnel."""
+    if user.role is Role.ADMIN:
+        return user
+    if user.role is Role.TEACHER and user.organization.is_personal:
+        return user
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès non autorisé pour ce rôle")
+
+
 AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
+StructureManager = Annotated[User, Depends(structure_manager)]
 TeacherUser = Annotated[User, Depends(require_roles(Role.TEACHER))]
 StudentUser = Annotated[User, Depends(require_roles(Role.STUDENT))]

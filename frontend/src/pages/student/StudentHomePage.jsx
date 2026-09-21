@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth';
 import { Alert, Button, Chips, EmptyState, Loading, Tabs, Tag } from '../../components/ui';
@@ -45,6 +45,62 @@ function clean(n) {
 
 function plural(count, word) {
   return `${count} ${word}${count > 1 ? 's' : ''}`;
+}
+
+const dayMonthFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+const dayOnlyFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric' });
+const WEEK_MS = 7 * 86_400_000;
+
+/** Le lundi 0 h de la semaine d'une date. */
+function mondayOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
+}
+
+/** La date qui situe une copie rendue : le début de l'épreuve, sinon le rendu. */
+function doneDate(evaluation) {
+  const v = evaluation.scheduled_start || evaluation.submitted_at;
+  return v ? new Date(v) : null;
+}
+
+/** « Cette semaine », « La semaine dernière », sinon « Semaine du 8 au 14 septembre ». */
+function weekLabel(monday) {
+  const weeks = Math.round((mondayOf(new Date()).getTime() - monday.getTime()) / WEEK_MS);
+  if (weeks === 0) return 'Cette semaine';
+  if (weeks === 1) return 'La semaine dernière';
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  const from = monday.getMonth() === sunday.getMonth() ? dayOnlyFmt.format(monday) : dayMonthFmt.format(monday);
+  const year = monday.getFullYear() !== new Date().getFullYear() ? ` ${sunday.getFullYear()}` : '';
+  return `Semaine du ${from} au ${dayMonthFmt.format(sunday)}${year}`;
+}
+
+/**
+ * Range les copies rendues par semaine, la plus récente d'abord, à la manière du
+ * Finder. Les copies sans date ferment la liste.
+ */
+function groupByWeek(evaluations) {
+  const groups = new Map();
+  const undated = [];
+  for (const evaluation of evaluations) {
+    const date = doneDate(evaluation);
+    if (!date) {
+      undated.push(evaluation);
+      continue;
+    }
+    const key = mondayOf(date).getTime();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(evaluation);
+  }
+  const weeks = [...groups.entries()]
+    .sort(([a], [b]) => b - a)
+    .map(([key, list]) => ({
+      key: String(key),
+      label: weekLabel(new Date(key)),
+      items: list.sort((a, b) => doneDate(b) - doneDate(a)),
+    }));
+  if (undated.length) weeks.push({ key: 'sans-date', label: 'Sans date', items: undated });
+  return weeks;
 }
 
 function startTime(evaluation) {
@@ -322,7 +378,7 @@ export default function StudentHomePage() {
     };
   }, [items]);
 
-  if (evaluations.isPending) return <Loading />;
+  if (evaluations.isPending) return <Loading variant="page" />;
 
   const graded = done.filter((e) => e.published && e.score != null && e.total_points > 0);
   const average = graded.length
@@ -358,13 +414,15 @@ export default function StudentHomePage() {
         </div>
         <h1>Mes évaluations</h1>
         <p className="sub">{lead}</p>
+        <Link className="cd-link" to="/rejoindre">Rejoindre une autre classe avec un code</Link>
       </header>
 
       {evaluations.error && <Alert>{evaluations.error.message}</Alert>}
 
       {items.length === 0 ? (
         <EmptyState title="Aucune évaluation prévue">
-          Vos épreuves apparaîtront ici dès qu'un enseignant vous y aura inscrit.
+          Vos épreuves apparaîtront ici dès qu'un enseignant vous y aura inscrit. Il vous a
+          donné un code ? <Link to="/rejoindre">Rejoignez sa classe</Link>.
         </EmptyState>
       ) : (
         <>
@@ -404,7 +462,7 @@ export default function StudentHomePage() {
 
           {activeTab === 'todo' &&
             (todo === 0 ? (
-              <EmptyState title="Rien à faire pour l'instant">
+              <EmptyState variant="done" title="Rien à faire pour l'instant">
                 Aucune épreuve n'est ouverte ni programmée. Vos copies rendues sont dans l'onglet
                 « Terminées ».
               </EmptyState>
@@ -442,7 +500,7 @@ export default function StudentHomePage() {
                 votre enseignant aura publié les résultats.
               </EmptyState>
             ) : (
-              <section className="stu-section">
+              <>
                 {subjects.length > 1 && (
                   <Chips
                     label="Matière :"
@@ -455,10 +513,18 @@ export default function StudentHomePage() {
                     }))}
                   />
                 )}
-                {shownDone.map((evaluation) => (
-                  <DoneCard key={evaluation.id} evaluation={evaluation} />
+                {groupByWeek(shownDone).map((week) => (
+                  <section key={week.key} className="stu-section">
+                    <h2 className="stu-section-title stu-week-title">
+                      <span>{week.label}</span>
+                      <span className="stu-week-count">{week.items.length}</span>
+                    </h2>
+                    {week.items.map((evaluation) => (
+                      <DoneCard key={evaluation.id} evaluation={evaluation} />
+                    ))}
+                  </section>
                 ))}
-              </section>
+              </>
             ))}
         </>
       )}

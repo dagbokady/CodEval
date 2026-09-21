@@ -50,7 +50,7 @@ export default function StudentCopyPage() {
   // Déplier tous les corrigés d'un geste, pour relire la copie avec eux.
   const [allOpen, setAllOpen] = useState(false);
 
-  if (copy.isPending) return <Loading label="Ouverture de votre copie…" />;
+  if (copy.isPending) return <Loading variant="page" label="Ouverture de votre copie…" />;
   if (copy.error) {
     return (
       <div className="content" style={{ display: 'grid', gap: 12 }}>

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, func, select
 
 from ..audit import log
-from ..deps import AdminUser, CurrentUser, DbSession, TeacherUser
+from ..deps import AdminUser, CurrentUser, DbSession, StructureManager, TeacherUser
 from ..models import (
     AuditLog,
     BankExercise,
@@ -38,12 +38,14 @@ from ..schemas import (
     NamedCreate,
     Page,
     PasswordResetOut,
+    PlanOut,
     SubjectAdminOut,
     SubjectOut,
     UserCreate,
     UserOut,
     UserUpdate,
 )
+from ..plans import check_classroom_quota, limits, usage
 from ..security import hash_password
 
 router = APIRouter(prefix="/api", tags=["établissement"])
@@ -287,26 +289,26 @@ def _subject_name_taken(db, org_id: int, name: str, except_id: int | None = None
 
 
 @router.post("/subjects", response_model=SubjectOut, status_code=status.HTTP_201_CREATED)
-def create_subject(payload: NamedCreate, admin: AdminUser, db: DbSession) -> SubjectOut:
+def create_subject(payload: NamedCreate, manager: StructureManager, db: DbSession) -> SubjectOut:
     name = payload.name.strip()
-    if _subject_name_taken(db, admin.organization_id, name):
+    if _subject_name_taken(db, manager.organization_id, name):
         raise HTTPException(status.HTTP_409_CONFLICT, "Matière déjà existante")
-    subject = Subject(organization_id=admin.organization_id, name=name)
+    subject = Subject(organization_id=manager.organization_id, name=name)
     db.add(subject)
     db.flush()
-    log(db, admin, admin.organization_id, "subject.created", "subject", subject.id, name=name)
+    log(db, manager, manager.organization_id, "subject.created", "subject", subject.id, name=name)
     db.commit()
     db.refresh(subject)
     return SubjectOut.model_validate(subject)
 
 
 @router.patch("/subjects/{subject_id}", response_model=SubjectOut)
-def rename_subject(subject_id: int, payload: NamedCreate, admin: AdminUser, db: DbSession) -> SubjectOut:
-    subject = _get_subject(db, admin, subject_id)
+def rename_subject(subject_id: int, payload: NamedCreate, manager: StructureManager, db: DbSession) -> SubjectOut:
+    subject = _get_subject(db, manager, subject_id)
     name = payload.name.strip()
-    if _subject_name_taken(db, admin.organization_id, name, except_id=subject.id):
+    if _subject_name_taken(db, manager.organization_id, name, except_id=subject.id):
         raise HTTPException(status.HTTP_409_CONFLICT, "Matière déjà existante")
-    log(db, admin, admin.organization_id, "subject.renamed", "subject", subject.id,
+    log(db, manager, manager.organization_id, "subject.renamed", "subject", subject.id,
         previous=subject.name, name=name)
     subject.name = name
     db.commit()
@@ -314,8 +316,8 @@ def rename_subject(subject_id: int, payload: NamedCreate, admin: AdminUser, db: 
 
 
 @router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_subject(subject_id: int, admin: AdminUser, db: DbSession) -> None:
-    subject = _get_subject(db, admin, subject_id)
+def delete_subject(subject_id: int, manager: StructureManager, db: DbSession) -> None:
+    subject = _get_subject(db, manager, subject_id)
     used = db.scalar(select(func.count(Evaluation.id)).where(Evaluation.subject_id == subject.id))
     used = (used or 0) + (
         db.scalar(select(func.count(BankExercise.id)).where(BankExercise.subject_id == subject.id)) or 0
@@ -326,7 +328,7 @@ def delete_subject(subject_id: int, admin: AdminUser, db: DbSession) -> None:
             "Des évaluations ou des exercices utilisent cette matière : elle ne peut pas être supprimée",
         )
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.subject_id == subject.id))
-    log(db, admin, admin.organization_id, "subject.deleted", "subject", subject.id, name=subject.name)
+    log(db, manager, manager.organization_id, "subject.deleted", "subject", subject.id, name=subject.name)
     db.delete(subject)
     db.commit()
 
@@ -390,6 +392,9 @@ def get_classroom(classroom_id: int, user: CurrentUser, db: DbSession) -> Classr
         .where(Evaluation.classroom_id == classroom_id)
         .limit(1)
     ).first()
+    # Le code d'accès reste entre les mains de l'équipe : un étudiant n'a pas
+    # à le lire, encore moins à le faire circuler.
+    staff = user.role is not Role.STUDENT
     return ClassroomDetailOut(
         id=classroom.id,
         name=classroom.name,
@@ -397,6 +402,8 @@ def get_classroom(classroom_id: int, user: CurrentUser, db: DbSession) -> Classr
         students_count=students_count,
         subject_name=subject_row[0] if subject_row else None,
         created_at=classroom.created_at,
+        join_code=classroom.join_code if staff else None,
+        join_code_expires_at=classroom.join_code_expires_at if staff else None,
     )
 
 
@@ -436,13 +443,14 @@ def classroom_evaluations(classroom_id: int, user: CurrentUser, db: DbSession) -
 
 
 @router.post("/classrooms", response_model=ClassroomOut, status_code=status.HTTP_201_CREATED)
-def create_classroom(payload: ClassroomCreate, admin: AdminUser, db: DbSession) -> ClassroomOut:
+def create_classroom(payload: ClassroomCreate, manager: StructureManager, db: DbSession) -> ClassroomOut:
+    check_classroom_quota(db, manager.organization)
     classroom = Classroom(
-        organization_id=admin.organization_id, name=payload.name.strip(), level=payload.level or None
+        organization_id=manager.organization_id, name=payload.name.strip(), level=payload.level or None
     )
     db.add(classroom)
     db.flush()
-    log(db, admin, admin.organization_id, "classroom.created", "classroom", classroom.id,
+    log(db, manager, manager.organization_id, "classroom.created", "classroom", classroom.id,
         name=classroom.name)
     db.commit()
     db.refresh(classroom)
@@ -451,23 +459,23 @@ def create_classroom(payload: ClassroomCreate, admin: AdminUser, db: DbSession) 
 
 @router.patch("/classrooms/{classroom_id}", response_model=ClassroomOut)
 def update_classroom(
-    classroom_id: int, payload: ClassroomUpdate, admin: AdminUser, db: DbSession
+    classroom_id: int, payload: ClassroomUpdate, manager: StructureManager, db: DbSession
 ) -> ClassroomOut:
-    classroom = _get_classroom(db, admin, classroom_id)
+    classroom = _get_classroom(db, manager, classroom_id)
     data = payload.model_dump(exclude_unset=True)
     if data.get("name"):
         classroom.name = data["name"].strip()
     if "level" in data:
         classroom.level = data["level"] or None
-    log(db, admin, admin.organization_id, "classroom.updated", "classroom", classroom.id,
+    log(db, manager, manager.organization_id, "classroom.updated", "classroom", classroom.id,
         fields=list(data))
     db.commit()
     return ClassroomOut(id=classroom.id, name=classroom.name, level=classroom.level)
 
 
 @router.delete("/classrooms/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_classroom(classroom_id: int, admin: AdminUser, db: DbSession) -> None:
-    classroom = _get_classroom(db, admin, classroom_id)
+def delete_classroom(classroom_id: int, manager: StructureManager, db: DbSession) -> None:
+    classroom = _get_classroom(db, manager, classroom_id)
     if db.scalar(select(func.count(Evaluation.id)).where(Evaluation.classroom_id == classroom.id)):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -475,7 +483,7 @@ def delete_classroom(classroom_id: int, admin: AdminUser, db: DbSession) -> None
         )
     db.execute(delete(Enrollment).where(Enrollment.classroom_id == classroom.id))
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.classroom_id == classroom.id))
-    log(db, admin, admin.organization_id, "classroom.deleted", "classroom", classroom.id,
+    log(db, manager, manager.organization_id, "classroom.deleted", "classroom", classroom.id,
         name=classroom.name)
     db.delete(classroom)
     db.commit()
@@ -495,14 +503,14 @@ def classroom_students(classroom_id: int, user: CurrentUser, db: DbSession) -> l
 
 @router.post("/classrooms/{classroom_id}/students", status_code=status.HTTP_204_NO_CONTENT)
 def enroll_students(
-    classroom_id: int, payload: EnrollPayload, admin: AdminUser, db: DbSession
+    classroom_id: int, payload: EnrollPayload, manager: StructureManager, db: DbSession
 ) -> None:
-    classroom = _get_classroom(db, admin, classroom_id)
+    classroom = _get_classroom(db, manager, classroom_id)
     valid = set(
         db.scalars(
             select(User.id).where(
                 User.id.in_(payload.student_ids),
-                User.organization_id == admin.organization_id,
+                User.organization_id == manager.organization_id,
                 User.role == Role.STUDENT,
             )
         )
@@ -514,7 +522,7 @@ def enroll_students(
     for student_id in added:
         db.add(Enrollment(classroom_id=classroom_id, student_id=student_id))
     if added:
-        log(db, admin, admin.organization_id, "classroom.enrolled", "classroom", classroom.id,
+        log(db, manager, manager.organization_id, "classroom.enrolled", "classroom", classroom.id,
             students=sorted(added))
     db.commit()
 
@@ -522,8 +530,8 @@ def enroll_students(
 @router.delete(
     "/classrooms/{classroom_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT
 )
-def unenroll_student(classroom_id: int, student_id: int, admin: AdminUser, db: DbSession) -> None:
-    classroom = _get_classroom(db, admin, classroom_id)
+def unenroll_student(classroom_id: int, student_id: int, manager: StructureManager, db: DbSession) -> None:
+    classroom = _get_classroom(db, manager, classroom_id)
     enrollment = db.scalar(
         select(Enrollment).where(
             Enrollment.classroom_id == classroom.id, Enrollment.student_id == student_id
@@ -532,7 +540,7 @@ def unenroll_student(classroom_id: int, student_id: int, admin: AdminUser, db: D
     if enrollment is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Étudiant non inscrit dans cette classe")
     db.delete(enrollment)
-    log(db, admin, admin.organization_id, "classroom.unenrolled", "classroom", classroom.id,
+    log(db, manager, manager.organization_id, "classroom.unenrolled", "classroom", classroom.id,
         student=student_id)
     db.commit()
 
@@ -618,6 +626,15 @@ def unassign_teacher(
         classroom.id, teacher=assignment.teacher_id, subject=assignment.subject_id)
     db.delete(assignment)
     db.commit()
+
+
+# ----- Offre -----
+@router.get("/plan", response_model=PlanOut)
+def my_plan(user: CurrentUser, db: DbSession) -> PlanOut:
+    """L'offre de l'espace et ce qu'il en consomme, pour l'afficher avant qu'une
+    création ne soit refusée."""
+    org = user.organization
+    return PlanOut(kind=org.kind, plan=org.plan, limits=limits(org), usage=usage(db, org))
 
 
 # ----- Statistiques établissement -----

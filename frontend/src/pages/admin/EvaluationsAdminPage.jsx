@@ -76,7 +76,10 @@ export default function EvaluationsAdminPage() {
         {evaluations.isPending ? (
           <Loading />
         ) : items.length === 0 ? (
-          <EmptyState title="Aucune évaluation">
+          <EmptyState
+            variant={status || classroomId || debounced ? 'search' : 'empty'}
+            title={status || classroomId || debounced ? 'Aucun résultat' : 'Aucune évaluation'}
+          >
             {status || classroomId || debounced
               ? 'Aucune évaluation ne correspond à ces filtres.'
               : 'Les épreuves préparées par les enseignants apparaîtront ici.'}
