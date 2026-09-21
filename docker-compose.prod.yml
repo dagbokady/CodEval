@@ -1,0 +1,91 @@
+# Production sur un VPS : docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d --build
+x-backend-env: &backend-env
+  CODEVAL_DATABASE_URL: postgresql+psycopg://codeval:${POSTGRES_PASSWORD}@db:5432/codeval
+  CODEVAL_SECRET_KEY: ${SECRET_KEY}
+  CODEVAL_CORS_ORIGINS: https://${DOMAIN}
+  CODEVAL_FRONTEND_URL: https://${DOMAIN}
+  CODEVAL_MAILJET_API_KEY: ${MAILJET_API_KEY}
+  CODEVAL_MAILJET_API_SECRET: ${MAILJET_API_SECRET}
+  CODEVAL_SMTP_FROM: ${MAIL_FROM}
+  CODEVAL_ORG_NAME: ${ORG_NAME}
+  CODEVAL_ADMIN_EMAIL: ${ADMIN_EMAIL}
+  CODEVAL_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: codeval
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: codeval
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeval"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      db: { condition: service_healthy }
+    # "public" : accès sortant nécessaire pour Mailjet
+    networks: [internal, public]
+    tmpfs: ["/tmp:size=256m,mode=1777"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment: *backend-env
+    depends_on:
+      api: { condition: service_healthy }   # migrations appliquées par l'API
+    # Réseau interne seulement : le code des apprenants n'a pas accès à Internet
+    networks: [internal]
+    tmpfs: ["/tmp:size=512m,mode=1777"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: 1.5
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    depends_on: [api]
+    networks: [public]
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+networks:
+  internal:
+    internal: true
+  public:
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

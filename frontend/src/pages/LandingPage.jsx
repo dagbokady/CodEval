@@ -4,28 +4,26 @@ import '../styles/landing.css';
 
 const STEPS = [
   {
-    who: 'Enseignant',
+
     title: 'Créer les évaluations',
     text:
       "Vous rédigez les exercices, le code de départ et les jeux de tests, puis vous ouvrez l'épreuve à votre classe.",
     Illustration: PrepareSheet,
   },
   {
-    who: 'Étudiants',
+
     title: 'Composer',
     text:
       "L'étudiant écrit son programme en plein écran, sans pouvoir l'exécuter, comme sur papier. Chaque frappe est sauvegardée.",
     Illustration: ExamSheet,
   },
   {
-    who: 'Enseignant',
     title: 'Corriger sans se fatiguer, puis publier',
     text:
       "Un clic lance la correction : CodEval compile, exécute les tests en bac à sable et note chaque copie. Vous relisez, puis publiez les résultats.",
     Illustration: ResultsSheet,
   },
   {
-    who: 'Étudiants',
     title: 'Recevoir ses résultats',
     text:
       "Dès la publication, chaque étudiant voit sa note et le détail par exercice : les tests réussis et ceux qui ont échoué.",
@@ -102,13 +100,10 @@ export default function LandingPage() {
               de la plateforme.
             </p>
             <ol className="landing-how">
-              {STEPS.map(({ who, title, text, Illustration }, index) => (
+              {STEPS.map(({  title, text, Illustration }, index) => (
                 <li key={title} className="landing-how-step">
                   <div className="landing-how-text">
-                    <span className="landing-step-num">
-                      {String(index + 1).padStart(2, '0')} · {who}
-                    </span>
-                    <h3>{title}</h3>
+                    <h3>{String(index + 1).padStart(2, '0')} · {title}</h3>
                     <p>{text}</p>
                   </div>
                   <Illustration />
