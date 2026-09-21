@@ -11,6 +11,7 @@ import logging
 import time
 
 from sqlalchemy import inspect, select
+from sqlalchemy.exc import OperationalError
 
 from .config import settings
 from .db import SessionLocal, engine
@@ -60,8 +61,13 @@ def run_once() -> bool:
 def wait_for_migrations() -> None:
     # Le schéma appartient à l'API (alembic upgrade head). Créer les tables ici
     # ferait échouer la première migration si le worker démarre avant l'API.
-    while not inspect(engine).has_table("alembic_version"):
-        log.info("En attente des migrations de l'API")
+    while True:
+        try:
+            if inspect(engine).has_table("alembic_version"):
+                return
+        except OperationalError:
+            pass  # base pas encore joignable
+        log.info("En attente de la base et des migrations de l'API")
         time.sleep(5)
 
 

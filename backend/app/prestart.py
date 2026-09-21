@@ -8,13 +8,34 @@ communauté (app.seed_community). Rejouable à chaque démarrage.
 
 from __future__ import annotations
 
+import time
+
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 
 from .config import settings
+from .db import engine
+
+
+def wait_for_database(timeout: int = 300) -> None:
+    # Une base tout juste créée (Render) refuse les connexions quelques minutes.
+    limite = time.monotonic() + timeout
+    while True:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return
+        except OperationalError:
+            if time.monotonic() > limite:
+                raise
+            print("Base de données injoignable, nouvel essai dans 5 s")
+            time.sleep(5)
 
 
 def main() -> None:
+    wait_for_database()
     command.upgrade(Config("alembic.ini"), "head")
     if settings.admin_email.strip() and settings.admin_password.strip():
         from .seed import main as seed
