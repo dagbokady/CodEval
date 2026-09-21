@@ -896,6 +896,7 @@ function Exam({ evaluationId, data }) {
                   language={langageAffiche}
                   date={data.evaluation.scheduled_start}
                   exercises={data.exercises}
+                  header={data.evaluation.sheet_header}
                 />
               </div>
             </div>
@@ -1168,6 +1169,7 @@ const FeuilleDeComposition = memo(function FeuilleDeComposition({
           points={points}
           language={language}
           date={evaluation.scheduled_start}
+          header={evaluation.sheet_header}
         />
         <SheetInstructions>{instructions}</SheetInstructions>
         <SheetExercise exercise={exercise} number={number} showAnswerZone={false} />

@@ -33,6 +33,17 @@ function letter(index) {
   return index < 26 ? String.fromCharCode(97 + index) : String(index + 1);
 }
 
+/** Les dispositions proposées dans les paramètres de l'enseignant. */
+export const SHEET_LAYOUTS = [
+  { value: 'classique', label: 'Classique', hint: 'Établissement à gauche, session à droite' },
+  { value: 'centre', label: 'Centrée', hint: 'Logo et établissement au centre' },
+  { value: 'officiel', label: 'Officielle', hint: 'Deux blocs : établissement, République' },
+];
+
+/**
+ * En-tête de la feuille. `header` est le réglage de l'enseignant (logo, lignes,
+ * titre, disposition) : absent, la feuille garde l'en-tête d'origine.
+ */
 export function SheetHeader({
   organization,
   classroom,
@@ -43,18 +54,52 @@ export function SheetHeader({
   language,
   date,
   kindLabel = 'ÉVALUATION',
+  header,
 }) {
+  const layout = header?.layout ?? 'classique';
+  const leftLines = (header?.left_lines ?? []).filter((line) => line.trim());
+  const rightLines = (header?.right_lines ?? []).filter((line) => line.trim());
+  const showClassroom = header?.show_classroom !== false;
+  const showSession = header?.show_session !== false;
+  const heading = header?.title?.trim() || subject || kindLabel;
+
+  const [main, ...rest] = leftLines.length > 0 ? leftLines : [organization ?? 'CodEval'];
+  const session = showSession && (
+    <div className="sujet-session">Session : {sessionYear(date)}</div>
+  );
+
   return (
-    <header className="sujet-entete">
+    <header className={`sujet-entete sujet-entete--${layout}`}>
       <div className="sujet-entete-haut">
         <div className="sujet-etablissement">
-          <div className="sujet-etablissement-nom">{organization ?? 'CodEval'}</div>
-          {classroom && <div className="sujet-etablissement-sous">{classroom}</div>}
+          {header?.logo && <img className="sujet-logo" src={header.logo} alt="" />}
+          <div className="sujet-etablissement-texte">
+            <div className="sujet-etablissement-nom">{main}</div>
+            {rest.map((line, index) => (
+              <div className="sujet-etablissement-ligne" key={index}>
+                {line}
+              </div>
+            ))}
+            {showClassroom && classroom && (
+              <div className="sujet-etablissement-sous">{classroom}</div>
+            )}
+          </div>
         </div>
-        <div className="sujet-session">Session : {sessionYear(date)}</div>
+        {layout === 'officiel' ? (
+          <div className="sujet-republique">
+            {rightLines.map((line, index) => (
+              <div className="sujet-republique-ligne" key={index}>
+                {line}
+              </div>
+            ))}
+            {session}
+          </div>
+        ) : (
+          session
+        )}
       </div>
 
-      <div className="sujet-concours">{(subject ?? kindLabel).toUpperCase()}</div>
+      <div className="sujet-concours">{heading.toUpperCase()}</div>
 
       <div className="sujet-cartouche">
         <div className="sujet-cartouche-ligne">
@@ -326,6 +371,7 @@ export function SubjectSheet({
   exercises,
   showAnswerZone = true,
   emptyLabel,
+  header,
 }) {
   const points = exercises.reduce((sum, item) => sum + Number(item.points || 0), 0);
   const groups = groupExercises(exercises);
@@ -341,6 +387,7 @@ export function SubjectSheet({
         points={points}
         language={language}
         date={date}
+        header={header}
       />
 
       <SheetInstructions>{instructions}</SheetInstructions>

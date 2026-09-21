@@ -185,6 +185,9 @@ class User(Base, TimestampMixin):
     photo: Mapped[str | None] = mapped_column(Text, default=None)
     # « F » ou « M » : accorde les libellés (Enseignante, Étudiante).
     gender: Mapped[str | None] = mapped_column(String(1), default=None)
+    # En-tête des feuilles de l'enseignant (logo, lignes, titre, disposition) :
+    # posé sur chacune de ses épreuves, côté apprenant comme côté correction.
+    sheet_header: Mapped[dict | None] = mapped_column(JSONColumn, default=None)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     organization: Mapped[Organization] = relationship()

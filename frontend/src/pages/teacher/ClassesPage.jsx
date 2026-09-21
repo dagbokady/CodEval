@@ -47,8 +47,7 @@ export default function ClassesPage() {
   const students = list.reduce((sum, c) => sum + (c.students_count ?? 0), 0);
   const maxClassrooms = plan.data?.limits?.classrooms;
   const full = maxClassrooms !== undefined && list.length >= maxClassrooms;
-  // Liste vide : l'état vide porte déjà le bouton de création.
-  const newClassroom = personal && list.length > 0 && (
+  const newClassroom = personal && (
     <Button
       disabled={full}
       title={full ? `L'offre gratuite est limitée à ${maxClassrooms} classes` : undefined}

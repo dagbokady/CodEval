@@ -270,3 +270,68 @@ def test_seul_le_personnel_gere_le_code(teacher):
     assert res.status_code == 403
     res = client.post("/api/classrooms", headers=auth(student), json={"name": "X"})
     assert res.status_code == 403
+
+
+def test_chacun_change_sa_photo(teacher):
+    other = PHOTO.replace("data:image/png", "data:image/webp")
+    res = client.put("/api/auth/me/photo", headers=auth(teacher), json={"photo": other})
+    assert res.status_code == 200, res.text
+    assert res.json()["photo"] == other
+    assert client.get("/api/auth/me", headers=auth(teacher)).json()["user"]["photo"] == other
+
+    res = client.put(
+        "/api/auth/me/photo", headers=auth(teacher), json={"photo": "data:text/plain;base64,aGVsbG8="}
+    )
+    assert res.status_code == 422, "une photo doit être une image"
+
+    limiter._attempts.clear()
+    student = client.post(
+        "/api/auth/login", json={"email": "awa@etu.ci", "password": "motdepasse1"}
+    ).json()["access_token"]
+    res = client.put("/api/auth/me/photo", headers=auth(student), json={"photo": other})
+    assert res.status_code == 200, res.text
+    assert res.json()["photo"] == other
+
+
+def test_enseignant_regle_l_entete_des_feuilles(teacher):
+    header = {
+        "layout": "officiel",
+        "logo": PHOTO,
+        "left_lines": ["Université Félix Houphouët-Boigny", "UFR Mathématiques et Informatique", ""],
+        "right_lines": ["République de Côte d'Ivoire", "Union - Discipline - Travail"],
+        "title": "Examen de fin de semestre",
+        "show_classroom": False,
+        "show_session": True,
+    }
+    res = client.put("/api/auth/me/sheet-header", headers=auth(teacher), json=header)
+    assert res.status_code == 200, res.text
+    saved = res.json()["sheet_header"]
+    assert saved["layout"] == "officiel"
+    assert saved["left_lines"] == header["left_lines"][:2], "les lignes vides de fin tombent"
+    assert client.get("/api/auth/me", headers=auth(teacher)).json()["user"]["sheet_header"] == saved
+
+    # L'en-tête suit l'épreuve : l'aperçu de l'enseignant le reprend.
+    evaluation = client.post(
+        "/api/evaluations", headers=auth(teacher), json={"title": "Contrôle", "duration_minutes": 30}
+    )
+    assert evaluation.status_code == 201, evaluation.text
+    detail = client.get(f"/api/evaluations/{evaluation.json()['id']}", headers=auth(teacher))
+    assert detail.json()["sheet_header"] == saved
+
+    res = client.put(
+        "/api/auth/me/sheet-header", headers=auth(teacher), json={**header, "layout": "penché"}
+    )
+    assert res.status_code == 422
+    res = client.put(
+        "/api/auth/me/sheet-header",
+        headers=auth(teacher),
+        json={**header, "logo": "data:text/plain;base64,aGVsbG8="},
+    )
+    assert res.status_code == 422, "le logo doit être une image"
+
+    limiter._attempts.clear()
+    student = client.post(
+        "/api/auth/login", json={"email": "awa@etu.ci", "password": "motdepasse1"}
+    ).json()["access_token"]
+    res = client.put("/api/auth/me/sheet-header", headers=auth(student), json=header)
+    assert res.status_code == 403

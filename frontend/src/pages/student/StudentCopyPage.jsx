@@ -113,6 +113,7 @@ export default function StudentCopyPage() {
             durationMinutes={data.duration_minutes}
             points={data.total_points}
             date={data.date}
+            header={data.sheet_header}
           />
           {/* La note est écrite sur la copie, au stylo rouge, comme sur papier. */}
           <div className="copie-note-posee">

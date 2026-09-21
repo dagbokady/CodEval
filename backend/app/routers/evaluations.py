@@ -47,6 +47,7 @@ from ..services import (
     require_status,
     resolve_names,
     seconds_left,
+    sheet_header_of,
     start_session,
     sync_participants,
 )
@@ -224,6 +225,7 @@ def _detail(db, evaluation: Evaluation) -> EvaluationDetailOut:
             "participants_count": participants,
             "exercises_count": len(items),
             "exercises": items,
+            "sheet_header": sheet_header_of(db, evaluation),
         }
     )
 

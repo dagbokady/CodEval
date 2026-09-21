@@ -1948,6 +1948,25 @@ tr.row-confirm:hover { background: none; }
 
 .sujet-filet { border-top: 3px solid var(--text-title); margin-top: 1.2em; }
 
+/* En-tête réglé par l'enseignant : logo, lignes d'établissement, disposition. */
+.sujet-etablissement { display: flex; align-items: flex-start; gap: 0.8em; min-width: 0; }
+.sujet-logo {
+  width: auto; height: auto; max-height: 4.6em; max-width: 7em;
+  object-fit: contain; flex-shrink: 0;
+}
+.sujet-etablissement-ligne { font-size: 0.95em; line-height: 1.35; margin-top: 0.1em; }
+.sujet-republique { text-align: center; font-size: 0.95em; line-height: 1.35; flex-shrink: 0; }
+.sujet-republique-ligne:first-child { font-weight: 700; text-transform: uppercase; }
+.sujet-republique-ligne:not(:first-child) { font-style: italic; }
+.sujet-republique .sujet-session { margin-top: 0.6em; }
+
+.sujet-entete--officiel .sujet-etablissement { flex-direction: column; align-items: center; text-align: center; }
+.sujet-entete--officiel .sujet-etablissement-nom { font-weight: 700; }
+
+.sujet-entete--centre .sujet-entete-haut { flex-direction: column; align-items: center; gap: 0.6em; }
+.sujet-entete--centre .sujet-etablissement { flex-direction: column; align-items: center; text-align: center; }
+.sujet-entete--centre .sujet-etablissement-nom { max-width: none; }
+
 .sujet-consignes {
   margin-bottom: 1.6em; text-align: center;
   font-weight: 600; font-style: italic; font-size: 0.95em;
@@ -2110,6 +2129,19 @@ tr.row-confirm:hover { background: none; }
 }
 .settings-section-head h2 { font-size: 15px; margin-bottom: 6px; color: var(--text-title); }
 .settings-section-head p { margin: 0; font-size: 13px; line-height: 1.5; }
+.settings-inline-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.sheet-logo-picker { margin-bottom: 20px; }
+.sheet-logo-preview { border-radius: var(--radius); background: var(--bg-paper); }
+.sheet-logo-preview img { object-fit: contain; padding: 4px; }
+.sheet-header-lines { display: grid; gap: 16px; margin-bottom: 20px; }
+.sheet-header-lines--deux { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.sheet-header-block { display: grid; gap: 6px; border: none; margin: 0; padding: 0; min-width: 0; }
+.sheet-header-block legend { padding: 0; margin-bottom: 6px; }
+.sheet-header-apercu {
+  border-radius: var(--radius-lg); background: var(--bg-paper-tray); padding: 14px;
+}
+.sheet-header-apercu .sujet { font-size: 10px; min-height: 0; }
+.sheet-header-apercu .sujet-entete { margin-bottom: 0; }
 .settings-subtitle { font-size: 13px; font-weight: 600; color: var(--text-title); margin: 4px 0 0; }
 .settings-actions {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;

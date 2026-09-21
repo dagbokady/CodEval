@@ -16,9 +16,11 @@ from ..rate_limit import limiter
 from ..schemas import (
     ForgotPasswordPayload,
     LoginPayload,
+    PhotoUpdate,
     RegisterOrg,
     RegisterTeacher,
     ResetPasswordPayload,
+    SheetHeaderSettings,
     TokenOut,
     UserOut,
 )
@@ -186,3 +188,30 @@ def me(user: CurrentUser, db: DbSession) -> TokenOut:
         organization=org.name,
         organization_kind=org.kind,
     )
+
+
+@router.put("/me/photo", response_model=UserOut)
+def update_photo(payload: PhotoUpdate, user: CurrentUser, db: DbSession) -> UserOut:
+    """L'enseignant et l'étudiant changent eux-mêmes leur photo de profil."""
+    if user.role not in (Role.TEACHER, Role.STUDENT):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès non autorisé pour ce rôle")
+    user.photo = payload.photo
+    log(db, user, user.organization_id, "user.photo_updated", "user", user.id)
+    db.commit()
+    db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+@router.put("/me/sheet-header", response_model=UserOut)
+def update_sheet_header(
+    payload: SheetHeaderSettings, user: CurrentUser, db: DbSession
+) -> UserOut:
+    """L'enseignant règle l'en-tête de ses feuilles : il vaut pour toutes ses
+    épreuves, passées comme à venir."""
+    if user.role is not Role.TEACHER:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès réservé aux enseignants")
+    user.sheet_header = payload.model_dump()
+    log(db, user, user.organization_id, "user.sheet_header_updated", "user", user.id)
+    db.commit()
+    db.refresh(user)
+    return UserOut.model_validate(user)

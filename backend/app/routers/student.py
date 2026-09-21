@@ -47,6 +47,7 @@ from ..services import (
     participant_scores,
     participation_breakdown,
     seconds_left,
+    sheet_header_of,
     start_if_due,
 )
 
@@ -351,6 +352,7 @@ def open_exam(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentEx
                 "classroom_name": classroom.name if classroom else None,
                 "subject_name": subject.name if subject else None,
                 "submitted_at": participation.submitted_at,
+                "sheet_header": sheet_header_of(db, evaluation),
             }
         ),
         instructions=evaluation.instructions,
@@ -802,6 +804,7 @@ def my_copy(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentCopy
     return StudentCopyOut(
         evaluation_id=evaluation.id,
         title=evaluation.title,
+        sheet_header=sheet_header_of(db, evaluation),
         subject_name=subject.name if subject else None,
         classroom_name=classroom.name if classroom else None,
         instructions=evaluation.instructions,

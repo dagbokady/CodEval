@@ -980,7 +980,7 @@ function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
 }
 
 function SheetPreview({ form, exercises, classrooms, subjects }) {
-  const { organization } = useAuth();
+  const { organization, user } = useAuth();
   const classroom = (classrooms ?? []).find((c) => String(c.id) === String(form.classroom_id));
   const subject = (subjects ?? []).find((s) => String(s.id) === String(form.subject_id));
 
@@ -997,6 +997,7 @@ function SheetPreview({ form, exercises, classrooms, subjects }) {
           language={evaluationUsesLanguage(exercises) ? form.language : null}
           date={form.scheduled_start}
           exercises={exercises}
+          header={user?.sheet_header}
           emptyLabel="Ajoutez des exercices pour voir l'aperçu de votre sujet ici."
         />
       </div>

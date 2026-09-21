@@ -50,9 +50,14 @@ export function AuthProvider({ children }) {
     setState(ANONYMOUS);
   }, []);
 
+  /** Après une modification du profil : le serveur renvoie l'utilisateur à jour. */
+  const updateUser = useCallback((user) => {
+    setState((current) => ({ ...current, user }));
+  }, []);
+
   const value = useMemo(
-    () => ({ ...state, authenticate, signIn, signOut }),
-    [state, authenticate, signIn, signOut],
+    () => ({ ...state, authenticate, signIn, signOut, updateUser }),
+    [state, authenticate, signIn, signOut, updateUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

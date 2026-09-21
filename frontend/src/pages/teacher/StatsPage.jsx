@@ -203,9 +203,7 @@ function TrendChart({ evaluations }) {
           }}
         >
           <strong>{shown.title}</strong>
-          <span>
-            Moyenne {grade(shown.average)} / 20 · {percent(shown.success_rate)} de réussite
-          </span>
+          <span>Moyenne {grade(shown.average)} / 20</span>
           <span className="sub">
             {plural(shown.copies, 'copie')}
             {shown.classroom_name ? ` · ${shown.classroom_name}` : ''}
@@ -375,7 +373,6 @@ function EvaluationsTable({ evaluations }) {
             <th className="num">Copies</th>
             <th className="num">Moyenne</th>
             <th>Étendue (0 à 20)</th>
-            <th className="num">Réussite</th>
           </tr>
         </thead>
         <tbody>
@@ -393,7 +390,6 @@ function EvaluationsTable({ evaluations }) {
               <td>
                 <Range worst={e.worst} average={e.average} best={e.best} />
               </td>
-              <td className="num">{percent(e.success_rate)}</td>
             </tr>
           ))}
         </tbody>

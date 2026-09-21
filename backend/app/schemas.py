@@ -58,6 +58,47 @@ class RegisterTeacher(BaseModel):
         return check_photo(value)
 
 
+class PhotoUpdate(BaseModel):
+    photo: str
+
+    @field_validator("photo")
+    @classmethod
+    def _photo(cls, value: str) -> str:
+        return check_photo(value)
+
+
+SheetLayout = Literal["classique", "centre", "officiel"]
+
+
+class SheetHeaderSettings(BaseModel):
+    """L'en-tête que l'enseignant pose sur ses feuilles. Une ligne vide ou une
+    liste vide laisse la valeur par défaut (nom de l'établissement, matière)."""
+
+    layout: SheetLayout = "classique"
+    logo: str | None = None
+    # Bloc de gauche : établissement, département, filière…
+    left_lines: list[str] = Field(default_factory=list, max_length=4)
+    # Bloc de droite, disposition « officiel » : République, devise…
+    right_lines: list[str] = Field(default_factory=list, max_length=4)
+    # Le titre centré au-dessus du cartouche (examen, concours, matière).
+    title: str = Field(default="", max_length=160)
+    show_classroom: bool = True
+    show_session: bool = True
+
+    @field_validator("logo")
+    @classmethod
+    def _logo(cls, value: str | None) -> str | None:
+        return check_photo(value) if value else None
+
+    @field_validator("left_lines", "right_lines")
+    @classmethod
+    def _lines(cls, value: list[str]) -> list[str]:
+        lines = [line.strip()[:160] for line in value]
+        while lines and not lines[-1]:
+            lines.pop()
+        return lines
+
+
 class JoinClassPayload(BaseModel):
     """On entre dans une classe par son code, ou par le jeton d'un lien."""
 
@@ -113,6 +154,7 @@ class UserOut(ORMModel):
     matricule: str | None = None
     photo: str | None = None
     gender: str | None = None
+    sheet_header: dict | None = None
     is_active: bool
     organization_id: int
 
@@ -536,6 +578,8 @@ class EvaluationOut(ORMModel):
 
 class EvaluationDetailOut(EvaluationOut):
     exercises: list[ExerciseOut] = []
+    # L'en-tête de l'auteur : les aperçus et les copies le reprennent.
+    sheet_header: dict | None = None
 
 
 class Page(BaseModel):
@@ -630,6 +674,8 @@ class StudentEvaluationOut(ORMModel):
     published: bool = False
     solutions_available: bool = False
     status_label: str = ""
+    # Renseigné à l'ouverture de l'épreuve seulement : le logo pèse trop pour la liste.
+    sheet_header: dict | None = None
 
 
 class StudentExamOut(BaseModel):
@@ -796,6 +842,7 @@ class StudentCopyExercise(BaseModel):
 class StudentCopyOut(BaseModel):
     evaluation_id: int
     title: str
+    sheet_header: dict | None = None
     subject_name: str | None = None
     classroom_name: str | None = None
     instructions: str = ""

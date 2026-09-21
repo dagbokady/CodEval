@@ -296,3 +296,9 @@ def resolve_names(db: Session, evaluation: Evaluation) -> tuple[str | None, str 
     classroom = db.get(Classroom, evaluation.classroom_id) if evaluation.classroom_id else None
     subject = db.get(Subject, evaluation.subject_id) if evaluation.subject_id else None
     return (classroom.name if classroom else None, subject.name if subject else None)
+
+
+def sheet_header_of(db: Session, evaluation: Evaluation) -> dict | None:
+    """L'en-tête de feuille réglé par l'auteur de l'épreuve, s'il en a posé un."""
+    teacher = db.get(User, evaluation.teacher_id)
+    return teacher.sheet_header if teacher else None

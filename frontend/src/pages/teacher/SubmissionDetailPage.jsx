@@ -294,6 +294,7 @@ export default function SubmissionDetailPage() {
                 evaluationUsesLanguage(data.exercises) ? evalData?.language : null
               }
               date={evalData?.scheduled_start}
+              header={evalData?.sheet_header}
             />
             <div className="copie-note-posee">
               <GradeMark score={data.final_score} total={data.max_score} size="lg" />

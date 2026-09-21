@@ -113,6 +113,7 @@ export default function SessionMonitorPage() {
                 }
                 date={evaluation.data.scheduled_start}
                 exercises={evaluation.data.exercises ?? []}
+                header={evaluation.data.sheet_header}
                 emptyLabel="Cette épreuve ne contient aucun exercice."
               />
             </div>
