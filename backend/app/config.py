@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +59,15 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password: str = ""
     admin_name: str = "Administration"
+
+    @field_validator("database_url")
+    @classmethod
+    def _psycopg_driver(cls, v: str) -> str:
+        # Render et d'autres hébergeurs fournissent postgres:// ou postgresql://
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     @property
     def origins(self) -> list[str]:

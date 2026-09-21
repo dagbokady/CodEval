@@ -1,0 +1,55 @@
+# Blueprint Render : base PostgreSQL, API FastAPI, worker de correction.
+# Render > New > Blueprint > choisir le dépôt. Les valeurs "sync: false"
+# sont demandées à la création.
+databases:
+  - name: codeval-db
+    databaseName: codeval
+    user: codeval
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "17"
+
+envVarGroups:
+  - name: codeval-env
+    envVars:
+      - key: CODEVAL_SECRET_KEY
+        generateValue: true
+      - key: CODEVAL_CORS_ORIGINS
+        sync: false            # https://DOMAINE,https://www.DOMAINE
+      - key: CODEVAL_FRONTEND_URL
+        sync: false            # https://DOMAINE
+      - key: CODEVAL_MAILJET_API_KEY
+        sync: false
+      - key: CODEVAL_MAILJET_API_SECRET
+        sync: false
+      - key: CODEVAL_SMTP_FROM
+        sync: false            # noreply@DOMAINE
+      - key: CODEVAL_ADMIN_EMAIL
+        sync: false
+      - key: CODEVAL_ADMIN_PASSWORD
+        sync: false
+
+services:
+  - type: web
+    name: codeval-api
+    runtime: docker
+    rootDir: backend
+    region: frankfurt
+    plan: starter
+    healthCheckPath: /api/health
+    envVars:
+      - fromGroup: codeval-env
+      - key: CODEVAL_DATABASE_URL
+        fromDatabase: { name: codeval-db, property: connectionString }
+
+  - type: worker
+    name: codeval-worker
+    runtime: docker
+    rootDir: backend
+    region: frankfurt
+    plan: starter
+    dockerCommand: python -m app.worker
+    envVars:
+      - fromGroup: codeval-env
+      - key: CODEVAL_DATABASE_URL
+        fromDatabase: { name: codeval-db, property: connectionString }
