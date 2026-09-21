@@ -24,7 +24,7 @@ Renseigner ensuite dans `.env` :
 
 - `CODEVAL_SECRET_KEY`, par exemple avec une clé générée par
   `python -c "import secrets; print(secrets.token_urlsafe(48))"` ;
-- le compte d'administration : `CODEVAL_ORG_NAME`, `CODEVAL_ADMIN_EMAIL`,
+- le compte d'administration : `CODEVAL_ADMIN_EMAIL`,
   `CODEVAL_ADMIN_PASSWORD` et, facultatif, `CODEVAL_ADMIN_NAME`.
 
 Base de données : soit un PostgreSQL local :
@@ -45,8 +45,8 @@ soit le conteneur fourni :
 docker compose up -d db
 ```
 
-Le schéma est créé au démarrage de l'API. Création de l'établissement et de son
-administrateur, à partir des variables de `.env` :
+Le schéma est créé au démarrage de l'API. Création du compte
+d'administration, à partir des variables de `.env` :
 
 ```bash
 ./.venv/bin/python -m app.seed
@@ -90,7 +90,6 @@ Toutes les variables sont préfixées `CODEVAL_` et lues depuis l'environnement 
 | `SANDBOX_COMPILE_TIMEOUT` | délai de compilation | `20` |
 | `SANDBOX_MAX_PROCESSES` | processus par exécution (Linux) | `64` |
 | `WORKER_POLL_SECONDS` | fréquence de scrutation des campagnes | `2.0` |
-| `ORG_NAME` | nom de l'établissement créé par `app.seed` | (obligatoire pour le seed) |
 | `ADMIN_EMAIL` | e-mail de l'administrateur créé par `app.seed` | (obligatoire pour le seed) |
 | `ADMIN_PASSWORD` | mot de passe de cet administrateur | (obligatoire pour le seed) |
 | `ADMIN_NAME` | nom affiché de l'administrateur | `Administration` |
@@ -108,21 +107,21 @@ app/
   services.py    règles métier partagées : accès, cycle de vie, scores
   audit.py       journalisation des opérations critiques
   routers/
-    auth.py         inscription d'un établissement, connexion, session courante
-    org.py          utilisateurs, matières, classes, inscriptions, statistiques
+    auth.py         inscription d'un enseignant, connexion, session courante
+    org.py          utilisateurs, matières des enseignants, classes, inscriptions
     evaluations.py  évaluations, exercices, jeux de tests, session et suivi
     corrections.py  campagnes, résultats, ajustements, validation, exports CSV et Excel
     bank.py         banque d'exercices réutilisables
     student.py      accès à l'épreuve, sauvegarde automatique, soumission, résultats
   scheduler.py   ouverture automatique des sessions à l'heure programmée
   grading/
-    languages.py  langages supportés (C, C++, Python), commandes et squelettes
+    languages.py  langages (C, C++, Python, algorithmique), ouverture par l'admin
     matching.py   jetons opaques des exercices « à relier » (corrigé non exposé)
     sandbox.py    exécution contrainte du code non fiable
     engine.py     compilation, exécution des tests, calcul des notes
   worker.py      consommation des campagnes de correction
   exports.py     génération du classeur Excel des résultats
-  seed.py        création de l'établissement et de son administrateur
+  seed.py        création du compte d'administration
 ```
 
 Séparation des responsabilités : les routers ne portent que le transport et

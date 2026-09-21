@@ -654,7 +654,8 @@ tr.row-confirm:hover { background: none; }
    Une colonne, un formulaire. La marque en haut à gauche, rien d'autre. */
 .auth { min-height: 100vh; display: flex; flex-direction: column; background: var(--bg-app); }
 .auth-top { padding: 20px 28px; }
-.auth-top .brand { padding: 0; margin: 0; height: auto; }
+.auth-top .brand { padding: 0; margin: 0; height: auto; width: fit-content; }
+.auth-top a.brand:hover { text-decoration: none; }
 .auth-zone { flex: 1; display: grid; place-items: center; padding: 40px 16px 112px; }
 .auth-card { width: 100%; max-width: 380px; }
 .auth-card h1 { font-size: 24px; line-height: 1.25; font-weight: 600; color: var(--text-title); letter-spacing: -0.015em; }

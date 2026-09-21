@@ -79,14 +79,49 @@ LANGUAGES: dict[str, Language] = {
 
 DEFAULT_LANGUAGE = "c"
 
-# Langages proposés à l'enseignante. La plateforme ne sert aujourd'hui qu'un
-# cours de langage C : les autres définitions restent en place, prêtes à être
-# rouvertes en ajoutant leur clé ici.
-ENABLED_LANGUAGES = ("c",)
+# Ce que l'administration ouvre ou ferme pour toute la plateforme : les langages
+# de programmation, plus l'algorithmique, qui se compose en blocs de pseudo-code
+# et n'a pas de compilateur.
+ALGO = "algo"
+DISCIPLINES: dict[str, str] = {
+    "c": "Langage C",
+    "cpp": "C++",
+    "python": "Python",
+    ALGO: "Algorithmique",
+}
+# Ouverts tant que l'administration n'a rien réglé.
+DEFAULT_ENABLED = ("c", ALGO)
+_SETTING_KEY = "enabled_languages"
 
 
-def enabled_languages() -> list[Language]:
-    return [LANGUAGES[key] for key in ENABLED_LANGUAGES if key in LANGUAGES]
+def enabled_keys(db) -> list[str]:
+    from ..models import PlatformSetting
+
+    setting = db.get(PlatformSetting, _SETTING_KEY)
+    keys = setting.value if setting is not None and isinstance(setting.value, list) else DEFAULT_ENABLED
+    return [key for key in DISCIPLINES if key in keys]
+
+
+def set_enabled(db, key: str, enabled: bool) -> list[str]:
+    from ..models import PlatformSetting
+
+    keys = set(enabled_keys(db))
+    if enabled:
+        keys.add(key)
+    else:
+        keys.discard(key)
+    ordered = [k for k in DISCIPLINES if k in keys]
+    setting = db.get(PlatformSetting, _SETTING_KEY)
+    if setting is None:
+        db.add(PlatformSetting(key=_SETTING_KEY, value=ordered))
+    else:
+        setting.value = ordered
+    return ordered
+
+
+def enabled_languages(db) -> list[Language]:
+    """Langages de programmation ouverts, sans l'algorithmique."""
+    return [LANGUAGES[key] for key in enabled_keys(db) if key in LANGUAGES]
 
 
 def get_language(key: str) -> Language:

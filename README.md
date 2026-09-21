@@ -39,12 +39,11 @@ Renseigner dans `.env` la clé `CODEVAL_SECRET_KEY` et le compte d'administratio
 
 | Variable | Rôle |
 | --- | --- |
-| `CODEVAL_ORG_NAME` | nom de l'établissement |
 | `CODEVAL_ADMIN_EMAIL` | e-mail de connexion de l'administrateur |
 | `CODEVAL_ADMIN_PASSWORD` | son mot de passe (la valeur d'exemple `change-me` est refusée) |
 | `CODEVAL_ADMIN_NAME` | nom affiché (facultatif, `Administration` par défaut) |
 
-Créer ensuite l'établissement et son administrateur, puis démarrer l'API :
+Créer ensuite le compte d'administration, puis démarrer l'API :
 
 ```bash
 ./.venv/bin/python -m app.seed
@@ -69,10 +68,11 @@ npm install && npm run dev
 Interface sur <http://localhost:5173>, documentation de l'API sur
 <http://localhost:8000/docs>.
 
-La base démarre vide : `app.seed` ne crée que l'établissement et le compte
-d'administration définis dans `.env`. Se connecter avec cet e-mail et ce mot de passe,
-puis créer depuis l'espace Établissement les matières, les classes et les comptes
-enseignants. Les enseignants créent ensuite leurs exercices et leurs évaluations, et
+La base démarre vide : `app.seed` ne crée que le compte d'administration défini dans
+`.env`. Se connecter avec cet e-mail et ce mot de passe, ouvrir les langages proposés
+(page « Langages et matières »), puis créer les classes et les comptes enseignants. Les
+enseignants créent leurs matières (chacune avec un langage), leurs exercices et leurs
+évaluations, et
 les étudiants rejoignent leur classe par code ou lien d'invitation. Le script est
 rejouable : il ne recrée pas un administrateur déjà présent.
 
@@ -85,14 +85,15 @@ l'autorisation sur chaque requête.
 | --- | --- |
 | Enseignant | créer une évaluation et ses exercices, programmer et suivre une session, relancer une correction, réajuster une note, publier les résultats, gérer ses classes et sa banque d'exercices |
 | Étudiant | composer dans un environnement contrôlé, avec sauvegarde automatique, puis consulter sa copie et ses résultats une fois publiés |
-| Établissement | tableau de bord, utilisateurs, classes, vue d'ensemble des évaluations |
+| Administration | tableau de bord, utilisateurs, classes, langages ouverts, vue d'ensemble des matières et des évaluations |
 
 Six types de question cohabitent dans une même épreuve : QCM, correspondance,
 vrai/faux, réponse courte, exercice de code et exercice d'algorithmique en blocs. Les
 quatre premiers sont corrigés par comparaison, sans exécution ; les deux derniers
-passent par le compilateur et la sandbox. Le langage activé aujourd'hui est le C : le
-C++ et Python sont décrits dans `grading/languages.py` mais désactivés
-(`ENABLED_LANGUAGES`).
+passent par le compilateur et la sandbox. L'administration ouvre ou ferme le C, le C++,
+Python et l'algorithmique pour toute la plateforme (C et algorithmique par défaut) ;
+l'enseignant choisit le langage de chaque matière parmi ceux qui sont ouverts, et ce
+langage s'impose aux épreuves de la matière.
 
 ## Cycle de vie d'une évaluation
 

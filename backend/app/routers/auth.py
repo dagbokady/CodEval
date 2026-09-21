@@ -17,7 +17,6 @@ from ..schemas import (
     ForgotPasswordPayload,
     LoginPayload,
     PhotoUpdate,
-    RegisterOrg,
     RegisterTeacher,
     ResetPasswordPayload,
     SheetHeaderSettings,
@@ -54,36 +53,10 @@ def token_out(user: User, org: Organization) -> TokenOut:
     )
 
 
-@router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
-def register_organization(payload: RegisterOrg, db: DbSession) -> TokenOut:
-    """Crée un établissement et son compte administrateur."""
-    slug = _slugify(payload.organization_name)
-    if email_taken(db, payload.email):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
-    if db.scalar(select(Organization).where(Organization.slug == slug)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Un établissement porte déjà ce nom")
-
-    org = Organization(name=payload.organization_name, slug=slug, settings={})
-    db.add(org)
-    db.flush()
-    user = User(
-        organization_id=org.id,
-        email=payload.email.lower(),
-        password_hash=hash_password(payload.password),
-        full_name=payload.full_name,
-        role=Role.ADMIN,
-    )
-    db.add(user)
-    log(db, user, org.id, "organization.created", "organization", org.id)
-    db.commit()
-    db.refresh(user)
-    return token_out(user, org)
-
-
 @router.post("/register-teacher", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def register_teacher(payload: RegisterTeacher, db: DbSession) -> TokenOut:
-    """Inscription d'un enseignant seul, sans passer par un établissement : un
-    espace personnel est créé pour lui, sur l'offre gratuite."""
+    """Inscription d'un enseignant seul : un espace personnel est créé pour lui,
+    sur l'offre gratuite."""
     if email_taken(db, payload.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
     org = create_personal_space(db, payload.full_name.strip())

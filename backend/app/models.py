@@ -200,6 +200,20 @@ class Subject(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
     name: Mapped[str] = mapped_column(String(120))
+    # Langage enseigné : une clé de `grading.languages.DISCIPLINES` (« c »,
+    # « algo »…). Il fixe celui des épreuves rattachées à la matière.
+    language: Mapped[str] = mapped_column(String(30), default="c")
+    # Enseignant qui l'a créée : lui seul la renomme ou la supprime.
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None, index=True)
+
+
+class PlatformSetting(Base):
+    """Réglage de toute la plateforme, posé par l'administration (langages ouverts…)."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    value: Mapped[dict | list] = mapped_column(JSONColumn, default=dict)
 
 
 class Classroom(Base, TimestampMixin):

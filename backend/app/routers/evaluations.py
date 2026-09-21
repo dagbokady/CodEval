@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from ..audit import log
 from ..deps import DbSession, TeacherUser
-from ..grading.languages import enabled_languages
+from ..grading.languages import LANGUAGES, enabled_keys, enabled_languages
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
 from ..models import (
     AuditLog,
@@ -68,7 +68,7 @@ _STATUS_GROUPS = {
 
 
 @router.get("/languages")
-def languages() -> list[dict]:
+def languages(user: TeacherUser, db: DbSession) -> list[dict]:
     return [
         {
             "key": l.key,
@@ -76,7 +76,7 @@ def languages() -> list[dict]:
             "mode": l.editor_mode,
             "starter_code": l.starter_code,
         }
-        for l in enabled_languages()
+        for l in enabled_languages(db)
     ]
 
 
@@ -175,12 +175,18 @@ def list_evaluations(
 def create_evaluation(
     payload: EvaluationCreate, user: TeacherUser, db: DbSession
 ) -> EvaluationDetailOut:
-    _check_refs(db, user, payload.classroom_id, payload.subject_id)
+    subject = _check_refs(db, user, payload.classroom_id, payload.subject_id)
+    if subject is not None and subject.language not in enabled_keys(db):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le langage de cette matière est désactivé par l'administration",
+        )
     evaluation = Evaluation(
         organization_id=user.organization_id,
         teacher_id=user.id,
         **payload.model_dump(),
     )
+    _follow_subject(evaluation, subject)
     db.add(evaluation)
     log(db, user, user.organization_id, "evaluation.created", "evaluation", None,
         title=payload.title)
@@ -189,15 +195,26 @@ def create_evaluation(
     return _detail(db, evaluation)
 
 
-def _check_refs(db, user: User, classroom_id: int | None, subject_id: int | None) -> None:
+def _check_refs(
+    db, user: User, classroom_id: int | None, subject_id: int | None
+) -> Subject | None:
     if classroom_id is not None:
         classroom = db.get(Classroom, classroom_id)
         if classroom is None or classroom.organization_id != user.organization_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Classe inconnue")
-    if subject_id is not None:
-        subject = db.get(Subject, subject_id)
-        if subject is None or subject.organization_id != user.organization_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Matière inconnue")
+    if subject_id is None:
+        return None
+    subject = db.get(Subject, subject_id)
+    if subject is None or subject.organization_id != user.organization_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Matière inconnue")
+    return subject
+
+
+def _follow_subject(evaluation: Evaluation, subject: Subject | None) -> None:
+    """Le langage d'une matière de programmation s'impose à l'épreuve.
+    L'algorithmique n'en fixe aucun : les copies s'y composent en pseudo-code."""
+    if subject is not None and subject.language in LANGUAGES:
+        evaluation.language = subject.language
 
 
 def _detail(db, evaluation: Evaluation) -> EvaluationDetailOut:
@@ -427,9 +444,10 @@ def update_evaluation(
     evaluation = get_evaluation(db, evaluation_id, user)
     require_status(evaluation, EvaluationStatus.DRAFT, EvaluationStatus.SCHEDULED)
     data = payload.model_dump(exclude_unset=True)
-    _check_refs(db, user, data.get("classroom_id"), data.get("subject_id"))
+    subject = _check_refs(db, user, data.get("classroom_id"), data.get("subject_id"))
     for field, value in data.items():
         setattr(evaluation, field, value)
+    _follow_subject(evaluation, subject)
     log(db, user, user.organization_id, "evaluation.updated", "evaluation", evaluation.id,
         fields=list(data))
     db.commit()

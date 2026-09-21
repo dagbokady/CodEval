@@ -55,7 +55,7 @@ jeton JWT et vérifié côté serveur à chaque requête ; côté client, le com
 
 ### 2.0 Administration (`admin`)
 
-Elle gère l'établissement depuis un backoffice (`/admin`). Elle ne conçoit ni
+Elle gère la plateforme depuis un backoffice (`/admin`). Elle ne conçoit ni
 ne corrige aucune épreuve : les routes enseignantes lui répondent 403.
 
 - **Tableau de bord** (`/admin`, `GET /api/stats/overview`) : comptes, classes,
@@ -71,16 +71,18 @@ ne corrige aucune épreuve : les routes enseignantes lui répondent 403.
   suppression (refusée si des évaluations y sont rattachées), inscription et
   désinscription d'étudiants, attribution d'enseignements (enseignant + matière,
   `/api/classrooms/:id/teachers`).
-- **Matières** (`/admin/matieres`, `GET /api/admin/subjects`) : création,
-  renommage, suppression tant qu'aucune évaluation ni exercice ne l'utilise.
+- **Langages et matières** (`/admin/langages`, `GET/PUT /api/admin/languages`,
+  `GET /api/admin/subjects`) : ouvre ou ferme le C, le C++, Python et
+  l'algorithmique pour tous les enseignants (C et algorithmique par défaut).
+  Fermer un langage ne touche pas aux épreuves existantes : il empêche d'en
+  créer de nouvelles. Les matières, créées par les enseignants, y sont listées
+  en lecture seule avec leur langage et leur auteur.
 - **Évaluations** (`/admin/evaluations`, `GET /api/admin/evaluations`) :
-  toutes les épreuves de l'établissement, en lecture seule.
+  toutes les épreuves, en lecture seule.
 - **Journal d'activité** (`/admin/journal`, `GET /api/admin/audit`) : les
   opérations journalisées, filtrables par famille.
-- **Établissement** (`/admin/etablissement`, `/api/admin/organization`) : nom.
-
-`POST /api/auth/register` crée désormais l'établissement avec un compte
-d'administration.
+Il n'y a pas d'établissement à créer ni à configurer : l'unique compte
+d'administration naît de `app.seed`.
 
 ### 2.1 Enseignante (`teacher`)
 
@@ -99,6 +101,12 @@ voit que **ses propres évaluations**, dans son établissement.
   voir §8.
 - **Mes classes** (`/classes`, `/classes/:id`) : sa classe, ses effectifs et les
   évaluations rattachées.
+- **Mes matières** (`/matieres`, `/api/subjects`, `GET /api/disciplines`) :
+  création d'une matière avec son langage, choisi parmi ceux que
+  l'administration a ouverts. Ce langage s'impose aux épreuves de la matière
+  (aucun langage à choisir en algorithmique). Seul l'auteur renomme ou
+  supprime sa matière ; son langage ne change plus dès qu'une évaluation ou un
+  exercice l'utilise. Les matières des collègues restent utilisables.
 - **Banque d'exercices** (`/banque`) : voir §5.
 - **Statistiques** (`/statistiques`).
 
@@ -131,13 +139,12 @@ Il n'a accès qu'à ses épreuves et à ses copies. Il ne crée rien.
 
 ### 2.4 L'installation initiale
 
-`python -m app.seed` crée uniquement l'établissement et son compte
-d'administration, à partir des variables de `.env` (copié depuis
-`.env.example`) : `CODEVAL_ORG_NAME`, `CODEVAL_ADMIN_EMAIL`,
+`python -m app.seed` crée uniquement le compte d'administration, à partir
+des variables de `.env` (copié depuis `.env.example`) : `CODEVAL_ADMIN_EMAIL`,
 `CODEVAL_ADMIN_PASSWORD` et, facultatif, `CODEVAL_ADMIN_NAME`.
 
 Aucun enseignant, étudiant, classe, matière, exercice ni évaluation :
-l'administrateur configure l'établissement depuis l'interface.
+l'administrateur ouvre les langages et crée les comptes depuis l'interface.
 
 ## 3. Authentification et compte
 

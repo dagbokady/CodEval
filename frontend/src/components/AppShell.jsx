@@ -79,6 +79,7 @@ const TEACHER_NAV = [
     title: 'Gestion',
     items: [
       { to: '/classes', label: 'Mes classes', icon: <IconClasses /> },
+      { to: '/matieres', label: 'Mes matières', icon: <IconBook /> },
       { to: '/banque', label: "Banque d'exercices", icon: <IconCode />, end: true },
       { to: '/banque/evaluations', label: "Banque d'évaluations", icon: <IconBook /> },
       { to: '/communaute', label: 'Communauté', icon: <IconCommunity /> },
@@ -100,11 +101,11 @@ const STUDENT_NAV = [
 const ADMIN_NAV = [
   { to: '/admin', label: 'Tableau de bord', icon: <IconHome />, end: true },
   {
-    title: 'Établissement',
+    title: 'Gestion',
     items: [
       { to: '/admin/utilisateurs', label: 'Utilisateurs', icon: <IconUsers /> },
       { to: '/admin/classes', label: 'Classes', icon: <IconClasses /> },
-      { to: '/admin/matieres', label: 'Matières', icon: <IconBook /> },
+      { to: '/admin/langages', label: 'Langages et matières', icon: <IconCode /> },
     ],
   },
   {

@@ -1,19 +1,19 @@
-"""Backoffice de l'administration : établissement, supervision, journal."""
+"""Backoffice de l'administration : langages ouverts, supervision, journal."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 
 from ..audit import log
 from ..deps import AdminUser, DbSession
+from ..grading.languages import ALGO, DISCIPLINES, enabled_keys, set_enabled
 from ..models import (
     AuditLog,
     Classroom,
     Evaluation,
     EvaluationKind,
     EvaluationStatus,
-    Organization,
     Participation,
     Subject,
     User,
@@ -21,31 +21,45 @@ from ..models import (
 from ..schemas import (
     AdminEvaluationOut,
     AuditEntryOut,
-    OrganizationOut,
-    OrganizationUpdate,
+    DisciplineOut,
+    DisciplineToggle,
     Page,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["administration"])
 
 
-@router.get("/organization", response_model=OrganizationOut)
-def get_organization(admin: AdminUser, db: DbSession) -> OrganizationOut:
-    return OrganizationOut.model_validate(db.get(Organization, admin.organization_id))
+def _disciplines(enabled: list[str]) -> list[DisciplineOut]:
+    return [
+        DisciplineOut(
+            key=key,
+            label=label,
+            kind="algo" if key == ALGO else "code",
+            enabled=key in enabled,
+        )
+        for key, label in DISCIPLINES.items()
+    ]
 
 
-@router.patch("/organization", response_model=OrganizationOut)
-def update_organization(
-    payload: OrganizationUpdate, admin: AdminUser, db: DbSession
-) -> OrganizationOut:
-    org = db.get(Organization, admin.organization_id)
-    name = payload.name.strip()
-    log(db, admin, org.id, "organization.renamed", "organization", org.id,
-        previous=org.name, name=name)
-    # Le slug reste celui de la création : il sert d'identifiant stable.
-    org.name = name
+@router.get("/languages", response_model=list[DisciplineOut])
+def list_languages(admin: AdminUser, db: DbSession) -> list[DisciplineOut]:
+    return _disciplines(enabled_keys(db))
+
+
+@router.put("/languages/{key}", response_model=list[DisciplineOut])
+def toggle_language(
+    key: str, payload: DisciplineToggle, admin: AdminUser, db: DbSession
+) -> list[DisciplineOut]:
+    """Ouvre ou ferme un langage pour tous les enseignants. Le fermer ne touche
+    pas aux épreuves existantes : il empêche seulement d'en créer de nouvelles."""
+    if key not in DISCIPLINES:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Langage inconnu")
+    enabled = set_enabled(db, key, payload.enabled)
+    log(db, admin, admin.organization_id,
+        "language.enabled" if payload.enabled else "language.disabled", "language", None,
+        language=key)
     db.commit()
-    return OrganizationOut.model_validate(org)
+    return _disciplines(enabled)
 
 
 @router.get("/evaluations", response_model=Page)

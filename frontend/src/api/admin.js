@@ -70,8 +70,8 @@ export function useAudit({ action, page = 1, pageSize = 50 }) {
   });
 }
 
-export function useOrganization() {
-  return useQuery({ queryKey: ['admin', 'organization'], queryFn: () => api('/api/admin/organization') });
+export function useAdminLanguages() {
+  return useQuery({ queryKey: ['admin', 'languages'], queryFn: () => api('/api/admin/languages') });
 }
 
 export const ROLE_LABELS = { admin: 'Administrateur', teacher: 'Enseignant', student: 'Étudiant' };
@@ -80,8 +80,8 @@ export const ROLE_PLURALS = { admin: 'Administrateurs', teacher: 'Enseignants', 
 /** Libellés du journal : une phrase courte par action journalisée. */
 export const AUDIT_LABELS = {
   'auth.login': 'Connexion',
-  'organization.created': 'Établissement créé',
-  'organization.renamed': 'Établissement renommé',
+  'language.enabled': 'Langage ouvert',
+  'language.disabled': 'Langage fermé',
   'user.created': 'Compte créé',
   'user.updated': 'Compte modifié',
   'user.password_reset': 'Mot de passe réinitialisé',

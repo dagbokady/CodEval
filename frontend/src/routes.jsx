@@ -4,6 +4,7 @@ import AppShell from './components/AppShell';
 import { Landing, Protected } from './components/Protected';
 import { Loading } from './components/ui';
 
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const JoinPage = lazy(() => import('./pages/JoinPage'));
@@ -23,6 +24,7 @@ const BankPage = lazy(() => import('./pages/teacher/BankPage'));
 const BankEvaluationsPage = lazy(() => import('./pages/teacher/BankEvaluationsPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const StatsPage = lazy(() => import('./pages/teacher/StatsPage'));
+const SubjectsPage = lazy(() => import('./pages/teacher/SubjectsPage'));
 
 const StudentHomePage = lazy(() => import('./pages/student/StudentHomePage'));
 const StudentResultsPage = lazy(() => import('./pages/student/StudentResultsPage'));
@@ -33,10 +35,9 @@ const AdminHomePage = lazy(() => import('./pages/admin/AdminHomePage'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 const ClassroomsAdminPage = lazy(() => import('./pages/admin/ClassroomsAdminPage'));
 const ClassroomAdminDetailPage = lazy(() => import('./pages/admin/ClassroomAdminDetailPage'));
-const SubjectsPage = lazy(() => import('./pages/admin/SubjectsPage'));
+const LanguagesPage = lazy(() => import('./pages/admin/LanguagesPage'));
 const EvaluationsAdminPage = lazy(() => import('./pages/admin/EvaluationsAdminPage'));
 const AuditPage = lazy(() => import('./pages/admin/AuditPage'));
-const OrganizationPage = lazy(() => import('./pages/admin/OrganizationPage'));
 
 // Hors de la coquille (connexion, épreuve), l'attente occupe tout l'écran ;
 // dedans, elle prend la forme d'une page.
@@ -50,7 +51,7 @@ const teacher = ['teacher'];
 const admin = ['admin'];
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Landing /> },
+  { path: '/', element: <Landing><Lazy screen><LandingPage /></Lazy></Landing> },
   { path: '/connexion', element: <Lazy screen><LoginPage /></Lazy> },
   { path: '/inscription', element: <Lazy screen><RegisterPage /></Lazy> },
   { path: '/rejoindre', element: <Lazy screen><JoinPage /></Lazy> },
@@ -77,10 +78,9 @@ export const router = createBrowserRouter([
       { path: '/admin/utilisateurs', element: <Protected roles={admin}><Lazy><UsersPage /></Lazy></Protected> },
       { path: '/admin/classes', element: <Protected roles={admin}><Lazy><ClassroomsAdminPage /></Lazy></Protected> },
       { path: '/admin/classes/:classroomId', element: <Protected roles={admin}><Lazy><ClassroomAdminDetailPage /></Lazy></Protected> },
-      { path: '/admin/matieres', element: <Protected roles={admin}><Lazy><SubjectsPage /></Lazy></Protected> },
+      { path: '/admin/langages', element: <Protected roles={admin}><Lazy><LanguagesPage /></Lazy></Protected> },
       { path: '/admin/evaluations', element: <Protected roles={admin}><Lazy><EvaluationsAdminPage /></Lazy></Protected> },
       { path: '/admin/journal', element: <Protected roles={admin}><Lazy><AuditPage /></Lazy></Protected> },
-      { path: '/admin/etablissement', element: <Protected roles={admin}><Lazy><OrganizationPage /></Lazy></Protected> },
       { path: '/accueil', element: <Protected roles={teacher}><Lazy><TeacherHomePage /></Lazy></Protected> },
       { path: '/evaluations', element: <Protected roles={teacher}><Lazy><DashboardPage /></Lazy></Protected> },
       { path: '/evaluations/nouvelle', element: <Protected roles={teacher}><Lazy><EvaluationEditorPage /></Lazy></Protected> },
@@ -91,6 +91,7 @@ export const router = createBrowserRouter([
         path: '/evaluations/:evaluationId/resultats/:participationId',
         element: <Protected roles={teacher}><Lazy><SubmissionDetailPage /></Lazy></Protected>,
       },
+      { path: '/matieres', element: <Protected roles={teacher}><Lazy><SubjectsPage /></Lazy></Protected> },
       { path: '/classes', element: <Protected roles={teacher}><Lazy><ClassesPage /></Lazy></Protected> },
       { path: '/classes/:classroomId', element: <Protected roles={teacher}><Lazy><ClassDetailPage /></Lazy></Protected> },
       { path: '/banque', element: <Protected roles={teacher}><Lazy><BankPage /></Lazy></Protected> },

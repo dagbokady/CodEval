@@ -1,5 +1,4 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../auth';
 import { AUDIT_LABELS, useAdminEvaluations, useAdminOverview, useAudit } from '../../api/admin';
 import { Alert, Button, PageHeader, Skeleton, Stat, Status } from '../../components/ui';
 import { formatPercent, formatRelative, formatSchedule } from '../../format';
@@ -7,13 +6,12 @@ import { formatPercent, formatRelative, formatSchedule } from '../../format';
 const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 /*
- * Le tableau de bord de l'administration : l'état de l'établissement en
+ * Le tableau de bord de l'administration : l'état de la plateforme en
  * chiffres, ce qui demande une intervention, puis ce qui se passe en ce
  * moment (sessions ouvertes, dernières opérations).
  */
 export default function AdminHomePage() {
   const navigate = useNavigate();
-  const { organization } = useAuth();
   const overview = useAdminOverview();
   const running = useAdminEvaluations({ status: 'running', pageSize: 5 });
   const audit = useAudit({ pageSize: 8 });
@@ -46,9 +44,9 @@ export default function AdminHomePage() {
 
   return (
     <>
-      <PageHeader breadcrumb="Administration" title={organization ?? 'Tableau de bord'}>
-        <Button variant="secondary" onClick={() => navigate('/admin/etablissement')}>
-          Établissement
+      <PageHeader breadcrumb="Administration" title="Tableau de bord">
+        <Button variant="secondary" onClick={() => navigate('/admin/langages')}>
+          Langages
         </Button>
         <Button onClick={() => navigate('/admin/utilisateurs?nouveau=student')}>+ Nouveau compte</Button>
       </PageHeader>

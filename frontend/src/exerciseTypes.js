@@ -169,19 +169,15 @@ export function evaluationUsesLanguage(exercises) {
 }
 
 /**
- * Le langage qu'impose la matière de l'épreuve.
+ * Le langage qu'impose la matière de l'épreuve, choisi par l'enseignant à sa
+ * création.
  *
  * `null` : une matière d'algorithmique, où l'on compose en pseudo-code et où
  * aucun langage n'est à choisir. Une clé (`'c'`, `'python'`…) : le cours de ce
- * langage, qui le fixe d'office. `undefined` : la matière ne dit rien, le choix
- * reste à l'enseignant.
+ * langage, qui le fixe d'office. `undefined` : pas de matière, le choix reste à
+ * l'enseignant.
  */
-export function subjectLanguage(subjectName) {
-  const name = String(subjectName ?? '').toLowerCase();
-  if (!name) return undefined;
-  if (/algo/.test(name)) return null;
-  if (/c\+\+|\bcpp\b/.test(name)) return 'cpp';
-  if (/python/.test(name)) return 'python';
-  if (/(^|langage |programmation )c\b(?!\+)|^c$/.test(name)) return 'c';
-  return undefined;
+export function subjectLanguage(subject) {
+  if (!subject?.language) return undefined;
+  return subject.language === 'algo' ? null : subject.language;
 }

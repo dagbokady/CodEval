@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select
 
 from ..audit import log
 from ..deps import AdminUser, CurrentUser, DbSession, StructureManager, TeacherUser
+from ..grading.languages import ALGO, DISCIPLINES, enabled_keys
 from ..models import (
     AuditLog,
     BankExercise,
@@ -33,6 +34,7 @@ from ..schemas import (
     ClassroomDetailOut,
     ClassroomOut,
     ClassroomUpdate,
+    DisciplineOut,
     EnrollPayload,
     EvaluationOut,
     NamedCreate,
@@ -40,7 +42,9 @@ from ..schemas import (
     PasswordResetOut,
     PlanOut,
     SubjectAdminOut,
+    SubjectCreate,
     SubjectOut,
+    SubjectUpdate,
     UserCreate,
     UserOut,
     UserUpdate,
@@ -243,6 +247,18 @@ def reset_password(user_id: int, admin: AdminUser, db: DbSession) -> PasswordRes
 
 
 # ----- Matières -----
+@router.get("/disciplines", response_model=list[DisciplineOut])
+def list_disciplines(teacher: TeacherUser, db: DbSession) -> list[DisciplineOut]:
+    """Langages ouverts par l'administration, parmi lesquels l'enseignant choisit
+    celui de chacune de ses matières."""
+    enabled = enabled_keys(db)
+    return [
+        DisciplineOut(key=key, label=DISCIPLINES[key], kind="algo" if key == ALGO else "code",
+                      enabled=True)
+        for key in enabled
+    ]
+
+
 @router.get("/subjects", response_model=list[SubjectOut])
 def list_subjects(user: CurrentUser, db: DbSession) -> list[SubjectOut]:
     subjects = db.scalars(
@@ -267,11 +283,22 @@ def list_subjects_admin(admin: AdminUser, db: DbSession) -> list[SubjectAdminOut
             .group_by(TeacherAssignment.subject_id)
         ).all()
     )
-    subjects = db.scalars(select(Subject).where(Subject.organization_id == org).order_by(Subject.name))
+    subjects = list(
+        db.scalars(select(Subject).where(Subject.organization_id == org).order_by(Subject.name))
+    )
+    author_ids = {s.author_id for s in subjects if s.author_id}
+    authors = (
+        dict(db.execute(select(User.id, User.full_name).where(User.id.in_(author_ids))).all())
+        if author_ids
+        else {}
+    )
     return [
         SubjectAdminOut(
             id=s.id,
             name=s.name,
+            language=s.language,
+            author_id=s.author_id,
+            author_name=authors.get(s.author_id),
             evaluations_count=evaluations.get(s.id, 0),
             bank_count=bank.get(s.id, 0),
             teachers_count=teachers.get(s.id, 0),
@@ -289,47 +316,89 @@ def _subject_name_taken(db, org_id: int, name: str, except_id: int | None = None
     return db.scalar(query) is not None
 
 
+def _check_language(db, language: str) -> None:
+    if language not in DISCIPLINES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Langage inconnu")
+    if language not in enabled_keys(db):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "Ce langage est désactivé par l'administration"
+        )
+
+
+def _subject_used(db, subject: Subject) -> int:
+    used = db.scalar(select(func.count(Evaluation.id)).where(Evaluation.subject_id == subject.id))
+    return (used or 0) + (
+        db.scalar(select(func.count(BankExercise.id)).where(BankExercise.subject_id == subject.id)) or 0
+    )
+
+
+def _own_subject(db, teacher: User, subject_id: int) -> Subject:
+    """Seul l'enseignant qui a créé une matière la modifie."""
+    subject = _get_subject(db, teacher, subject_id)
+    if subject.author_id != teacher.id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Seul l'enseignant qui a créé cette matière peut la modifier"
+        )
+    return subject
+
+
 @router.post("/subjects", response_model=SubjectOut, status_code=status.HTTP_201_CREATED)
-def create_subject(payload: NamedCreate, manager: StructureManager, db: DbSession) -> SubjectOut:
+def create_subject(payload: SubjectCreate, teacher: TeacherUser, db: DbSession) -> SubjectOut:
     name = payload.name.strip()
-    if _subject_name_taken(db, manager.organization_id, name):
+    _check_language(db, payload.language)
+    if _subject_name_taken(db, teacher.organization_id, name):
         raise HTTPException(status.HTTP_409_CONFLICT, "Matière déjà existante")
-    subject = Subject(organization_id=manager.organization_id, name=name)
+    subject = Subject(
+        organization_id=teacher.organization_id,
+        name=name,
+        language=payload.language,
+        author_id=teacher.id,
+    )
     db.add(subject)
     db.flush()
-    log(db, manager, manager.organization_id, "subject.created", "subject", subject.id, name=name)
+    log(db, teacher, teacher.organization_id, "subject.created", "subject", subject.id,
+        name=name, language=payload.language)
     db.commit()
     db.refresh(subject)
     return SubjectOut.model_validate(subject)
 
 
 @router.patch("/subjects/{subject_id}", response_model=SubjectOut)
-def rename_subject(subject_id: int, payload: NamedCreate, manager: StructureManager, db: DbSession) -> SubjectOut:
-    subject = _get_subject(db, manager, subject_id)
-    name = payload.name.strip()
-    if _subject_name_taken(db, manager.organization_id, name, except_id=subject.id):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Matière déjà existante")
-    log(db, manager, manager.organization_id, "subject.renamed", "subject", subject.id,
-        previous=subject.name, name=name)
-    subject.name = name
+def update_subject(
+    subject_id: int, payload: SubjectUpdate, teacher: TeacherUser, db: DbSession
+) -> SubjectOut:
+    subject = _own_subject(db, teacher, subject_id)
+    if payload.name is not None:
+        name = payload.name.strip()
+        if _subject_name_taken(db, teacher.organization_id, name, except_id=subject.id):
+            raise HTTPException(status.HTTP_409_CONFLICT, "Matière déjà existante")
+        if name != subject.name:
+            log(db, teacher, teacher.organization_id, "subject.renamed", "subject", subject.id,
+                previous=subject.name, name=name)
+            subject.name = name
+    if payload.language is not None and payload.language != subject.language:
+        _check_language(db, payload.language)
+        # Les épreuves déjà rattachées ont été écrites pour l'ancien langage.
+        if _subject_used(db, subject):
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Des évaluations ou des exercices utilisent cette matière : son langage ne change plus",
+            )
+        subject.language = payload.language
     db.commit()
     return SubjectOut.model_validate(subject)
 
 
 @router.delete("/subjects/{subject_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_subject(subject_id: int, manager: StructureManager, db: DbSession) -> None:
-    subject = _get_subject(db, manager, subject_id)
-    used = db.scalar(select(func.count(Evaluation.id)).where(Evaluation.subject_id == subject.id))
-    used = (used or 0) + (
-        db.scalar(select(func.count(BankExercise.id)).where(BankExercise.subject_id == subject.id)) or 0
-    )
-    if used:
+def delete_subject(subject_id: int, teacher: TeacherUser, db: DbSession) -> None:
+    subject = _own_subject(db, teacher, subject_id)
+    if _subject_used(db, subject):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "Des évaluations ou des exercices utilisent cette matière : elle ne peut pas être supprimée",
         )
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.subject_id == subject.id))
-    log(db, manager, manager.organization_id, "subject.deleted", "subject", subject.id, name=subject.name)
+    log(db, teacher, teacher.organization_id, "subject.deleted", "subject", subject.id, name=subject.name)
     db.delete(subject)
     db.commit()
 

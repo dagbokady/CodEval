@@ -30,21 +30,32 @@ def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def create_admin(org_name: str, full_name: str, email: str) -> str:
+    """L'administration naît du script de mise en place, pas d'une inscription."""
+    from app.exports import slugify
+    from app.models import Organization, Role, User
+    from app.security import hash_password
+
+    db = SessionLocal()
+    try:
+        org = Organization(name=org_name, slug=slugify(org_name), settings={})
+        db.add(org)
+        db.flush()
+        db.add(User(organization_id=org.id, email=email, full_name=full_name, role=Role.ADMIN,
+                    password_hash=hash_password("motdepasse1")))
+        db.commit()
+    finally:
+        db.close()
+    res = client.post("/api/auth/login", json={"email": email, "password": "motdepasse1"})
+    assert res.status_code == 200, res.text
+    return res.json()["access_token"]
+
+
 @pytest.fixture(scope="module")
 def context() -> dict:
     Base.metadata.drop_all(engine)
     init_db()
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "organization_name": "Test University",
-            "full_name": "Admin Test",
-            "email": "admin@test.ci",
-            "password": "motdepasse1",
-        },
-    )
-    assert res.status_code == 201, res.text
-    admin = res.json()["access_token"]
+    admin = create_admin("Test University", "Admin Test", "admin@test.ci")
 
     client.post(
         "/api/users",
@@ -70,7 +81,6 @@ def context() -> dict:
     classroom = client.post(
         "/api/classrooms", headers=auth(admin), json={"name": "L2 Test"}
     ).json()
-    subject = client.post("/api/subjects", headers=auth(admin), json={"name": "Algo"}).json()
     res = client.post(
         f"/api/classrooms/{classroom['id']}/students",
         headers=auth(admin),
@@ -84,6 +94,10 @@ def context() -> dict:
     student_token = client.post(
         "/api/auth/login", json={"email": "etu@test.ci", "password": "motdepasse1"}
     ).json()["access_token"]
+    # Les matières sont créées par les enseignants, pas par l'administration.
+    subject = client.post(
+        "/api/subjects", headers=auth(teacher_token), json={"name": "Algo", "language": "algo"}
+    ).json()
     return {
         "admin": admin,
         "teacher": teacher_token,
@@ -1539,13 +1553,19 @@ def test_admin_user_management(context):
 
 def test_admin_classrooms_and_subjects(context):
     a = auth(context["admin"])
+    t = auth(context["teacher"])
     teacher = next(
         u for u in client.get("/api/users?role=teacher", headers=a).json()["items"]
         if u["email"] == "prof@test.ci"
     )
     classroom = client.post("/api/classrooms", headers=a, json={"name": "L3 Temp"}).json()
-    subject = client.post("/api/subjects", headers=a, json={"name": "Réseaux"}).json()
-    assert client.post("/api/subjects", headers=a, json={"name": "réseaux"}).status_code == 409
+    # L'administration ne crée plus de matière.
+    assert client.post("/api/subjects", headers=a,
+                       json={"name": "Réseaux", "language": "c"}).status_code == 403
+    subject = client.post("/api/subjects", headers=t, json={"name": "Réseaux", "language": "c"}).json()
+    assert subject["language"] == "c"
+    assert client.post("/api/subjects", headers=t,
+                       json={"name": "réseaux", "language": "c"}).status_code == 409
 
     res = client.post(
         f"/api/classrooms/{classroom['id']}/teachers",
@@ -1557,6 +1577,8 @@ def test_admin_classrooms_and_subjects(context):
     assert assignment["subject_name"] == "Réseaux"
     listing = {c["id"]: c for c in client.get("/api/classrooms", headers=a).json()}
     assert listing[classroom["id"]]["teachers_count"] == 1
+    admin_subjects = {s["id"]: s for s in client.get("/api/admin/subjects", headers=a).json()}
+    assert admin_subjects[subject["id"]]["author_name"] == "Prof Test"
 
     res = client.patch(
         f"/api/classrooms/{classroom['id']}", headers=a, json={"name": "L3 Réseaux", "level": "L3"}
@@ -1564,11 +1586,45 @@ def test_admin_classrooms_and_subjects(context):
     assert res.json()["name"] == "L3 Réseaux"
 
     # Une matière utilisée par une évaluation ne se supprime pas.
-    assert client.delete(f"/api/subjects/{context['subject']}", headers=a).status_code == 409
+    assert client.delete(f"/api/subjects/{context['subject']}", headers=t).status_code == 409
     assert client.delete(f"/api/classrooms/{context['classroom']}", headers=a).status_code == 409
 
-    assert client.delete(f"/api/subjects/{subject['id']}", headers=a).status_code == 204
+    assert client.delete(f"/api/subjects/{subject['id']}", headers=a).status_code == 403
+    assert client.delete(f"/api/subjects/{subject['id']}", headers=t).status_code == 204
     assert client.delete(f"/api/classrooms/{classroom['id']}", headers=a).status_code == 204
+
+
+def test_admin_opens_and_closes_languages(context):
+    a = auth(context["admin"])
+    t = auth(context["teacher"])
+    languages = {l["key"]: l for l in client.get("/api/admin/languages", headers=a).json()}
+    assert languages["c"]["enabled"] and languages["algo"]["enabled"]
+    assert not languages["python"]["enabled"]
+    assert languages["algo"]["kind"] == "algo"
+    assert client.get("/api/admin/languages", headers=t).status_code == 403
+
+    # Fermé : aucun enseignant ne crée de matière dans ce langage.
+    assert client.post("/api/subjects", headers=t,
+                       json={"name": "Python 1", "language": "python"}).status_code == 400
+    res = client.put("/api/admin/languages/python", headers=a, json={"enabled": True})
+    assert {l["key"] for l in res.json() if l["enabled"]} == {"c", "python", "algo"}
+    keys = [l["key"] for l in client.get("/api/evaluations/languages", headers=t).json()]
+    assert keys == ["c", "python"]
+    subject = client.post("/api/subjects", headers=t,
+                          json={"name": "Python 1", "language": "python"}).json()
+
+    # La matière impose son langage à l'épreuve.
+    evaluation = client.post("/api/evaluations", headers=t, json={
+        "title": "Test Python", "subject_id": subject["id"], "language": "c"}).json()
+    assert evaluation["language"] == "python"
+
+    client.put("/api/admin/languages/python", headers=a, json={"enabled": False})
+    res = client.post("/api/evaluations", headers=t, json={
+        "title": "Refusée", "subject_id": subject["id"]})
+    assert res.status_code == 400
+    assert client.put("/api/admin/languages/cobol", headers=a,
+                      json={"enabled": True}).status_code == 404
+    client.delete(f"/api/evaluations/{evaluation['id']}", headers=t)
 
 
 def test_admin_supervision(context):
@@ -1581,8 +1637,9 @@ def test_admin_supervision(context):
     audit = client.get("/api/admin/audit?action=user", headers=a).json()
     assert audit["total"] >= 2
     assert all(e["action"].startswith("user.") for e in audit["items"])
-    res = client.patch("/api/admin/organization", headers=a, json={"name": "Test University 2"})
-    assert res.json()["name"] == "Test University 2"
+    assert client.post("/api/auth/register", json={
+        "organization_name": "Nouvelle", "full_name": "X", "email": "x@x.ci",
+        "password": "motdepasse1"}).status_code in (404, 405)
 
 
 def test_notation_du_cours_d_algorithmique():
@@ -1865,11 +1922,7 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert exercise_item["title"] == "Maximum"
 
     # Un autre établissement voit la communauté et en tire des copies.
-    other_admin = client.post(
-        "/api/auth/register",
-        json={"organization_name": "Autre École", "full_name": "Admin Deux",
-              "email": "admin2@autre.ci", "password": "motdepasse1"},
-    ).json()["access_token"]
+    other_admin = create_admin("Autre École", "Admin Deux", "admin2@autre.ci")
     client.post("/api/users", headers=auth(other_admin),
                 json={"email": "prof2@autre.ci", "full_name": "Prof Deux", "role": "teacher",
                       "password": "motdepasse1"})

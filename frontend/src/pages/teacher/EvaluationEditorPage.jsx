@@ -7,6 +7,7 @@ import {
   useClassrooms,
   useEvaluation,
   useLanguages,
+  useDisciplines,
   useSubjects,
 } from '../../api/hooks';
 import { Alert, Button, EmptyState, Field, Loading, PageHeader, Tag } from '../../components/ui';
@@ -201,6 +202,7 @@ function Editor({ evaluationId, evaluation }) {
   const classrooms = useClassrooms();
   const subjects = useSubjects();
   const languages = useLanguages();
+  const disciplines = useDisciplines();
 
   const [form, setForm] = useState(() => formFrom(evaluation, searchParams.get('classe')));
   const [exercises, setExercises] = useState(() =>
@@ -364,6 +366,7 @@ function Editor({ evaluationId, evaluation }) {
             titleError={titleError}
             langageUtile={langageUtile}
             languages={languages.data ?? []}
+            openKeys={disciplines.data ? new Set(disciplines.data.map((d) => d.key)) : null}
             classrooms={classrooms.data ?? []}
             subjects={subjects.data ?? []}
             pending={saveParams.isPending}
@@ -610,6 +613,7 @@ function SetupStep({
   titleError,
   langageUtile,
   languages,
+  openKeys,
   classrooms,
   subjects,
   pending,
@@ -622,11 +626,14 @@ function SetupStep({
   const missing = (text) => <span className="is-missing">{text}</span>;
   // La matière décide du langage : aucun en algorithmique, le sien pour un cours
   // de langage. Le choix ne reste ouvert que si la matière ne dit rien.
-  const imposed = subjectLanguage(subject?.name);
+  const imposed = subjectLanguage(subject);
+  // Une matière dont le langage est fermé ne reçoit plus de nouvelle épreuve,
+  // mais celle déjà choisie reste affichée.
+  const offered = (s) =>
+    !openKeys || openKeys.has(s.language) || String(s.id) === String(form.subject_id);
   const imposedLabel = languages.find((l) => l.key === imposed)?.label ?? imposed?.toUpperCase();
   const chooseSubject = (subjectId) => {
-    const name = subjects.find((s) => String(s.id) === String(subjectId))?.name;
-    const language = subjectLanguage(name);
+    const language = subjectLanguage(subjects.find((s) => String(s.id) === String(subjectId)));
     set({ subject_id: subjectId, ...(language ? { language } : {}) });
   };
 
@@ -708,7 +715,7 @@ function SetupStep({
                   onChange={(e) => chooseSubject(e.target.value)}
                 >
                   <option value="">Aucune</option>
-                  {subjects.map((s) => (
+                  {subjects.filter(offered).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>

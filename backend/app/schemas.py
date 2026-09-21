@@ -17,13 +17,6 @@ class ORMModel(BaseModel):
 
 
 # ----- Auth -----
-class RegisterOrg(BaseModel):
-    organization_name: str = Field(min_length=2, max_length=160)
-    full_name: str = Field(min_length=2, max_length=160)
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-
-
 PHOTO_MAX_BYTES = 300_000
 _PHOTO_PREFIXES = ("data:image/jpeg;base64,", "data:image/png;base64,", "data:image/webp;base64,")
 
@@ -233,9 +226,21 @@ class ClassroomUpdate(BaseModel):
 class SubjectOut(ORMModel):
     id: int
     name: str
+    language: str
+    author_id: int | None = None
+
+
+class SubjectCreate(NamedCreate):
+    language: str = Field(min_length=1, max_length=30)
+
+
+class SubjectUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    language: str | None = Field(default=None, min_length=1, max_length=30)
 
 
 class SubjectAdminOut(SubjectOut):
+    author_name: str | None = None
     evaluations_count: int = 0
     bank_count: int = 0
     teachers_count: int = 0
@@ -303,6 +308,18 @@ class OrganizationOut(ORMModel):
     name: str
     slug: str
     created_at: datetime | None = None
+
+
+class DisciplineOut(BaseModel):
+    key: str
+    label: str
+    # « code » : un langage compilé ou interprété. « algo » : pseudo-code en blocs.
+    kind: str
+    enabled: bool
+
+
+class DisciplineToggle(BaseModel):
+    enabled: bool
 
 
 class OrganizationUpdate(BaseModel):

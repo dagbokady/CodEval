@@ -37,6 +37,11 @@ export function useSubjects() {
   return useQuery({ queryKey: ['subjects'], queryFn: () => api('/api/subjects'), staleTime: 300_000 });
 }
 
+/** Langages ouverts par l'administration, algorithmique comprise. */
+export function useDisciplines() {
+  return useQuery({ queryKey: ['disciplines'], queryFn: () => api('/api/disciplines'), staleTime: 60_000 });
+}
+
 export function useClassrooms() {
   return useQuery({
     queryKey: ['classrooms'],

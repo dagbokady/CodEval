@@ -26,6 +26,27 @@ from app.security import create_join_token  # noqa: E402
 client = TestClient(app)
 
 
+def create_admin(org_name: str, full_name: str, email: str) -> str:
+    """L'administration naît du script de mise en place, pas d'une inscription."""
+    from app.exports import slugify
+    from app.models import Organization, Role, User
+    from app.security import hash_password
+
+    db = SessionLocal()
+    try:
+        org = Organization(name=org_name, slug=slugify(org_name), settings={})
+        db.add(org)
+        db.flush()
+        db.add(User(organization_id=org.id, email=email, full_name=full_name, role=Role.ADMIN,
+                    password_hash=hash_password("motdepasse1")))
+        db.commit()
+    finally:
+        db.close()
+    res = client.post("/api/auth/login", json={"email": email, "password": "motdepasse1"})
+    assert res.status_code == 200, res.text
+    return res.json()["access_token"]
+
+
 # Un pixel PNG : la plus petite photo valide.
 PHOTO = (
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="
@@ -83,22 +104,12 @@ def test_l_enseignant_gere_lui_meme_ses_classes_dans_la_limite_de_deux(teacher):
     assert client.get("/api/plan", headers=auth(teacher)).json()["usage"] == {"classrooms": 2}
 
     # Il crée aussi ses matières, sans administration au-dessus de lui.
-    res = client.post("/api/subjects", headers=auth(teacher), json={"name": "Algorithmique"})
+    res = client.post("/api/subjects", headers=auth(teacher), json={"name": "Algorithmique", "language": "algo"})
     assert res.status_code == 201
 
 
 def test_un_etablissement_n_a_pas_de_limite():
-    res = client.post(
-        "/api/auth/register",
-        json={
-            "organization_name": "Lycée Sans Limite",
-            "full_name": "Admin",
-            "email": "admin@lycee.ci",
-            "password": "motdepasse1",
-        },
-    )
-    admin = res.json()["access_token"]
-    assert res.json()["organization_kind"] == "institution"
+    admin = create_admin("Lycée Sans Limite", "Admin", "admin@lycee.ci")
     for i in range(3):
         res = client.post("/api/classrooms", headers=auth(admin), json={"name": f"C{i}"})
         assert res.status_code == 201

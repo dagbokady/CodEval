@@ -13,10 +13,11 @@ export function Protected({ roles, children }) {
   return children;
 }
 
-export function Landing() {
+/** Une personne connectée va droit à son espace ; les autres voient `children`
+ * (la page d'accueil publique) ou, à défaut, la connexion. */
+export function Landing({ children }) {
   const { status, user } = useAuth();
   if (status === 'loading') return <Loading variant="screen" />;
-  return (
-    <Navigate to={status === 'authenticated' ? HOME_BY_ROLE[user.role] : '/connexion'} replace />
-  );
+  if (status === 'authenticated') return <Navigate to={HOME_BY_ROLE[user.role]} replace />;
+  return children ?? <Navigate to="/connexion" replace />;
 }

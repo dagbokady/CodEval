@@ -1,13 +1,13 @@
 """Installation initiale : python -m app.seed
 
-Crée l'établissement et son compte d'administration, rien d'autre : ni
+Crée le compte d'administration de la plateforme, rien d'autre : ni
 enseignant, ni étudiant, ni classe, ni exercice, ni évaluation. L'administrateur
-invite ensuite les enseignants et configure l'établissement depuis l'interface.
+crée ensuite les comptes et ouvre les langages depuis l'interface.
 
-Le nom de l'établissement, l'e-mail et le mot de passe de l'administrateur sont
-lus dans `.env` (voir `.env.example`) :
+L'e-mail et le mot de passe de l'administrateur sont lus dans `.env` (voir
+`.env.example`) :
 
-    CODEVAL_ORG_NAME, CODEVAL_ADMIN_EMAIL, CODEVAL_ADMIN_PASSWORD, CODEVAL_ADMIN_NAME
+    CODEVAL_ADMIN_EMAIL, CODEVAL_ADMIN_PASSWORD, CODEVAL_ADMIN_NAME
 
 Le script est rejouable : un compte déjà présent sous cet e-mail n'est pas recréé.
 """
@@ -29,7 +29,6 @@ def _config() -> tuple[str, str, str, str]:
     manquantes = [
         nom
         for nom, valeur in (
-            ("CODEVAL_ORG_NAME", settings.org_name),
             ("CODEVAL_ADMIN_EMAIL", settings.admin_email),
             ("CODEVAL_ADMIN_PASSWORD", settings.admin_password),
         )
@@ -40,7 +39,7 @@ def _config() -> tuple[str, str, str, str]:
     if settings.admin_password == "change-me":
         sys.exit("CODEVAL_ADMIN_PASSWORD vaut encore la valeur d'exemple : choisissez un mot de passe.")
     return (
-        settings.org_name.strip(),
+        settings.org_name.strip() or "CodEval",
         settings.admin_email.strip().lower(),
         settings.admin_password,
         settings.admin_name.strip() or "Administration",
@@ -74,7 +73,6 @@ def main() -> None:
         )
         db.commit()
 
-        print(f"Établissement  : {org.name}")
         print(f"Administrateur : {full_name} <{email}>")
     finally:
         db.close()

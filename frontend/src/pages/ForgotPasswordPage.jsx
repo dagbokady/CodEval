@@ -29,10 +29,10 @@ export default function ForgotPasswordPage() {
   return (
     <div className="auth">
       <header className="auth-top">
-        <div className="brand">
+        <Link to="/" className="brand" aria-label="CodEval, page d'accueil">
           <span className="brand-icon" aria-hidden="true">&lt;/&gt;</span>
           CodEval
-        </div>
+        </Link>
       </header>
       <div className="auth-zone">
         {sent ? (
