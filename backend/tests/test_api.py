@@ -344,6 +344,9 @@ def test_bank_exercise_lifecycle(context):
 
     found = client.get("/api/bank/exercises?q=somme&language=c", headers=t).json()
     assert any(e["id"] == item["id"] for e in found["items"])
+    by_kind = client.get(f"/api/bank/exercises?kind={item['kind']}", headers=t).json()["items"]
+    assert any(e["id"] == item["id"] for e in by_kind)
+    assert all(e["kind"] == "qcm" for e in client.get("/api/bank/exercises?kind=qcm", headers=t).json()["items"])
 
     updated = client.put(
         f"/api/bank/exercises/{item['id']}",
@@ -1934,6 +1937,10 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert subject_item["id"] in ids and exercise_item["id"] in ids
     assert all(not item["can_delete"] for item in listing["items"])
     assert client.get("/api/community?item_type=exercise", headers=other).json()["total"] >= 1
+    by_kind = client.get(f"/api/community?kind={exercise_item['exercise_kind']}", headers=other).json()
+    assert exercise_item["id"] in [i["id"] for i in by_kind["items"]]
+    assert subject_item["id"] not in [i["id"] for i in by_kind["items"]]
+    assert client.get("/api/community?kind=inexistant", headers=other).json()["total"] == 0
 
     # On ne publie pas le travail d'un autre établissement.
     res = client.post("/api/community", headers=other,

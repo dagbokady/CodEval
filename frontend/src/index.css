@@ -910,16 +910,16 @@ tr.row-confirm:hover { background: none; }
     border-bottom: 1px solid var(--border-soft);
   }
   .brand { padding: 0 8px 0 0; }
-  .nav { flex-direction: row; flex: 0; }
+  .nav { flex-direction: row; flex: none; gap: 2px; }
   .nav--bottom { display: none; }
-  .nav-group { margin: 0; display: flex; gap: 2px; }
+  .nav-group { margin: 0; display: flex; flex-direction: row; gap: 2px; }
   .nav-group-title { display: none; }
   /* Masqué à l'œil seulement : l'icône garde son nom pour les lecteurs d'écran. */
   .nav-item .nav-label {
     position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0 0 0 0); white-space: nowrap;
   }
-  .nav-item { width: 40px; height: 40px; justify-content: center; padding: 0; }
+  .nav-item { position: relative; width: 40px; height: 40px; justify-content: center; padding: 0; }
   .sidebar-footer { margin: 0 0 0 auto; border: none; padding: 0; }
   .sidebar-chevron { display: none; }
   .identity { display: none; }
@@ -1688,7 +1688,7 @@ tr.row-confirm:hover { background: none; }
 .th-panel .empty { margin-top: 8px; }
 
 .th-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 36px; align-items: start; }
-@media (max-width: 1000px) { .th-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .th-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* Lignes : toute la ligne réagit au survol, le titre porte le lien. */
 .th-rows { display: grid; margin: 0; padding: 0; list-style: none; }

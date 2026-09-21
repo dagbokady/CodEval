@@ -81,26 +81,28 @@ export function useLanguages() {
   });
 }
 
-export function useBankExercises({ q, language, scope = 'all', subjectId, page = 1 }) {
+export function useBankExercises({ q, language, kind, scope = 'all', subjectId, page = 1 }) {
   const params = new URLSearchParams({ page: String(page), page_size: '20', scope });
   if (q) params.set('q', q);
+  if (kind) params.set('kind', kind);
   if (language) params.set('language', language);
   if (subjectId) params.set('subject_id', String(subjectId));
   return useQuery({
-    queryKey: key('bank', scope, q, language, subjectId, page),
+    queryKey: key('bank', scope, q, language, kind, subjectId, page),
     queryFn: () => api(`/api/bank/exercises?${params}`),
     placeholderData: (prev) => prev,
   });
 }
 
 /** La communauté : exercices et sujets complets publiés par tous les établissements. */
-export function useCommunity({ q, itemType, language, scope = 'all', sort = 'recent', page = 1 }) {
+export function useCommunity({ q, itemType, kind, language, scope = 'all', sort = 'recent', page = 1 }) {
   const params = new URLSearchParams({ page: String(page), page_size: '18', scope, sort });
   if (q) params.set('q', q);
+  if (kind) params.set('kind', kind);
   if (itemType) params.set('item_type', itemType);
   if (language) params.set('language', language);
   return useQuery({
-    queryKey: key('community', scope, sort, itemType, language, q, page),
+    queryKey: key('community', scope, sort, itemType, kind, language, q, page),
     queryFn: () => api(`/api/community?${params}`),
     placeholderData: (prev) => prev,
   });

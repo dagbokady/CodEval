@@ -13,9 +13,10 @@ import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import case, String, cast, func, or_, select
 from sqlalchemy.orm import selectinload
 
+from ..db import soft_delete
 from ..audit import log
 from ..deps import DbSession, TeacherUser, require_roles
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
@@ -45,6 +46,12 @@ _TEST_FIELDS = (
     "name", "stdin", "expected_stdout", "comparison", "points", "timeout_ms",
     "target_id", "expected_type",
 )
+_ORDRE_TYPES = case(
+    {"qcm": 0, "truefalse": 1, "short": 2, "algo": 3},
+    value=CommunityItem.content["exercise"]["kind"].as_string(),
+    else_=9,
+)
+
 _EXERCISE_FIELDS = ("title", "statement", "language", "points", "starter_code", "kind")
 
 
@@ -145,8 +152,10 @@ def list_items(
     q: str | None = Query(default=None, max_length=120),
     item_type: str | None = Query(default=None, pattern="^(exercise|subject)$"),
     language: str | None = None,
+    # Type d'exercice (« qcm », « truefalse », « algo »…) : n'en garde que les exercices.
+    kind: str | None = Query(default=None, max_length=20),
     scope: str = Query("all", pattern="^(all|mine|organization)$"),
-    sort: str = Query("recent", pattern="^(recent|popular)$"),
+    sort: str = Query("recent", pattern="^(recent|popular|type)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
@@ -155,6 +164,9 @@ def list_items(
         filters.append(CommunityItem.item_type == item_type)
     if language:
         filters.append(CommunityItem.language == language)
+    if kind:
+        filters.append(CommunityItem.item_type == "exercise")
+        filters.append(CommunityItem.content["exercise"]["kind"].as_string() == kind)
     if scope == "mine":
         filters.append(CommunityItem.author_id == user.id)
     elif scope == "organization":
@@ -179,6 +191,7 @@ def list_items(
         .where(*filters)
         .order_by(
             *((CommunityItem.uses.desc(),) if sort == "popular" else ()),
+            *((_ORDRE_TYPES,) if sort == "type" else ()),
             CommunityItem.created_at.desc(),
             CommunityItem.id.desc(),
         )
@@ -333,7 +346,7 @@ def unpublish(item_id: int, user: MemberUser, db: DbSession) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Publication d'un autre auteur")
     log(db, user, user.organization_id, "community.removed", "community_item", item.id,
         title=item.title)
-    db.delete(item)
+    soft_delete(item)
     db.commit()
 
 

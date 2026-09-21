@@ -49,6 +49,24 @@ def _sortie(valeurs) -> str:
     return "\n".join(_nombre(v) for v in valeurs)
 
 
+def _type_de(v: str) -> str:
+    try:
+        int(v)
+        return "int"
+    except ValueError:
+        pass
+    try:
+        float(v)
+        return "float"
+    except ValueError:
+        return "string"
+
+
+def _valeur(v: str):
+    t = _type_de(v)
+    return int(v) if t == "int" else float(v) if t == "float" else v
+
+
 def algo(td, title, statement, cases, *, points=4.0, comparison="numeric", tools=None,
          solution="", notes=""):
     """cases : liste de (entrée, sortie attendue) ; la sortie est une liste de
@@ -57,6 +75,7 @@ def algo(td, title, statement, cases, *, points=4.0, comparison="numeric", tools
     tests = []
     for i, (stdin, attendu) in enumerate(cases, start=1):
         sortie = attendu if isinstance(attendu, str) else _sortie(attendu)
+        lignes = [l for l in stdin.splitlines() if l.strip()]
         tests.append({
             "name": f"Test {i}",
             "kind": "official",
@@ -67,8 +86,9 @@ def algo(td, title, statement, cases, *, points=4.0, comparison="numeric", tools
             "timeout_ms": 2000,
             "target_id": None,
             "expected_type": "string",
-            "input_types": [],
-            "args": [],
+            "input_types": [{"name": f"e{j}", "type": _type_de(v)}
+                            for j, v in enumerate(lignes, start=1)],
+            "args": [_valeur(v) for v in lignes],
         })
     return td, {
         "title": title,
@@ -622,18 +642,27 @@ def exercises() -> list[tuple[str, dict]]:
     return items
 
 
+TYPE_TAGS = {"qcm": "QCM", "truefalse": "Vrai/Faux", "short": "Questions-réponses",
+             "algo": "Algorithme à écrire"}
+ORDRE_TYPES = {k: i for i, k in enumerate(TYPE_TAGS)}
+
+
 def main() -> None:
     db = SessionLocal()
     try:
         admin = db.scalar(select(User).where(User.role == Role.ADMIN).order_by(User.id))
         if admin is None:
             sys.exit("Aucun administrateur : lancez d'abord python -m app.seed")
-        existing = set(db.scalars(
-            select(CommunityItem.title).where(CommunityItem.author_id == admin.id)
-        ))
+        existing = {item.title: item for item in db.scalars(
+            select(CommunityItem).where(CommunityItem.author_id == admin.id)
+        )}
         created = 0
-        for td, exercise in exercises():
+        for td, exercise in sorted(exercises(), key=lambda e: ORDRE_TYPES.get(e[1]["kind"], 9)):
+            tags = [td, TYPE_TAGS.get(exercise["kind"], "Autre"), *BASE_TAGS]
             if exercise["title"] in existing:
+                item = existing[exercise["title"]]
+                item.content = {"exercise": exercise}
+                item.tags = tags
                 continue
             db.add(CommunityItem(
                 organization_id=admin.organization_id,
@@ -643,7 +672,7 @@ def main() -> None:
                 description=f"{td}, Initiation à l'algorithmique (L1 SRIT).",
                 language="algo",
                 subject_name=SUBJECT,
-                tags=[td, *BASE_TAGS],
+                tags=tags,
                 content={"exercise": exercise},
                 exercises_count=1,
                 total_points=exercise["points"],

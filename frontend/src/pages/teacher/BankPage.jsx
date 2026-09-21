@@ -4,7 +4,7 @@ import { useAction, useBankExercises, useLanguages, useSubjects } from '../../ap
 import { useAuth } from '../../auth';
 import { DEFAULT_ELEMENTS } from '../../algoVocabulary';
 import { defaultStarter, isUntouchedStarter } from '../../starterCode';
-import { exerciseType, hasQuestions, needsTests } from '../../exerciseTypes';
+import { KIND_LABELS, exerciseType, hasQuestions, needsTests } from '../../exerciseTypes';
 import BaremeEditor from '../../components/BaremeEditor';
 import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
@@ -173,6 +173,7 @@ export default function BankPage() {
   const { user } = useAuth();
   const [scope, setScope] = useState(null);
   const [search, setSearch] = useState('');
+  const [kindFilter, setKindFilter] = useState('');
   const [page, setPage] = useState(1);
   const [form, setForm] = useState(null);
   const [error, setError] = useState(null);
@@ -182,7 +183,7 @@ export default function BankPage() {
 
   const subjects = useSubjects();
   const languages = useLanguages();
-  const bank = useBankExercises({ q: search, scope: scope ?? 'all', page });
+  const bank = useBankExercises({ q: search, kind: kindFilter, scope: scope ?? 'all', page });
 
   const save = useAction(
     ({ id, body }) =>
@@ -579,6 +580,22 @@ export default function BankPage() {
           }}
         />
         )}
+        {!form && !typeChoice && (
+          <select
+            className="select-inline"
+            aria-label="Type d'exercice"
+            value={kindFilter}
+            onChange={(e) => {
+              setKindFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Tous les types</option>
+            {Object.entries(KIND_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Le formulaire remplace la liste : ouvert depuis « Modifier » en bas de tableau,
@@ -587,7 +604,7 @@ export default function BankPage() {
         <>
         {bank.isPending && <Loading />}
         {bank.data?.items.length === 0 && (
-          search || scope ? (
+          search || scope || kindFilter ? (
             <EmptyState variant="search" title="Aucun résultat">
               Aucun exercice ne correspond à cette recherche.
             </EmptyState>

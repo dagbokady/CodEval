@@ -21,7 +21,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
-from .db import Base
+from .db import Base, SoftDeleteMixin
 
 
 def utcnow() -> datetime:
@@ -193,7 +193,7 @@ class User(Base, TimestampMixin):
     organization: Mapped[Organization] = relationship()
 
 
-class Subject(Base, TimestampMixin):
+class Subject(Base, SoftDeleteMixin, TimestampMixin):
     __tablename__ = "subjects"
     __table_args__ = (UniqueConstraint("organization_id", "name", name="uq_subject_org_name"),)
 
@@ -216,7 +216,7 @@ class PlatformSetting(Base):
     value: Mapped[dict | list] = mapped_column(JSONColumn, default=dict)
 
 
-class Classroom(Base, TimestampMixin):
+class Classroom(Base, SoftDeleteMixin, TimestampMixin):
     __tablename__ = "classrooms"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -252,7 +252,7 @@ class TeacherAssignment(Base):
     subject_id: Mapped[int] = mapped_column(ForeignKey("subjects.id"), index=True)
 
 
-class Evaluation(Base, TimestampMixin):
+class Evaluation(Base, SoftDeleteMixin, TimestampMixin):
     __tablename__ = "evaluations"
     __table_args__ = (Index("ix_eval_org_status", "organization_id", "status"),)
 
@@ -291,7 +291,7 @@ class Evaluation(Base, TimestampMixin):
     )
 
 
-class Exercise(Base):
+class Exercise(Base, SoftDeleteMixin):
     __tablename__ = "exercises"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -340,7 +340,7 @@ class TestCase(Base):
     exercise: Mapped[Exercise] = relationship(back_populates="tests")
 
 
-class BankExercise(Base, TimestampMixin):
+class BankExercise(Base, SoftDeleteMixin, TimestampMixin):
     """Exercice réutilisable. Indépendant des évaluations : l'importer dans une
     évaluation en fait une copie, que la banque n'affectera plus."""
 
@@ -389,7 +389,7 @@ class BankTestCase(Base):
     exercise: Mapped[BankExercise] = relationship(back_populates="tests")
 
 
-class CommunityItem(Base, TimestampMixin):
+class CommunityItem(Base, SoftDeleteMixin, TimestampMixin):
     """Exercice ou sujet complet publié pour toute la plateforme.
 
     La publication est un instantané : le contenu (énoncés, jeux de tests,

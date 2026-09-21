@@ -21,7 +21,7 @@ import {
   Tabs,
 } from '../components/ui';
 import { EVAL_KIND_LABELS } from '../format';
-import { exerciseType } from '../exerciseTypes';
+import { KIND_LABELS, exerciseType } from '../exerciseTypes';
 
 const TYPES = [
   { value: 'exercise', label: 'Exercices' },
@@ -37,6 +37,7 @@ const SCOPES = [
 const SORTS = [
   { value: 'recent', label: 'Les plus récents' },
   { value: 'popular', label: 'Les plus repris' },
+  { value: 'type', label: 'Par type (QCM, Vrai/Faux…)' },
 ];
 
 const dayFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -90,6 +91,7 @@ export default function CommunityPage() {
   const q = params.get('q') ?? '';
   const itemType = params.get('type');
   const language = params.get('langage') ?? '';
+  const kind = params.get('format') ?? '';
   const scope = params.get('provenance') ?? 'all';
   const sort = params.get('tri') ?? 'recent';
   const page = Number(params.get('page')) || 1;
@@ -151,7 +153,7 @@ export default function CommunityPage() {
   const languages = useLanguages();
   const languageLabel = (key) =>
     (languages.data ?? []).find((l) => l.key === key)?.label ?? key?.toUpperCase();
-  const listing = useCommunity({ q, itemType, language, scope, sort, page });
+  const listing = useCommunity({ q, itemType, kind, language, scope, sort, page });
 
   const useItem = useAction(
     (id) => api(`/api/community/${id}/use`, { method: 'POST', body: {} }),
@@ -217,6 +219,11 @@ export default function CommunityPage() {
       key: 'type',
       label: TYPES.find((t) => t.value === itemType)?.label,
       clear: () => setFilter('type', null),
+    },
+    kind && {
+      key: 'format',
+      label: KIND_LABELS[kind] ?? kind,
+      clear: () => setFilter('format', null),
     },
     language && {
       key: 'langage',
@@ -298,6 +305,19 @@ export default function CommunityPage() {
                 <option key={l.key} value={l.key}>{l.label}</option>
               ))}
             </select>
+            {itemType !== 'subject' && (
+              <select
+                className="select-inline"
+                aria-label="Type d'exercice"
+                value={kind}
+                onChange={(e) => setFilter('format', e.target.value)}
+              >
+                <option value="">Tous les types d'exercice</option>
+                {Object.entries(KIND_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            )}
             <select
               className="select-inline cm-sort"
               aria-label="Trier"

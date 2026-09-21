@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from ..db import soft_delete
 from ..audit import log
 from ..deps import DbSession, TeacherUser
 from ..grading.languages import LANGUAGES, enabled_keys, enabled_languages
@@ -511,7 +512,7 @@ def replace_exercises(
                 raise HTTPException(
                     status.HTTP_409_CONFLICT, "Suppression d'exercice impossible après la clôture"
                 )
-            db.delete(exercise)
+            soft_delete(exercise)
 
     action = "correction.params_updated" if frozen else "evaluation.exercises_updated"
     log(db, user, user.organization_id, action, "evaluation", evaluation_id, count=len(payload))
@@ -552,11 +553,7 @@ def delete_evaluation(evaluation_id: int, user: TeacherUser, db: DbSession) -> N
     require_status(evaluation, EvaluationStatus.DRAFT, EvaluationStatus.SCHEDULED)
     log(db, user, user.organization_id, "evaluation.deleted", "evaluation", evaluation.id,
         title=evaluation.title)
-    db.execute(CorrectionRun.__table__.delete().where(CorrectionRun.evaluation_id == evaluation.id))
-    db.execute(Participation.__table__.delete().where(Participation.evaluation_id == evaluation.id))
-    db.execute(AuditLog.__table__.delete().where(
-        AuditLog.target_type == "evaluation", AuditLog.target_id == evaluation.id))
-    db.delete(evaluation)
+    soft_delete(evaluation)
     db.commit()
 
 

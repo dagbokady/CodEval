@@ -1,7 +1,11 @@
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, event
+from sqlalchemy.orm import (DeclarativeBase, Mapped, Session, mapped_column, sessionmaker,
+                            with_loader_criteria)
 
 from .config import settings
 
@@ -29,6 +33,25 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False
 
 class Base(DeclarativeBase):
     pass
+
+
+class SoftDeleteMixin:
+    """Ligne supprimée = deleted_at renseigné ; elle disparaît de toutes les requêtes ORM
+    (y compris les relations) sauf avec execution_options(include_deleted=True)."""
+
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None, index=True)
+
+
+def soft_delete(obj) -> None:
+    obj.deleted_at = datetime.now(timezone.utc)
+
+
+@event.listens_for(Session, "do_orm_execute")
+def _hide_deleted(state) -> None:
+    if state.is_select and not state.execution_options.get("include_deleted", False):
+        state.statement = state.statement.options(with_loader_criteria(
+            SoftDeleteMixin, lambda cls: cls.deleted_at.is_(None), include_aliases=True))
 
 
 def get_db() -> Iterator[Session]:

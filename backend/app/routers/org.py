@@ -7,6 +7,7 @@ import secrets
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, func, select
 
+from ..db import soft_delete
 from ..audit import log
 from ..deps import AdminUser, CurrentUser, DbSession, StructureManager, TeacherUser
 from ..grading.languages import ALGO, DISCIPLINES, enabled_keys
@@ -399,7 +400,8 @@ def delete_subject(subject_id: int, teacher: TeacherUser, db: DbSession) -> None
         )
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.subject_id == subject.id))
     log(db, teacher, teacher.organization_id, "subject.deleted", "subject", subject.id, name=subject.name)
-    db.delete(subject)
+    subject.name = f"{subject.name} (supprimée #{subject.id})"[:120]
+    soft_delete(subject)
     db.commit()
 
 
@@ -555,7 +557,8 @@ def delete_classroom(classroom_id: int, manager: StructureManager, db: DbSession
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.classroom_id == classroom.id))
     log(db, manager, manager.organization_id, "classroom.deleted", "classroom", classroom.id,
         name=classroom.name)
-    db.delete(classroom)
+    classroom.join_code = None
+    soft_delete(classroom)
     db.commit()
 
 

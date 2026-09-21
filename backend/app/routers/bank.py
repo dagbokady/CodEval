@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
+from ..db import soft_delete
 from ..audit import log
 from ..deps import DbSession, TeacherUser
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
@@ -62,6 +63,7 @@ def list_exercises(
     q: str | None = Query(default=None, max_length=120),
     language: str | None = None,
     subject_id: int | None = None,
+    kind: str | None = Query(default=None, max_length=20),
     scope: str = Query("all", pattern="^(all|mine|shared)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -75,6 +77,8 @@ def list_exercises(
         filters.append(BankExercise.language == language)
     if subject_id:
         filters.append(BankExercise.subject_id == subject_id)
+    if kind:
+        filters.append(BankExercise.kind == kind)
     if q:
         pattern = f"%{q.lower()}%"
         filters.append(
@@ -150,7 +154,7 @@ def update_exercise(
 @router.delete("/{exercise_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_exercise(exercise_id: int, user: TeacherUser, db: DbSession) -> None:
     exercise = _load(db, exercise_id, user, for_write=True)
-    db.delete(exercise)
+    soft_delete(exercise)
     log(db, user, user.organization_id, "bank.deleted", "bank_exercise", exercise_id)
     db.commit()
 
