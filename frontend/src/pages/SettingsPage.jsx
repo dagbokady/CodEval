@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import { useLanguages } from '../api/hooks';
 import { PhotoPicker } from '../components/IdentityFields';
 import { SHEET_LAYOUTS, SheetHeader } from '../components/SubjectSheet';
-import { Alert, Avatar, Button, Field, PageHeader } from '../components/ui';
+import { Alert, Avatar, Button, Field, PageHeader, PasswordInput } from '../components/ui';
 import { roleLabel } from '../roles';
 import { formatExamDuration } from '../format';
 import { MODE_LABELS, THEME_MODES, useTheme } from '../theme';
@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
         <Section
           title="Profil"
-          description="Ces informations viennent de votre établissement. Pour les corriger, adressez-vous à son administration."
+          description="Votre nom et votre rôle viennent de votre établissement. L'e-mail et le mot de passe se changent plus bas."
         >
           <dl className="profile-list">
             {[
@@ -79,6 +79,9 @@ export default function SettingsPage() {
             ))}
           </dl>
         </Section>
+
+        <PasswordSection />
+        <EmailSection />
 
         {(user.role === 'teacher' || user.role === 'student') && <PhotoSection />}
 
@@ -118,6 +121,158 @@ export default function SettingsPage() {
         {user.role === 'teacher' && <EvaluationDefaultsSection />}
       </div>
     </>
+  );
+}
+
+/** Nouveau mot de passe, après confirmation de l'actuel. */
+function PasswordSection() {
+  const empty = { current: '', next: '', confirm: '' };
+  const [form, setForm] = useState(empty);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [pending, setPending] = useState(false);
+  const set = (key) => (e) => { setForm({ ...form, [key]: e.target.value }); setNotice(null); };
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (form.next.length < 8) { setError('Le nouveau mot de passe doit contenir au moins 8 caractères.'); return; }
+    if (form.next !== form.confirm) { setError('Les deux mots de passe ne correspondent pas.'); return; }
+    setError(null);
+    setPending(true);
+    try {
+      await api('/api/auth/me/password', {
+        method: 'PUT',
+        body: { current_password: form.current, new_password: form.next },
+      });
+      setForm(empty);
+      setNotice('Mot de passe modifié.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Section title="Mot de passe" description="Au moins 8 caractères. Votre mot de passe actuel est demandé pour le changer.">
+      <form onSubmit={onSubmit} noValidate className="settings-form">
+        <Field label="Mot de passe actuel" id="pwd-current">
+          <PasswordInput id="pwd-current" autoComplete="current-password" value={form.current} onChange={set('current')} />
+        </Field>
+        <div className="row">
+          <Field label="Nouveau mot de passe" id="pwd-next">
+            <PasswordInput id="pwd-next" autoComplete="new-password" value={form.next} onChange={set('next')} />
+          </Field>
+          <Field label="Confirmer" id="pwd-confirm">
+            <PasswordInput id="pwd-confirm" autoComplete="new-password" value={form.confirm} onChange={set('confirm')} />
+          </Field>
+        </div>
+        {error && <Alert>{error}</Alert>}
+        <div className="settings-actions">
+          <Button type="submit" disabled={pending || !form.current || !form.next}>
+            {pending ? 'Modification…' : 'Changer le mot de passe'}
+          </Button>
+          {notice && <span className="sub" role="status">{notice}</span>}
+        </div>
+      </form>
+    </Section>
+  );
+}
+
+/** Nouvelle adresse : un code y est envoyé, elle ne remplace l'ancienne qu'une fois confirmée. */
+function EmailSection() {
+  const { user, updateUser } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [pending, setPending] = useState(false);
+
+  async function run(action) {
+    setError(null);
+    setNotice(null);
+    setPending(true);
+    try {
+      await action();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const sendCode = (event) => {
+    event?.preventDefault();
+    return run(async () => {
+      await api('/api/auth/me/email-code', { method: 'POST', body: { email, current_password: password } });
+      setSent(true);
+      setNotice(`Code envoyé à ${email}. Pensez aux courriers indésirables.`);
+    });
+  };
+
+  const confirm = (event) => {
+    event.preventDefault();
+    return run(async () => {
+      updateUser(await api('/api/auth/me/email', { method: 'PUT', body: { email, code } }));
+      setSent(false);
+      setEmail('');
+      setPassword('');
+      setCode('');
+      setNotice('Adresse modifiée : connectez-vous désormais avec celle-ci.');
+    });
+  };
+
+  return (
+    <Section title="Adresse e-mail" description={`Actuelle : ${user.email}. Elle sert à vous connecter et à recevoir les liens de réinitialisation.`}>
+      {!sent ? (
+        <form onSubmit={sendCode} noValidate className="settings-form">
+          <div className="row">
+            <Field label="Nouvelle adresse" id="email-new">
+              <input id="email-new" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </Field>
+            <Field label="Mot de passe actuel" id="email-pwd">
+              <PasswordInput id="email-pwd" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </Field>
+          </div>
+          {error && <Alert>{error}</Alert>}
+          <div className="settings-actions">
+            <Button type="submit" disabled={pending || !email.trim() || !password}>
+              {pending ? 'Envoi…' : 'Recevoir un code'}
+            </Button>
+            {notice && <span className="sub" role="status">{notice}</span>}
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={confirm} noValidate className="settings-form">
+          <Field label="Code reçu" id="email-change-code">
+            <input
+              id="email-change-code"
+              className="email-code-input"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              style={{ maxWidth: 200 }}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            />
+          </Field>
+          {error && <Alert>{error}</Alert>}
+          <div className="settings-actions">
+            <Button type="submit" disabled={pending || code.length !== 6}>
+              {pending ? 'Vérification…' : 'Confirmer la nouvelle adresse'}
+            </Button>
+            <Button variant="secondary" disabled={pending} onClick={() => sendCode()}>Renvoyer le code</Button>
+            <Button variant="ghost" onClick={() => { setSent(false); setCode(''); setNotice(null); setError(null); }}>
+              Annuler
+            </Button>
+            {notice && <span className="sub" role="status">{notice}</span>}
+          </div>
+        </form>
+      )}
+    </Section>
   );
 }
 

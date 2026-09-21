@@ -419,3 +419,70 @@ def test_enseignant_regle_l_entete_des_feuilles(teacher):
     ).json()["access_token"]
     res = client.put("/api/auth/me/sheet-header", headers=auth(student), json=header)
     assert res.status_code == 403
+
+
+def _nouvel_enseignant(email: str) -> str:
+    res = client.post(
+        "/api/auth/register-teacher",
+        json={"full_name": "Awa Traoré", "email": email, "password": "motdepasse1",
+              "photo": PHOTO, "gender": "F", "email_code": email_code(email)},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["access_token"]
+
+
+def test_chacun_change_son_mot_de_passe(teacher):
+    token = _nouvel_enseignant("awa@perso.ci")
+    res = client.put("/api/auth/me/password", headers=auth(token),
+                     json={"current_password": "mauvais", "new_password": "nouveaumdp1"})
+    assert res.status_code == 400
+    res = client.put("/api/auth/me/password", headers=auth(token),
+                     json={"current_password": "motdepasse1", "new_password": "nouveaumdp1"})
+    assert res.status_code == 200, res.text
+    assert client.post("/api/auth/login", json={"email": "awa@perso.ci", "password": "motdepasse1"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "awa@perso.ci", "password": "nouveaumdp1"}).status_code == 200
+
+
+def test_changer_d_adresse_demande_un_code_envoye_a_la_nouvelle(teacher):
+    token = _nouvel_enseignant("bintou@perso.ci")
+    body = {"email": "bintou.new@perso.ci", "current_password": "motdepasse1"}
+    res = client.post("/api/auth/me/email-code", headers=auth(token),
+                      json={**body, "current_password": "mauvais"})
+    assert res.status_code == 400
+    res = client.post("/api/auth/me/email-code", headers=auth(token),
+                      json={**body, "email": "kone@perso.ci"})
+    assert res.status_code == 409, "adresse déjà prise"
+    res = client.post("/api/auth/me/email-code", headers=auth(token), json=body)
+    assert res.status_code == 200, res.text
+    code = MAILBOX["bintou.new@perso.ci"]
+    wrong = "000000" if code != "000000" else "111111"
+    res = client.put("/api/auth/me/email", headers=auth(token),
+                     json={"email": "bintou.new@perso.ci", "code": wrong})
+    assert res.status_code == 400
+    res = client.put("/api/auth/me/email", headers=auth(token),
+                     json={"email": "bintou.new@perso.ci", "code": code})
+    assert res.status_code == 200, res.text
+    assert res.json()["email"] == "bintou.new@perso.ci"
+    assert client.post("/api/auth/login", json={"email": "bintou@perso.ci", "password": "motdepasse1"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "bintou.new@perso.ci", "password": "motdepasse1"}).status_code == 200
+
+
+def test_mot_de_passe_oublie_par_lien(teacher):
+    from app.models import PasswordResetToken
+
+    assert client.post("/api/auth/forgot-password", json={"email": "inconnu@perso.ci"}).json() == {"ok": True}
+    for _ in range(2):
+        assert client.post("/api/auth/forgot-password", json={"email": "kone@perso.ci"}).status_code == 200
+    db = SessionLocal()
+    try:
+        tokens = [t.token for t in db.query(PasswordResetToken).order_by(PasswordResetToken.id)]
+    finally:
+        db.close()
+    assert len(tokens) == 2
+    res = client.post("/api/auth/reset-password", json={"token": tokens[-1], "password": "reinit12345"})
+    assert res.status_code == 200, res.text
+    # Le lien utilisé comme le précédent ne servent plus.
+    for token in tokens:
+        res = client.post("/api/auth/reset-password", json={"token": token, "password": "autre12345"})
+        assert res.status_code == 400
+    assert client.post("/api/auth/login", json={"email": "kone@perso.ci", "password": "reinit12345"}).status_code == 200

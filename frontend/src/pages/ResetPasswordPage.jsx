@@ -16,7 +16,7 @@ export default function ResetPasswordPage() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caracteres.'); return; }
+    if (password.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères.'); return; }
     if (password !== confirm) { setError('Les mots de passe ne correspondent pas.'); return; }
     setError(null);
     setPending(true);
@@ -42,9 +42,9 @@ export default function ResetPasswordPage() {
         <div className="auth-zone">
           <div className="auth-card">
             <h1>Lien invalide</h1>
-            <p>Ce lien de reinitialisation est invalide ou a expire.</p>
+            <p>Ce lien de réinitialisation est invalide ou a expiré.</p>
             <div className="auth-footer">
-              <Link to="/connexion">Retour a la connexion</Link>
+              <Link to="/connexion">Retour à la connexion</Link>
             </div>
           </div>
         </div>
@@ -63,8 +63,8 @@ export default function ResetPasswordPage() {
       <div className="auth-zone">
         {done ? (
           <div className="auth-card">
-            <h1>Mot de passe modifie</h1>
-            <p>Votre mot de passe a ete reinitialise avec succes.</p>
+            <h1>Mot de passe modifié</h1>
+            <p>Votre mot de passe a été réinitialisé avec succes.</p>
             <div className="auth-footer">
               <Link to="/connexion">Se connecter</Link>
             </div>
@@ -94,7 +94,7 @@ export default function ResetPasswordPage() {
               />
             </Field>
             <Button size="large" type="submit" disabled={pending}>
-              {pending ? 'Modification...' : 'Modifier le mot de passe'}
+              {pending ? 'Modification…' : 'Modifier le mot de passe'}
             </Button>
           </form>
         )}

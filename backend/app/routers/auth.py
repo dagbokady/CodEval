@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from datetime import timedelta
@@ -11,13 +12,16 @@ from ..audit import log
 from ..config import settings
 from ..deps import CurrentUser, DbSession
 from ..email_verification import check_code, send_code
-from ..mail import send_email
+from ..mail import mail_configured, send_email
 from ..models import Organization, PasswordResetToken, Role, User, utcnow
 from ..rate_limit import limiter
 from ..schemas import (
+    EmailChangeConfirm,
+    EmailChangeRequest,
     EmailCodeRequest,
     ForgotPasswordPayload,
     LoginPayload,
+    PasswordChange,
     PhotoUpdate,
     RegisterTeacher,
     ResetPasswordPayload,
@@ -29,6 +33,7 @@ from ..security import create_access_token, hash_password, verify_password
 from ..workspace import create_personal_space, email_taken
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+logger = logging.getLogger("codeval.mail")
 
 
 def _slugify(value: str) -> str:
@@ -121,9 +126,17 @@ def login(payload: LoginPayload, request: Request, db: DbSession) -> TokenOut:
 
 
 @router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordPayload, db: DbSession) -> dict:
+def forgot_password(payload: ForgotPasswordPayload, request: Request, db: DbSession) -> dict:
     """Envoie un e-mail de réinitialisation. Répond toujours 200 pour ne pas
     révéler l'existence d'un compte."""
+    key = f"reset:{_rate_limit_key(request, payload.email)}"
+    if limiter.is_locked(key):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Trop de demandes. Réessayez dans {settings.login_lockout_minutes} minutes.",
+        )
+    limiter.record_failure(key)
+
     user = db.scalar(select(User).where(func.lower(User.email) == payload.email.lower()))
     if user is None or not user.is_active:
         return {"ok": True}
@@ -134,6 +147,10 @@ def forgot_password(payload: ForgotPasswordPayload, db: DbSession) -> dict:
     db.commit()
 
     link = f"{settings.frontend_url}/reset-password?token={token_str}"
+    if not mail_configured():
+        # Développement : sans service d'envoi, le lien se lit dans les journaux.
+        logger.warning("Lien de réinitialisation pour %s : %s", user.email, link)
+        return {"ok": True}
     send_email(
         user.email,
         "CodEval - Réinitialisation de votre mot de passe",
@@ -142,6 +159,9 @@ def forgot_password(payload: ForgotPasswordPayload, db: DbSession) -> dict:
 <p><a href="{link}">{link}</a></p>
 <p>Ce lien est valable {settings.reset_token_minutes} minutes.</p>
 <p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.</p>""",
+        f"Bonjour {user.full_name},\n\nPour réinitialiser votre mot de passe CodEval, ouvrez ce lien :\n"
+        f"{link}\n\nIl est valable {settings.reset_token_minutes} minutes.\n"
+        "Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.",
     )
     return {"ok": True}
 
@@ -165,7 +185,14 @@ def reset_password(payload: ResetPasswordPayload, db: DbSession) -> dict:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Lien invalide ou expiré")
 
     user.password_hash = hash_password(payload.password)
-    reset.used_at = now
+    # Le lien utilisé et ceux demandés avant lui ne servent plus.
+    for pending in db.scalars(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)
+        )
+    ):
+        pending.used_at = now
+    log(db, user, user.organization_id, "auth.password_reset", "user", user.id)
     db.commit()
     return {"ok": True}
 
@@ -203,6 +230,65 @@ def update_sheet_header(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès réservé aux enseignants")
     user.sheet_header = payload.model_dump()
     log(db, user, user.organization_id, "user.sheet_header_updated", "user", user.id)
+    db.commit()
+    db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+def _check_current_password(request: Request, user: User, password: str) -> None:
+    """Redemande le mot de passe avant de toucher aux identifiants du compte :
+    une session laissée ouverte ne suffit pas à les changer."""
+    key = f"me:{_rate_limit_key(request, user.email)}"
+    if limiter.is_locked(key):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Trop de tentatives. Réessayez dans {settings.login_lockout_minutes} minutes.",
+        )
+    if not verify_password(password, user.password_hash):
+        limiter.record_failure(key)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Mot de passe actuel incorrect")
+    limiter.reset(key)
+
+
+@router.put("/me/password")
+def change_password(
+    payload: PasswordChange, request: Request, user: CurrentUser, db: DbSession
+) -> dict:
+    """Chacun change son mot de passe en donnant l'actuel."""
+    _check_current_password(request, user, payload.current_password)
+    user.password_hash = hash_password(payload.new_password)
+    log(db, user, user.organization_id, "user.password_changed", "user", user.id)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/me/email-code")
+def request_email_change(
+    payload: EmailChangeRequest, request: Request, user: CurrentUser, db: DbSession
+) -> dict:
+    """Premier temps du changement d'adresse : un code part à la nouvelle."""
+    _check_current_password(request, user, payload.current_password)
+    if payload.email.lower() == user.email.lower():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "C'est déjà votre adresse actuelle.")
+    if email_taken(db, payload.email):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
+    send_code(db, payload.email, client_ip(request), change=True)
+    return {
+        "ok": True,
+        "expires_in": settings.email_code_minutes * 60,
+        "resend_in": settings.email_code_resend_seconds,
+    }
+
+
+@router.put("/me/email", response_model=UserOut)
+def confirm_email_change(payload: EmailChangeConfirm, user: CurrentUser, db: DbSession) -> UserOut:
+    """Second temps : le code reçu prouve que la nouvelle adresse est bien à lui."""
+    if email_taken(db, payload.email):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
+    check_code(db, payload.email, payload.code)
+    old = user.email
+    user.email = payload.email.lower()
+    log(db, user, user.organization_id, "user.email_changed", "user", user.id, previous=old)
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)

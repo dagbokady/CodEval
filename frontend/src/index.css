@@ -3507,3 +3507,9 @@ tr.row-confirm:hover { background: none; }
   .class-bars li { grid-template-columns: minmax(70px, 110px) minmax(0, 1fr) 36px; }
   .class-bars-rate { display: none; }
 }
+
+/* Mot de passe et adresse e-mail, dans les paramètres. */
+.settings-form { display: grid; gap: 14px; }
+@media (max-width: 560px) {
+  .settings-form .settings-actions > .btn { flex: 1 1 100%; }
+}

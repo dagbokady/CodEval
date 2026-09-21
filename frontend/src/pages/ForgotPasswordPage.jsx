@@ -38,15 +38,15 @@ export default function ForgotPasswordPage() {
         {sent ? (
           <div className="auth-card">
             <h1>E-mail envoyé</h1>
-            <p>Si un compte correspond a cette adresse, vous recevrez un lien de reinitialisation.</p>
+            <p>Si un compte correspond à cette adresse, vous recevrez un lien de réinitialisation.</p>
             <div className="auth-footer">
-              <Link to="/connexion">Retour a la connexion</Link>
+              <Link to="/connexion">Retour à la connexion</Link>
             </div>
           </div>
         ) : (
           <form className="auth-card" onSubmit={onSubmit} noValidate>
             <h1>Mot de passe oublié</h1>
-            <p className="subtitle">Entrez votre adresse e-mail pour recevoir un lien de reinitialisation.</p>
+            <p className="subtitle">Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.</p>
             <Alert>{error}</Alert>
             <Field label="E-mail" id="email">
               <input
@@ -61,10 +61,10 @@ export default function ForgotPasswordPage() {
               />
             </Field>
             <Button size="large" type="submit" disabled={pending}>
-              {pending ? 'Envoi...' : 'Envoyer le lien'}
+              {pending ? 'Envoi…' : 'Envoyer le lien'}
             </Button>
             <div className="auth-footer">
-              <Link to="/connexion">Retour a la connexion</Link>
+              <Link to="/connexion">Retour à la connexion</Link>
             </div>
           </form>
         )}

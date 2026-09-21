@@ -38,8 +38,9 @@ def _latest(db, email: str) -> EmailVerification | None:
     )
 
 
-def send_code(db, email: str, ip: str) -> None:
-    """Tire un nouveau code pour `email` et l'envoie. Le précédent ne vaut plus."""
+def send_code(db, email: str, ip: str, change: bool = False) -> None:
+    """Tire un nouveau code pour `email` et l'envoie. Le précédent ne vaut plus.
+    `change` : l'adresse remplacera celle d'un compte existant, pas une inscription."""
     email = email.lower()
     now = utcnow()
     db.execute(delete(EmailVerification).where(EmailVerification.created_at < now - timedelta(days=1)))
@@ -79,6 +80,7 @@ def send_code(db, email: str, ip: str) -> None:
         logger.warning("Code de vérification pour %s : %s", email, code)
         return
     minutes = settings.email_code_minutes
+    origin = "ce changement d'adresse" if change else "cette inscription"
     sent = send_email(
         email,
         f"CodEval : votre code de vérification {code}",
@@ -86,10 +88,10 @@ def send_code(db, email: str, ip: str) -> None:
 <p>Voici le code pour confirmer votre adresse e-mail sur CodEval :</p>
 <p style="font-size:28px;font-weight:700;letter-spacing:6px;font-family:monospace">{code}</p>
 <p>Il est valable {minutes} minutes.</p>
-<p>Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail.</p>""",
+<p>Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.</p>""",
         f"Votre code de vérification CodEval : {code}\n\n"
         f"Il est valable {minutes} minutes.\n"
-        "Si vous n'êtes pas à l'origine de cette inscription, ignorez cet e-mail.",
+        f"Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.",
     )
     if not sent:
         raise HTTPException(
