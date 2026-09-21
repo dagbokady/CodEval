@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     reset_token_minutes: int = 30
 
+    # Compte d'administration créé par `python -m app.seed`
+    org_name: str = ""
+    admin_email: str = ""
+    admin_password: str = ""
+    admin_name: str = "Administration"
+
     @property
     def origins(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

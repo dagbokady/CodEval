@@ -1,157 +1,81 @@
-"""Jeu de données initial : python -m app.seed
+"""Installation initiale : python -m app.seed
 
-Un administrateur, une seule enseignante, une seule classe, deux matières : le langage C et
-l'initiation à l'algorithmique, qui se répondent : la première se travaille avec
-l'éditeur de code, la seconde avec l'éditeur de blocs. Aucun exercice ni
-évaluation : l'enseignante crée les siens depuis l'interface.
+Crée l'établissement et son compte d'administration, rien d'autre : ni
+enseignant, ni étudiant, ni classe, ni exercice, ni évaluation. L'administrateur
+invite ensuite les enseignants et configure l'établissement depuis l'interface.
 
-Le script est rejouable : sur une base déjà installée, il n'ajoute que les
-matières manquantes et les rattachements qui vont avec, et le compte
-d'administration s'il manque.
+Le nom de l'établissement, l'e-mail et le mot de passe de l'administrateur sont
+lus dans `.env` (voir `.env.example`) :
+
+    CODEVAL_ORG_NAME, CODEVAL_ADMIN_EMAIL, CODEVAL_ADMIN_PASSWORD, CODEVAL_ADMIN_NAME
+
+Le script est rejouable : un compte déjà présent sous cet e-mail n'est pas recréé.
 """
 
 from __future__ import annotations
 
+import sys
+
 from sqlalchemy import select
 
+from .config import settings
 from .db import SessionLocal, init_db
-from .models import (
-    Classroom,
-    Enrollment,
-    Organization,
-    Role,
-    Subject,
-    TeacherAssignment,
-    User,
-)
+from .exports import slugify
+from .models import Organization, Role, User
 from .security import hash_password
 
-ORG_NAME = "ESATIC (École Supérieure Africaine des TIC)"
-ORG_SLUG = "esatic"
-PASSWORD = "codeval2026"
 
-ADMIN = ("admin@esatic.ci", "Administration ESATIC")
-TEACHER = ("dr.johnson@esatic.ci", "Dr Johnson")
-CLASSROOM = ("SRIT 2A", "2ᵉ année")
-SUBJECTS = ["Langage C", "Initiation à l'algorithmique"]
-STUDENTS = [
-    ("coulibaly.moussa@esatic.ci", "Coulibaly Moussa", "SRIT2A-001"),
-    ("kone.aminata@esatic.ci", "Koné Aminata", "SRIT2A-002"),
-    ("traore.ibrahim@esatic.ci", "Traoré Ibrahim", "SRIT2A-003"),
-    ("bamba.fatou@esatic.ci", "Bamba Fatou", "SRIT2A-004"),
-    ("diallo.sekou@esatic.ci", "Diallo Sékou", "SRIT2A-005"),
-]
-
-
-def _compléter_matières(db, org: Organization) -> list[str]:
-    """Les matières du catalogue absentes de l'établissement, créées et rattachées.
-
-    Une matière ajoutée au catalogue après la première installation n'a aucune
-    raison de manquer aux bases déjà en service : on la crée, et on y rattache
-    les enseignants là où ils enseignent déjà.
-    """
-    ajoutées: list[str] = []
-    classrooms = db.scalars(select(Classroom).where(Classroom.organization_id == org.id)).all()
-    teachers = db.scalars(
-        select(User).where(User.organization_id == org.id, User.role == Role.TEACHER)
-    ).all()
-
-    for name in SUBJECTS:
-        if db.scalar(
-            select(Subject).where(Subject.organization_id == org.id, Subject.name == name)
-        ):
-            continue
-        subject = Subject(organization_id=org.id, name=name)
-        db.add(subject)
-        db.flush()
-        ajoutées.append(name)
-        for teacher in teachers:
-            for classroom in classrooms:
-                db.add(
-                    TeacherAssignment(
-                        teacher_id=teacher.id,
-                        classroom_id=classroom.id,
-                        subject_id=subject.id,
-                    )
-                )
-    return ajoutées
-
-
-def _compléter_admin(db, org: Organization) -> bool:
-    """Le compte d'administration, créé s'il manque à une base déjà installée."""
-    if db.scalar(select(User).where(User.email == ADMIN[0])):
-        return False
-    db.add(
-        User(
-            organization_id=org.id,
-            email=ADMIN[0],
-            password_hash=hash_password(PASSWORD),
-            full_name=ADMIN[1],
-            role=Role.ADMIN,
+def _config() -> tuple[str, str, str, str]:
+    manquantes = [
+        nom
+        for nom, valeur in (
+            ("CODEVAL_ORG_NAME", settings.org_name),
+            ("CODEVAL_ADMIN_EMAIL", settings.admin_email),
+            ("CODEVAL_ADMIN_PASSWORD", settings.admin_password),
         )
+        if not valeur.strip()
+    ]
+    if manquantes:
+        sys.exit(f"Variables manquantes dans .env : {', '.join(manquantes)}")
+    if settings.admin_password == "change-me":
+        sys.exit("CODEVAL_ADMIN_PASSWORD vaut encore la valeur d'exemple : choisissez un mot de passe.")
+    return (
+        settings.org_name.strip(),
+        settings.admin_email.strip().lower(),
+        settings.admin_password,
+        settings.admin_name.strip() or "Administration",
     )
-    return True
 
 
 def main() -> None:
+    org_name, email, password, full_name = _config()
     init_db()
     db = SessionLocal()
     try:
-        existante = db.scalar(select(Organization).where(Organization.slug == ORG_SLUG))
-        if existante:
-            ajoutées = _compléter_matières(db, existante)
-            admin = _compléter_admin(db, existante)
-            db.commit()
-            if ajoutées:
-                print(f"Matière ajoutée : {', '.join(ajoutées)}")
-            if admin:
-                print(f"Administrateur ajouté : {ADMIN[1]} <{ADMIN[0]}>")
-            if not ajoutées and not admin:
-                print("Jeu de données déjà présent.")
+        if db.scalar(select(User).where(User.email == email)):
+            print(f"Administrateur déjà présent : {email}")
             return
 
-        org = Organization(name=ORG_NAME, slug=ORG_SLUG, settings={})
-        db.add(org)
-        db.flush()
+        slug = slugify(org_name)
+        org = db.scalar(select(Organization).where(Organization.slug == slug))
+        if org is None:
+            org = Organization(name=org_name, slug=slug, settings={})
+            db.add(org)
+            db.flush()
 
-        def user(email: str, name: str, role: Role, matricule: str | None = None) -> User:
-            u = User(
+        db.add(
+            User(
                 organization_id=org.id,
                 email=email,
-                password_hash=hash_password(PASSWORD),
-                full_name=name,
-                role=role,
-                matricule=matricule,
+                password_hash=hash_password(password),
+                full_name=full_name,
+                role=Role.ADMIN,
             )
-            db.add(u)
-            return u
-
-        user(ADMIN[0], ADMIN[1], Role.ADMIN)
-        teacher = user(TEACHER[0], TEACHER[1], Role.TEACHER)
-        students = [user(email, name, Role.STUDENT, mat) for email, name, mat in STUDENTS]
-        db.flush()
-
-        subjects = [Subject(organization_id=org.id, name=name) for name in SUBJECTS]
-        classroom = Classroom(organization_id=org.id, name=CLASSROOM[0], level=CLASSROOM[1])
-        db.add_all([*subjects, classroom])
-        db.flush()
-
-        for student in students:
-            db.add(Enrollment(classroom_id=classroom.id, student_id=student.id))
-        for subject in subjects:
-            db.add(
-                TeacherAssignment(
-                    teacher_id=teacher.id, classroom_id=classroom.id, subject_id=subject.id
-                )
-            )
+        )
         db.commit()
 
-        print(f"Établissement    : {ORG_NAME}")
-        print(f"Administrateur   : {ADMIN[1]} <{ADMIN[0]}>")
-        print(f"Enseignante      : {TEACHER[1]} <{TEACHER[0]}>")
-        print(f"Classe           : {CLASSROOM[0]} ({len(students)} étudiants)")
-        print(f"Matières         : {' · '.join(SUBJECTS)}")
-        print(f"Mot de passe     : {PASSWORD}")
+        print(f"Établissement  : {org.name}")
+        print(f"Administrateur : {full_name} <{email}>")
     finally:
         db.close()
 

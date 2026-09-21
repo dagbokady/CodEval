@@ -129,22 +129,15 @@ Il n'a accès qu'à ses épreuves et à ses copies. Il ne crée rien.
 - Aucun rôle ne voit les données d'une autre organisation : chaque requête est
   filtrée sur `organization_id`.
 
-### 2.4 Le jeu de données initial
+### 2.4 L'installation initiale
 
-`python -m app.seed` crée exactement :
+`python -m app.seed` crée uniquement l'établissement et son compte
+d'administration, à partir des variables de `.env` (copié depuis
+`.env.example`) : `CODEVAL_ORG_NAME`, `CODEVAL_ADMIN_EMAIL`,
+`CODEVAL_ADMIN_PASSWORD` et, facultatif, `CODEVAL_ADMIN_NAME`.
 
-| | |
-|---|---|
-| Établissement | ESATIC : École Supérieure Africaine des TIC |
-| Administration | **Administration ESATIC** `admin@esatic.ci` |
-| Enseignante | **Dr Johnson** `dr.johnson@esatic.ci` |
-| Classe | **SRIT 2A** (2ᵉ année), 5 étudiants |
-| Matière | **Langage C** |
-| Étudiants | Coulibaly Moussa, Koné Aminata, Traoré Ibrahim, Bamba Fatou, Diallo Sékou |
-| Mot de passe | `codeval2026` |
-
-Aucune évaluation, aucun exercice : Dr Johnson crée les siens depuis
-l'interface.
+Aucun enseignant, étudiant, classe, matière, exercice ni évaluation :
+l'administrateur configure l'établissement depuis l'interface.
 
 ## 3. Authentification et compte
 

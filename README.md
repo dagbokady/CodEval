@@ -35,8 +35,16 @@ python3.12 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Renseigner `CODEVAL_SECRET_KEY` dans `.env`, puis charger le jeu de démonstration et
-démarrer l'API :
+Renseigner dans `.env` la clé `CODEVAL_SECRET_KEY` et le compte d'administration :
+
+| Variable | Rôle |
+| --- | --- |
+| `CODEVAL_ORG_NAME` | nom de l'établissement |
+| `CODEVAL_ADMIN_EMAIL` | e-mail de connexion de l'administrateur |
+| `CODEVAL_ADMIN_PASSWORD` | son mot de passe (la valeur d'exemple `change-me` est refusée) |
+| `CODEVAL_ADMIN_NAME` | nom affiché (facultatif, `Administration` par défaut) |
+
+Créer ensuite l'établissement et son administrateur, puis démarrer l'API :
 
 ```bash
 ./.venv/bin/python -m app.seed
@@ -61,13 +69,12 @@ npm install && npm run dev
 Interface sur <http://localhost:5173>, documentation de l'API sur
 <http://localhost:8000/docs>.
 
-Comptes chargés par le jeu de démonstration, tous avec le mot de passe `codeval2026` :
-
-| Compte | Rôle |
-| --- | --- |
-| `admin@esatic.ci` | administration de l'établissement |
-| `dr.johnson@esatic.ci` | enseignante |
-| `coulibaly.moussa@esatic.ci` … `diallo.sekou@esatic.ci` | les 5 étudiants de la classe SRIT 2A |
+La base démarre vide : `app.seed` ne crée que l'établissement et le compte
+d'administration définis dans `.env`. Se connecter avec cet e-mail et ce mot de passe,
+puis créer depuis l'espace Établissement les matières, les classes et les comptes
+enseignants. Les enseignants créent ensuite leurs exercices et leurs évaluations, et
+les étudiants rejoignent leur classe par code ou lien d'invitation. Le script est
+rejouable : il ne recrée pas un administrateur déjà présent.
 
 ## Ce que fait la plateforme
 

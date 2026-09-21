@@ -302,7 +302,7 @@ button { font: inherit; }
 /* ========== Menu d'actions ========== */
 .menu { position: relative; display: inline-flex; }
 .menu-list {
-  position: absolute; top: calc(100% + 4px); right: 0; z-index: 20;
+  position: fixed; z-index: 200;
   min-width: 180px; padding: 4px;
   background: var(--bg-card); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-elevated);

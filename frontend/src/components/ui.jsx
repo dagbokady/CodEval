@@ -1,4 +1,5 @@
 import { Children, cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { useDocumentTitle } from '../useDocumentTitle';
 
@@ -43,22 +44,47 @@ export function Status({ tone = 'neutral', children, className, ...props }) {
  * clic extérieur, à Échap et après un choix. Avec `trigger`, le déclencheur est
  * un bouton secondaire qui porte ce libellé (« Exporter ▾ »).
  */
+// La liste est rendue hors du flux (dans <body> ou la <dialog> parente), en position fixe sous le bouton : dans un
+// tableau, `.table-wrap` défile (overflow) et coupait une liste positionnée
+// en absolu, si bien que les actions restaient invisibles.
 export function Menu({ label = 'Plus d’actions', items, trigger }) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState(null);
+  const [host, setHost] = useState(null);
   const ref = useRef(null);
+  const listRef = useRef(null);
+  const buttonRef = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const listHeight = listRef.current?.offsetHeight ?? 0;
+      const below = rect.bottom + 4;
+      const top = below + listHeight > window.innerHeight && rect.top - 4 - listHeight > 0
+        ? rect.top - 4 - listHeight
+        : below;
+      setPosition({ top, right: Math.max(4, window.innerWidth - rect.right) });
+    };
+    place();
+    const frame = requestAnimationFrame(place);
     const onPointer = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+      const inside = ref.current?.contains(event.target) || listRef.current?.contains(event.target);
+      if (!inside) setOpen(false);
     };
     const onKey = (event) => {
       if (event.key === 'Escape') setOpen(false);
     };
     document.addEventListener('mousedown', onPointer);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener('mousedown', onPointer);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
     };
   }, [open]);
   const visible = items.filter(Boolean);
@@ -66,6 +92,7 @@ export function Menu({ label = 'Plus d’actions', items, trigger }) {
   return (
     <div className="menu" ref={ref}>
       <button
+        ref={buttonRef}
         type="button"
         className={trigger ? 'btn secondary menu-trigger' : 'icon-btn'}
         aria-label={trigger ? undefined : label}
@@ -74,6 +101,7 @@ export function Menu({ label = 'Plus d’actions', items, trigger }) {
         aria-expanded={open}
         onClick={(event) => {
           event.stopPropagation();
+          setHost(event.currentTarget.closest('dialog') ?? document.body);
           setOpen((value) => !value);
         }}
       >
@@ -92,30 +120,45 @@ export function Menu({ label = 'Plus d’actions', items, trigger }) {
           </svg>
         )}
       </button>
-      {open && (
-        <div className="menu-list" role="menu">
-          {visible.map((item) =>
-            item === 'separator' ? (
-              <div key={`sep-${visible.indexOf(item)}`} className="menu-sep" role="separator" />
-            ) : (
-              <button
-                key={item.label}
-                type="button"
-                role="menuitem"
-                className={item.danger ? 'menu-danger' : undefined}
-                disabled={item.disabled}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setOpen(false);
-                  item.onClick();
-                }}
-              >
-                {item.label}
-              </button>
-            ),
-          )}
-        </div>
-      )}
+      {open &&
+        host &&
+        createPortal(
+          <div
+            ref={listRef}
+            className="menu-list"
+            role="menu"
+            style={{
+              position: 'fixed',
+              top: position?.top ?? 0,
+              right: position?.right ?? 0,
+              visibility: position ? 'visible' : 'hidden',
+            }}
+          >
+            {visible.map((item, index) =>
+              item === 'separator' ? (
+                <div key={`sep-${index}`} className="menu-sep" role="separator" />
+              ) : (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  className={item.danger ? 'menu-danger' : undefined}
+                  disabled={item.disabled}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setOpen(false);
+                    item.onClick();
+                  }}
+                >
+                  {item.label}
+                </button>
+              ),
+            )}
+          </div>,
+          // Une <dialog> ouverte par showModal() passe au-dessus de <body> :
+          // la liste d'un menu placé dedans doit y rester pour être visible.
+          host,
+        )}
     </div>
   );
 }

@@ -20,8 +20,12 @@ python3.12 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Renseigner ensuite `CODEVAL_SECRET_KEY` dans `.env` : par exemple avec une clé générée
-par `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+Renseigner ensuite dans `.env` :
+
+- `CODEVAL_SECRET_KEY`, par exemple avec une clé générée par
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"` ;
+- le compte d'administration : `CODEVAL_ORG_NAME`, `CODEVAL_ADMIN_EMAIL`,
+  `CODEVAL_ADMIN_PASSWORD` et, facultatif, `CODEVAL_ADMIN_NAME`.
 
 Base de données : soit un PostgreSQL local :
 
@@ -41,7 +45,8 @@ soit le conteneur fourni :
 docker compose up -d db
 ```
 
-Le schéma est créé au démarrage de l'API. Jeu de démonstration facultatif :
+Le schéma est créé au démarrage de l'API. Création de l'établissement et de son
+administrateur, à partir des variables de `.env` :
 
 ```bash
 ./.venv/bin/python -m app.seed
@@ -63,8 +68,9 @@ Le worker de correction, dans un autre terminal :
 
 Documentation interactive de l'API : <http://localhost:8000/docs>.
 
-Comptes de démonstration (mot de passe `codeval2026`) : `admin@demo.ci` (établissement),
-`prof@demo.ci` (enseignant), `kone@demo.ci` (apprenant).
+Aucun autre compte ni contenu n'est créé : l'administrateur se connecte avec l'e-mail
+et le mot de passe de `.env`, puis crée matières, classes et enseignants depuis
+l'interface.
 
 ## Configuration
 
@@ -84,6 +90,10 @@ Toutes les variables sont préfixées `CODEVAL_` et lues depuis l'environnement 
 | `SANDBOX_COMPILE_TIMEOUT` | délai de compilation | `20` |
 | `SANDBOX_MAX_PROCESSES` | processus par exécution (Linux) | `64` |
 | `WORKER_POLL_SECONDS` | fréquence de scrutation des campagnes | `2.0` |
+| `ORG_NAME` | nom de l'établissement créé par `app.seed` | (obligatoire pour le seed) |
+| `ADMIN_EMAIL` | e-mail de l'administrateur créé par `app.seed` | (obligatoire pour le seed) |
+| `ADMIN_PASSWORD` | mot de passe de cet administrateur | (obligatoire pour le seed) |
+| `ADMIN_NAME` | nom affiché de l'administrateur | `Administration` |
 
 ## Organisation du code
 
@@ -112,7 +122,7 @@ app/
     engine.py     compilation, exécution des tests, calcul des notes
   worker.py      consommation des campagnes de correction
   exports.py     génération du classeur Excel des résultats
-  seed.py        jeu de données de démonstration
+  seed.py        création de l'établissement et de son administrateur
 ```
 
 Séparation des responsabilités : les routers ne portent que le transport et
