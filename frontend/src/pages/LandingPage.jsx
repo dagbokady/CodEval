@@ -4,19 +4,32 @@ import '../styles/landing.css';
 
 const STEPS = [
   {
-    title: 'Préparer',
+    who: 'Enseignant',
+    title: "Préparer l'épreuve",
     text:
       "Vous rédigez les exercices, le code de départ et les jeux de tests. Le barème se pose en dernier, une fois les tests écrits.",
+    Illustration: PrepareSheet,
   },
   {
+    who: 'Enseignant',
+    title: 'Inviter la classe',
+    text:
+      "Chaque classe a son code, à écrire au tableau. Vous pouvez aussi envoyer un lien d'invitation, qui expire de lui-même.",
+    Illustration: InviteSheet,
+  },
+  {
+    who: 'Étudiant',
     title: 'Composer',
     text:
-      "Vos étudiants écrivent leur programme dans un environnement contrôlé, sans pouvoir l'exécuter. Chaque frappe est sauvegardée.",
+      "L'étudiant écrit son programme en plein écran, sans pouvoir l'exécuter, comme sur papier. Chaque frappe est sauvegardée.",
+    Illustration: ExamSheet,
   },
   {
-    title: 'Corriger',
+    who: 'CodEval, puis vous',
+    title: 'Corriger et publier',
     text:
       "À la clôture, les copies sont figées. CodEval compile, exécute les tests en bac à sable et note chaque exercice. Vous relisez, puis publiez.",
+    Illustration: ResultsSheet,
   },
 ];
 
@@ -83,13 +96,22 @@ export default function LandingPage() {
 
         <section className="landing-section" id="fonctionnement">
           <div className="landing-wrap">
-            <h2 className="landing-h2">Trois temps, dans cet ordre</h2>
-            <ol className="landing-steps">
-              {STEPS.map((step, index) => (
-                <li key={step.title}>
-                  <span className="landing-step-num">{String(index + 1).padStart(2, '0')}</span>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
+            <h2 className="landing-h2">Comment ça fonctionne</h2>
+            <p className="landing-body landing-body--narrow">
+              Quatre temps, dans cet ordre. De la préparation à la note publiée, rien ne sort
+              de la plateforme.
+            </p>
+            <ol className="landing-how">
+              {STEPS.map(({ who, title, text, Illustration }, index) => (
+                <li key={title} className="landing-how-step">
+                  <div className="landing-how-text">
+                    <span className="landing-step-num">
+                      {String(index + 1).padStart(2, '0')} · {who}
+                    </span>
+                    <h3>{title}</h3>
+                    <p>{text}</p>
+                  </div>
+                  <Illustration />
                 </li>
               ))}
             </ol>
@@ -231,6 +253,90 @@ function AlgoSheet() {
           <span className="kw">FIN</span>
         </code>
       </pre>
+    </figure>
+  );
+}
+
+/** Étape 1 : les jeux de tests d'un exercice, le barème posé en dernier. */
+function PrepareSheet() {
+  return (
+    <figure className="landing-sheet landing-sheet--small" aria-label="Exemple de jeux de tests">
+      <div className="landing-sheet-head">
+        <span>Exercice 2 · Jeux de tests</span>
+      </div>
+      <table className="landing-mini-table">
+        <thead>
+          <tr><th>Entrée</th><th>Sortie attendue</th><th>Points</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>5</td><td>15</td><td>2</td></tr>
+          <tr><td>1</td><td>1</td><td>2</td></tr>
+          <tr><td>70000</td><td>2450035000</td><td>2</td></tr>
+        </tbody>
+      </table>
+      <p className="landing-pen landing-pen--inline" aria-hidden="true">Total : 6 points</p>
+    </figure>
+  );
+}
+
+/** Étape 2 : le code de classe au tableau, et les premiers inscrits. */
+function InviteSheet() {
+  return (
+    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt" aria-label="Exemple de code de classe">
+      <div className="landing-sheet-head">
+        <span>SRIT 1 · Groupe B</span>
+        <span className="landing-mini-muted">32 inscrits</span>
+      </div>
+      <p className="landing-joincode">9E5G-97CJ-34DD</p>
+      <ul className="landing-mini-list">
+        <li>Aya Koné<span>vient de rejoindre</span></li>
+        <li>Yao Kouassi<span>il y a 2 min</span></li>
+        <li>Fatou Traoré<span>il y a 5 min</span></li>
+      </ul>
+    </figure>
+  );
+}
+
+/** Étape 3 : la salle d'examen, sans bouton pour exécuter. */
+function ExamSheet() {
+  return (
+    <figure className="landing-sheet landing-sheet--small landing-exam" aria-label="Exemple d'écran d'épreuve">
+      <div className="landing-exam-bar">
+        <span>Exercice 2 sur 4</span>
+        <span className="landing-exam-timer">00:42:15</span>
+      </div>
+      <pre className="landing-code">
+        <code>
+          {'    '}<span className="tk-kw">for</span> (i = <span className="tk-num">1</span>; i &lt;= n; i++){'\n'}
+          {'        '}s += i;{'\n'}
+          {'    '}<span className="tk-fn">printf</span>(<span className="tk-str">"%lld"</span>, s)<span className="landing-caret" />
+        </code>
+      </pre>
+      <div className="landing-exam-foot">
+        <span className="landing-exam-saved">Enregistré il y a 2 s</span>
+        <span className="landing-exam-run">Exécution désactivée</span>
+      </div>
+    </figure>
+  );
+}
+
+/** Étape 4 : les notes tombent à la clôture, vous relisez puis publiez. */
+function ResultsSheet() {
+  return (
+    <figure className="landing-sheet landing-sheet--small landing-sheet--tilt" aria-label="Exemple de résultats">
+      <div className="landing-sheet-head">
+        <span>Devoir 3 · Boucles</span>
+        <span className="landing-mini-muted">clos à 10 h 00</span>
+      </div>
+      <ul className="landing-grades">
+        <li><span>Aya Koné</span><b>18<small>/20</small></b></li>
+        <li><span>Yao Kouassi</span><b>14<small>/20</small></b></li>
+        <li><span>Fatou Traoré</span><b>11,5<small>/20</small></b></li>
+      </ul>
+      <div className="landing-grades-foot">
+        <span className="landing-mini-muted">32 copies notées</span>
+        <span className="landing-mini-btn">Publier les notes</span>
+      </div>
     </figure>
   );
 }
