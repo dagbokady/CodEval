@@ -3390,6 +3390,8 @@ tr.row-confirm:hover { background: none; }
 }
 .join-classroom strong { color: var(--text-title); font-size: 15px; }
 .join-classroom .cd-link { margin-top: 6px; }
+.partage-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.partage-form input { flex: 1 1 260px; min-width: 0; }
 .join-code-panel { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 .join-code-value {
   font-family: var(--mono);

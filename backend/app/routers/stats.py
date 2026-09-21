@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from ..classrooms import shared_classroom_ids
 from ..deps import DbSession, TeacherUser
 from ..models import (
     Classroom,
@@ -96,7 +97,6 @@ def teacher_stats(
         db.scalars(
             select(Evaluation)
             .where(
-                Evaluation.organization_id == user.organization_id,
                 Evaluation.teacher_id == user.id,
                 Evaluation.is_template.isnot(True),
                 Evaluation.status != EvaluationStatus.CANCELLED,
@@ -107,7 +107,10 @@ def teacher_stats(
     classrooms = {
         c.id: c
         for c in db.scalars(
-            select(Classroom).where(Classroom.organization_id == user.organization_id)
+            select(Classroom).where(
+                (Classroom.organization_id == user.organization_id)
+                | Classroom.id.in_(shared_classroom_ids(db, user) or [0])
+            )
         )
     }
 

@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAction, useClassroomEvaluations } from '../../api/hooks';
-import { useAuth } from '../../auth';
 import { formatJoinCode, joinLink } from '../../joinCode';
 import {
   Alert,
@@ -59,11 +58,11 @@ const EVAL_FILTERS = [
 export default function ClassDetailPage() {
   const { classroomId } = useParams();
   const navigate = useNavigate();
-  const { organizationKind } = useAuth();
-  const personal = organizationKind === 'personal';
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get('onglet');
-  const tab = ['apprenants', 'evaluations'].includes(requested) ? requested : 'apercu';
+  const tab = ['apprenants', 'evaluations', 'enseignants'].includes(requested)
+    ? requested
+    : 'apercu';
   const setTab = (value) =>
     setSearchParams(value === 'apercu' ? {} : { onglet: value }, { replace: true });
 
@@ -102,6 +101,7 @@ export default function ClassDetailPage() {
             <Link to="/classes">Mes classes</Link>
             {' · '}
             {[cls.level, cls.subject_name].filter(Boolean).join(' · ') || 'Classe'}
+            {cls.shared && ` · partagée par ${cls.owner_name ?? 'un collègue'} (${cls.organization_name})`}
           </>
         }
         title={cls.name}
@@ -116,6 +116,7 @@ export default function ClassDetailPage() {
           { value: 'apercu', label: "Vue d'ensemble" },
           { value: 'apprenants', label: 'Apprenants', count: cls.students_count },
           { value: 'evaluations', label: 'Évaluations', count: evalList.length },
+          { value: 'enseignants', label: 'Enseignants' },
         ]}
       />
 
@@ -141,9 +142,11 @@ export default function ClassDetailPage() {
             students={studentList}
             pending={students.isPending}
             error={students.error}
-            canRemove={personal}
+            canRemove={cls.can_manage}
           />
         )}
+
+        {tab === 'enseignants' && <TeachersTab classroom={cls} />}
 
         {tab === 'evaluations' && (
           <EvaluationsTab
@@ -348,6 +351,137 @@ function EvaluationList({ items, showRate = false }) {
  * Le code que l'enseignant donne à sa classe. Il ne sert qu'à entrer : le
  * changer ou le fermer laisse les apprenants déjà inscrits à leur place.
  */
+/**
+ * Les enseignants de la classe. Le créateur (ou l'administration) invite un
+ * collègue par son e-mail, même d'un autre espace : la classe reste une, ses
+ * apprenants aussi, et l'invité y fait passer ses propres épreuves.
+ */
+function TeachersTab({ classroom }) {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const key = ['classroom-shares', String(classroom.id)];
+  const shares = useQuery({
+    queryKey: key,
+    queryFn: () => api(`/api/classrooms/${classroom.id}/shares`),
+  });
+  const invite = useAction(
+    (address) =>
+      api(`/api/classrooms/${classroom.id}/shares`, { method: 'POST', body: { email: address } }),
+    [key, ['classrooms']],
+  );
+  const remove = useAction(
+    (shareId) => api(`/api/classrooms/${classroom.id}/shares/${shareId}`, { method: 'DELETE' }),
+    [key, ['classrooms']],
+  );
+
+  async function submit(event) {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+    try {
+      const share = await invite.mutateAsync(email.trim());
+      setNotice(`${share.teacher_name} a maintenant accès à la classe.`);
+      setEmail('');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function withdraw(share) {
+    setError(null);
+    setNotice(null);
+    try {
+      await remove.mutateAsync(share.id);
+      if (share.is_self) navigate('/classes');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const list = shares.data ?? [];
+
+  return (
+    <section>
+      <header className="section-head">
+        <h2 className="section-title">Enseignants de la classe</h2>
+        <span className="section-count">{list.length + 1}</span>
+      </header>
+      <p className="sub">
+        {classroom.owner_name
+          ? `Créée par ${classroom.owner_name}.`
+          : "Classe gérée par l'administration."}{' '}
+        Les enseignants invités font passer leurs épreuves à ces mêmes apprenants : personne
+        n'a à s'inscrire dans une seconde classe.
+      </p>
+
+      {classroom.can_manage && (
+        <form className="partage-form" onSubmit={submit}>
+          <label htmlFor="partage-email" className="sr-only">
+            E-mail de l'enseignant à inviter
+          </label>
+          <input
+            id="partage-email"
+            type="email"
+            required
+            autoComplete="off"
+            placeholder="E-mail de l'enseignant à inviter"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Button type="submit" disabled={invite.isPending || !email.trim()}>
+            Partager la classe
+          </Button>
+        </form>
+      )}
+      <Alert>{error}</Alert>
+      {notice && <Alert tone="success">{notice}</Alert>}
+      {shares.error && <Alert>{shares.error.message}</Alert>}
+      {shares.isPending && <Loading />}
+
+      {!shares.isPending && list.length === 0 && (
+        <p className="sub classe-table-vide">La classe n'est partagée avec aucun enseignant.</p>
+      )}
+      {list.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Enseignant</th>
+                <th>E-mail</th>
+                <th>Espace</th>
+                <th aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((share) => (
+                <tr key={share.id}>
+                  <td className="cell-title">{share.teacher_name}</td>
+                  <td>{share.teacher_email}</td>
+                  <td className="cell-muted">{share.organization_name}</td>
+                  <td className="actions">
+                    {(classroom.can_manage || share.is_self) && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={remove.isPending}
+                        onClick={() => withdraw(share)}
+                      >
+                        {share.is_self ? 'Quitter la classe' : 'Retirer'}
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function JoinCodePanel({ classroom }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(null);

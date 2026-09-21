@@ -275,6 +275,10 @@ class ClassroomOut(ORMModel):
     students_count: int = 0
     teachers_count: int = 0
     evaluations_count: int = 0
+    # Classe d'un autre enseignant, partagée avec l'utilisateur.
+    shared: bool = False
+    can_manage: bool = False
+    owner_name: str | None = None
 
 
 class ClassroomDetailOut(ORMModel):
@@ -286,6 +290,23 @@ class ClassroomDetailOut(ORMModel):
     created_at: datetime | None = None
     join_code: str | None = None
     join_code_expires_at: datetime | None = None
+    shared: bool = False
+    can_manage: bool = False
+    owner_name: str | None = None
+    organization_name: str | None = None
+
+
+class SharePayload(BaseModel):
+    email: EmailStr
+
+
+class ShareOut(BaseModel):
+    id: int
+    teacher_id: int
+    teacher_name: str
+    teacher_email: str
+    organization_name: str
+    is_self: bool = False
 
 
 class JoinCodePayload(BaseModel):

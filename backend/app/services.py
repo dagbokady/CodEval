@@ -32,9 +32,15 @@ from .models import (
 def get_evaluation(db: Session, evaluation_id: int, user: User) -> Evaluation:
     """Récupère une évaluation en garantissant l'isolation par établissement."""
     evaluation = db.get(Evaluation, evaluation_id)
-    if evaluation is None or evaluation.organization_id != user.organization_id:
+    if evaluation is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Évaluation introuvable")
-    if user.role is Role.TEACHER and evaluation.teacher_id != user.id:
+    # L'épreuve passée dans une classe partagée vit dans l'espace de la classe :
+    # son auteur y accède d'où qu'il vienne.
+    if user.role is Role.TEACHER and evaluation.teacher_id == user.id:
+        return evaluation
+    if evaluation.organization_id != user.organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Évaluation introuvable")
+    if user.role is Role.TEACHER:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Évaluation d'un autre enseignant")
     return evaluation
 
@@ -105,9 +111,11 @@ def freeze(db: Session, evaluation: Evaluation, reason: str, at=None) -> None:
 def final_uploads_pending(db: Session, evaluation: Evaluation) -> int:
     """Secondes pendant lesquelles un envoi final peut encore arriver.
 
-    À la clôture, le navigateur de chaque apprenant pousse son dernier état.
-    Corriger avant la fin de cette fenêtre noterait une copie incomplète ; si
-    toutes les copies ont été rendues, rien n'est plus attendu.
+    À la clôture, le navigateur de chaque apprenant en ligne pousse son dernier
+    état puis rend sa copie. Seules restent attendues celles des apprenants qui
+    ont commencé sans rendre (coupure réseau) : corriger avant la fin de la
+    fenêtre noterait une copie incomplète. Un inscrit qui n'a jamais ouvert
+    l'épreuve n'enverra rien, on ne l'attend pas.
     """
     if evaluation.closed_at is None:
         return 0
@@ -117,6 +125,7 @@ def final_uploads_pending(db: Session, evaluation: Evaluation) -> int:
     unsubmitted = db.scalar(
         select(func.count(Participation.id)).where(
             Participation.evaluation_id == evaluation.id,
+            Participation.started_at.isnot(None),
             Participation.submitted_at.is_(None),
         )
     ) or 0

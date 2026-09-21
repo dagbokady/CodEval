@@ -9,17 +9,25 @@ from sqlalchemy import delete, func, select
 
 from ..db import soft_delete
 from ..audit import log
-from ..deps import AdminUser, CurrentUser, DbSession, StructureManager, TeacherUser
+from ..classrooms import (
+    can_manage,
+    classroom_for,
+    managed_classroom,
+    shared_classroom_ids,
+)
+from ..deps import AdminUser, CurrentUser, DbSession, StaffUser, TeacherUser
 from ..grading.languages import ALGO, DISCIPLINES, enabled_keys
 from ..models import (
     AuditLog,
     BankExercise,
     Classroom,
+    ClassroomShare,
     CorrectionResult,
     CorrectionRun,
     Enrollment,
     Evaluation,
     EvaluationStatus,
+    Organization,
     Participation,
     Role,
     RunStatus,
@@ -42,6 +50,8 @@ from ..schemas import (
     Page,
     PasswordResetOut,
     PlanOut,
+    ShareOut,
+    SharePayload,
     SubjectAdminOut,
     SubjectCreate,
     SubjectOut,
@@ -52,6 +62,7 @@ from ..schemas import (
 )
 from ..plans import check_classroom_quota, limits, usage
 from ..security import hash_password
+from ..services import notify
 
 router = APIRouter(prefix="/api", tags=["établissement"])
 
@@ -65,10 +76,12 @@ def _get_user(db, admin: User, user_id: int) -> User:
 
 
 def _get_classroom(db, user: User, classroom_id: int) -> Classroom:
-    classroom = db.get(Classroom, classroom_id)
-    if classroom is None or classroom.organization_id != user.organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Classe introuvable")
-    return classroom
+    return classroom_for(db, user, classroom_id)
+
+
+def _owner_name(db, classroom: Classroom) -> str | None:
+    owner = db.get(User, classroom.owner_id) if classroom.owner_id else None
+    return owner.full_name if owner else None
 
 
 def _get_subject(db, user: User, subject_id: int) -> Subject:
@@ -408,15 +421,19 @@ def delete_subject(subject_id: int, teacher: TeacherUser, db: DbSession) -> None
 # ----- Classes -----
 @router.get("/classrooms", response_model=list[ClassroomOut])
 def list_classrooms(user: CurrentUser, db: DbSession) -> list[ClassroomOut]:
+    shared = shared_classroom_ids(db, user)
     rows = list(
         db.scalars(
             select(Classroom)
-            .where(Classroom.organization_id == user.organization_id)
+            .where(
+                (Classroom.organization_id == user.organization_id)
+                | Classroom.id.in_(shared or [0])
+            )
             .order_by(Classroom.name)
         )
     )
     ids = [c.id for c in rows]
-    students = teachers = evaluations = {}
+    students = teachers = evaluations = shares = {}
     if ids:
         students = dict(
             db.execute(
@@ -439,14 +456,24 @@ def list_classrooms(user: CurrentUser, db: DbSession) -> list[ClassroomOut]:
                 .group_by(Evaluation.classroom_id)
             ).all()
         )
+        shares = dict(
+            db.execute(
+                select(ClassroomShare.classroom_id, func.count(ClassroomShare.id))
+                .where(ClassroomShare.classroom_id.in_(ids))
+                .group_by(ClassroomShare.classroom_id)
+            ).all()
+        )
     return [
         ClassroomOut(
             id=c.id,
             name=c.name,
             level=c.level,
             students_count=students.get(c.id, 0),
-            teachers_count=teachers.get(c.id, 0),
+            teachers_count=teachers.get(c.id, 0) + shares.get(c.id, 0),
             evaluations_count=evaluations.get(c.id, 0),
+            shared=c.organization_id != user.organization_id,
+            can_manage=can_manage(user, c),
+            owner_name=_owner_name(db, c) if c.organization_id != user.organization_id else None,
         )
         for c in rows
     ]
@@ -467,6 +494,7 @@ def get_classroom(classroom_id: int, user: CurrentUser, db: DbSession) -> Classr
     # Le code d'accès reste entre les mains de l'équipe : un étudiant n'a pas
     # à le lire, encore moins à le faire circuler.
     staff = user.role is not Role.STUDENT
+    org = db.get(Organization, classroom.organization_id)
     return ClassroomDetailOut(
         id=classroom.id,
         name=classroom.name,
@@ -476,15 +504,23 @@ def get_classroom(classroom_id: int, user: CurrentUser, db: DbSession) -> Classr
         created_at=classroom.created_at,
         join_code=classroom.join_code if staff else None,
         join_code_expires_at=classroom.join_code_expires_at if staff else None,
+        shared=classroom.organization_id != user.organization_id,
+        can_manage=can_manage(user, classroom),
+        owner_name=_owner_name(db, classroom),
+        organization_name=org.name if org else None,
     )
 
 
 @router.get("/classrooms/{classroom_id}/evaluations", response_model=list[EvaluationOut])
 def classroom_evaluations(classroom_id: int, user: CurrentUser, db: DbSession) -> list[EvaluationOut]:
-    _get_classroom(db, user, classroom_id)
+    classroom = _get_classroom(db, user, classroom_id)
+    filters = [Evaluation.classroom_id == classroom_id]
+    # L'invité d'un autre espace ne voit que ses propres épreuves dans la classe.
+    if classroom.organization_id != user.organization_id:
+        filters.append(Evaluation.teacher_id == user.id)
     rows = db.scalars(
         select(Evaluation)
-        .where(Evaluation.classroom_id == classroom_id)
+        .where(*filters)
         .order_by(Evaluation.scheduled_start.desc().nullslast(), Evaluation.id.desc())
     )
     results = []
@@ -515,10 +551,15 @@ def classroom_evaluations(classroom_id: int, user: CurrentUser, db: DbSession) -
 
 
 @router.post("/classrooms", response_model=ClassroomOut, status_code=status.HTTP_201_CREATED)
-def create_classroom(payload: ClassroomCreate, manager: StructureManager, db: DbSession) -> ClassroomOut:
+def create_classroom(payload: ClassroomCreate, manager: StaffUser, db: DbSession) -> ClassroomOut:
+    """L'administration comme tout enseignant crée une classe ; l'enseignant en
+    devient le créateur, et la gère."""
     check_classroom_quota(db, manager.organization)
     classroom = Classroom(
-        organization_id=manager.organization_id, name=payload.name.strip(), level=payload.level or None
+        organization_id=manager.organization_id,
+        name=payload.name.strip(),
+        level=payload.level or None,
+        owner_id=manager.id if manager.role is Role.TEACHER else None,
     )
     db.add(classroom)
     db.flush()
@@ -526,14 +567,16 @@ def create_classroom(payload: ClassroomCreate, manager: StructureManager, db: Db
         name=classroom.name)
     db.commit()
     db.refresh(classroom)
-    return ClassroomOut(id=classroom.id, name=classroom.name, level=classroom.level)
+    return ClassroomOut(
+        id=classroom.id, name=classroom.name, level=classroom.level, can_manage=True
+    )
 
 
 @router.patch("/classrooms/{classroom_id}", response_model=ClassroomOut)
 def update_classroom(
-    classroom_id: int, payload: ClassroomUpdate, manager: StructureManager, db: DbSession
+    classroom_id: int, payload: ClassroomUpdate, manager: StaffUser, db: DbSession
 ) -> ClassroomOut:
-    classroom = _get_classroom(db, manager, classroom_id)
+    classroom = managed_classroom(db, manager, classroom_id)
     data = payload.model_dump(exclude_unset=True)
     if data.get("name"):
         classroom.name = data["name"].strip()
@@ -546,8 +589,8 @@ def update_classroom(
 
 
 @router.delete("/classrooms/{classroom_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_classroom(classroom_id: int, manager: StructureManager, db: DbSession) -> None:
-    classroom = _get_classroom(db, manager, classroom_id)
+def delete_classroom(classroom_id: int, manager: StaffUser, db: DbSession) -> None:
+    classroom = managed_classroom(db, manager, classroom_id)
     if db.scalar(select(func.count(Evaluation.id)).where(Evaluation.classroom_id == classroom.id)):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -555,6 +598,7 @@ def delete_classroom(classroom_id: int, manager: StructureManager, db: DbSession
         )
     db.execute(delete(Enrollment).where(Enrollment.classroom_id == classroom.id))
     db.execute(delete(TeacherAssignment).where(TeacherAssignment.classroom_id == classroom.id))
+    db.execute(delete(ClassroomShare).where(ClassroomShare.classroom_id == classroom.id))
     log(db, manager, manager.organization_id, "classroom.deleted", "classroom", classroom.id,
         name=classroom.name)
     classroom.join_code = None
@@ -576,9 +620,9 @@ def classroom_students(classroom_id: int, user: CurrentUser, db: DbSession) -> l
 
 @router.post("/classrooms/{classroom_id}/students", status_code=status.HTTP_204_NO_CONTENT)
 def enroll_students(
-    classroom_id: int, payload: EnrollPayload, manager: StructureManager, db: DbSession
+    classroom_id: int, payload: EnrollPayload, manager: StaffUser, db: DbSession
 ) -> None:
-    classroom = _get_classroom(db, manager, classroom_id)
+    classroom = managed_classroom(db, manager, classroom_id)
     valid = set(
         db.scalars(
             select(User.id).where(
@@ -603,8 +647,8 @@ def enroll_students(
 @router.delete(
     "/classrooms/{classroom_id}/students/{student_id}", status_code=status.HTTP_204_NO_CONTENT
 )
-def unenroll_student(classroom_id: int, student_id: int, manager: StructureManager, db: DbSession) -> None:
-    classroom = _get_classroom(db, manager, classroom_id)
+def unenroll_student(classroom_id: int, student_id: int, manager: StaffUser, db: DbSession) -> None:
+    classroom = managed_classroom(db, manager, classroom_id)
     enrollment = db.scalar(
         select(Enrollment).where(
             Enrollment.classroom_id == classroom.id, Enrollment.student_id == student_id
@@ -615,6 +659,89 @@ def unenroll_student(classroom_id: int, student_id: int, manager: StructureManag
     db.delete(enrollment)
     log(db, manager, manager.organization_id, "classroom.unenrolled", "classroom", classroom.id,
         student=student_id)
+    db.commit()
+
+
+# ----- Partage d'une classe entre enseignants -----
+def _share_out(db, share: ClassroomShare, user: User) -> ShareOut:
+    teacher = db.get(User, share.teacher_id)
+    org = db.get(Organization, teacher.organization_id)
+    return ShareOut(
+        id=share.id,
+        teacher_id=teacher.id,
+        teacher_name=teacher.full_name,
+        teacher_email=teacher.email,
+        organization_name=org.name if org else "",
+        is_self=teacher.id == user.id,
+    )
+
+
+@router.get("/classrooms/{classroom_id}/shares", response_model=list[ShareOut])
+def classroom_shares(classroom_id: int, user: StaffUser, db: DbSession) -> list[ShareOut]:
+    _get_classroom(db, user, classroom_id)
+    shares = db.scalars(
+        select(ClassroomShare)
+        .where(ClassroomShare.classroom_id == classroom_id)
+        .order_by(ClassroomShare.created_at)
+    )
+    return [_share_out(db, share, user) for share in shares]
+
+
+@router.post(
+    "/classrooms/{classroom_id}/shares",
+    response_model=ShareOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def share_classroom(
+    classroom_id: int, payload: SharePayload, user: StaffUser, db: DbSession
+) -> ShareOut:
+    """Invite un enseignant, de cet espace ou d'un autre, par son e-mail."""
+    classroom = managed_classroom(db, user, classroom_id)
+    teacher = db.scalar(
+        select(User).where(func.lower(User.email) == payload.email.lower(), User.is_active.is_(True))
+    )
+    if teacher is None or teacher.role is not Role.TEACHER:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Aucun enseignant n'a de compte avec cet e-mail"
+        )
+    if teacher.id == classroom.owner_id or teacher.id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cet enseignant gère déjà la classe")
+    if db.scalar(
+        select(ClassroomShare.id).where(
+            ClassroomShare.classroom_id == classroom.id, ClassroomShare.teacher_id == teacher.id
+        )
+    ):
+        raise HTTPException(status.HTTP_409_CONFLICT, "La classe est déjà partagée avec lui")
+    share = ClassroomShare(classroom_id=classroom.id, teacher_id=teacher.id, invited_by=user.id)
+    db.add(share)
+    db.flush()
+    notify(
+        db, teacher.id,
+        f"Classe partagée : {classroom.name}",
+        f"{user.full_name} vous a ajouté à sa classe. Vous pouvez y faire passer vos épreuves.",
+        f"/classes/{classroom.id}",
+    )
+    log(db, user, user.organization_id, "classroom.shared", "classroom", classroom.id,
+        teacher=teacher.id)
+    db.commit()
+    return _share_out(db, share, user)
+
+
+@router.delete(
+    "/classrooms/{classroom_id}/shares/{share_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def unshare_classroom(classroom_id: int, share_id: int, user: StaffUser, db: DbSession) -> None:
+    """Le gestionnaire retire un invité ; l'invité peut aussi se retirer seul.
+    Ses épreuves déjà passées dans la classe lui restent."""
+    classroom = _get_classroom(db, user, classroom_id)
+    share = db.get(ClassroomShare, share_id)
+    if share is None or share.classroom_id != classroom.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Partage introuvable")
+    if share.teacher_id != user.id and not can_manage(user, classroom):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès non autorisé")
+    log(db, user, user.organization_id, "classroom.unshared", "classroom", classroom.id,
+        teacher=share.teacher_id)
+    db.delete(share)
     db.commit()
 
 

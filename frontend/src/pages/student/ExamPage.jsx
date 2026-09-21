@@ -248,6 +248,8 @@ function Exam({ evaluationId, data }) {
   const editsRef = useRef(edits);
   const inflight = useRef(Promise.resolve(true));
   const ending = useRef(false);
+  // La copie reste à rendre après la clôture (voir `handIn`).
+  const handInDue = useRef(false);
   const localTimer = useRef(null);
   const lastReport = useRef(0);
   const leaveTimer = useRef(null);
@@ -340,6 +342,20 @@ function Exam({ evaluationId, data }) {
    * Fin de l'épreuve pour ce poste (temps écoulé, clôture par l'enseignant,
    * annulation) : l'écran de fin s'affiche et le dernier état part au serveur.
    */
+  /**
+   * Épreuve close ou temps écoulé : une fois le dernier état transmis, la copie
+   * est rendue. L'enseignant n'attend alors plus que les postes coupés du
+   * réseau pour lancer la correction. Un échec est sans gravité : le serveur
+   * garde la copie telle que reçue, la remise sera retentée au retour en ligne.
+   */
+  const handIn = useCallback(async () => {
+    if (!handInDue.current) return;
+    try {
+      await api(`/api/me/evaluations/${evaluationId}/submit`, { method: 'POST' });
+      handInDue.current = false;
+    } catch { /* retenté à la prochaine synchronisation */ }
+  }, [evaluationId]);
+
   const finish = useCallback(
     async (reason) => {
       if (ending.current) return;
@@ -349,10 +365,14 @@ function Exam({ evaluationId, data }) {
       setPaused(false);
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
       setFinished({ reason, at: new Date().toISOString() });
+      handInDue.current = reason === 'closed' || reason === 'expired';
       const complete = await flush();
-      if (complete) clearDrafts(evaluationId, data.exercises.map((item) => item.id));
+      if (complete) {
+        clearDrafts(evaluationId, data.exercises.map((item) => item.id));
+        await handIn();
+      }
     },
-    [evaluationId, data.exercises, flush],
+    [evaluationId, data.exercises, flush, handIn],
   );
 
   /**
@@ -393,6 +413,7 @@ function Exam({ evaluationId, data }) {
     const complete = await flush();
     if (complete && ending.current) {
       clearDrafts(evaluationId, data.exercises.map((item) => item.id));
+      await handIn();
     }
 
     // 2. Incidents cumulés hors ligne
@@ -417,7 +438,7 @@ function Exam({ evaluationId, data }) {
 
     // 3. L'épreuve a pu être prolongée ou close pendant la coupure
     if (!ending.current) await checkPulse();
-  }, [evaluationId, data.exercises, flush, checkPulse]);
+  }, [evaluationId, data.exercises, flush, checkPulse, handIn]);
 
   // Suivi de l'état de connexion et synchronisation au retour en ligne
   useEffect(() => {

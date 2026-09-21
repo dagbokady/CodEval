@@ -1497,7 +1497,6 @@ def test_teacher_cannot_manage_establishment(context):
         json={"email": "x@test.ci", "full_name": "Pirate", "role": "admin", "password": "motdepasse1"},
     )
     assert res.status_code == 403
-    assert client.post("/api/classrooms", headers=t, json={"name": "X"}).status_code == 403
     assert client.get("/api/admin/audit", headers=t).status_code == 403
     assert client.get("/api/stats/overview", headers=t).status_code == 403
 
@@ -1853,6 +1852,40 @@ def test_no_upload_once_correction_started(context):
     _shift_closure(eid, 5)
     assert client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
                       json={"code": "print(3)", "version": 0}).status_code == 409
+
+
+def test_la_correction_n_attend_que_les_copies_commencees_non_rendues(context):
+    from app.models import Participation, Role, User
+
+    t, s = auth(context["teacher"]), auth(context["student"])
+    eid, exercise = _running_exam(context, "Remise à la clôture")
+    # Un inscrit qui n'ouvre jamais l'épreuve : on ne l'attendra pas.
+    db = SessionLocal()
+    absent = User(organization_id=db.get(User, 1).organization_id, email="absent@test.ci",
+                  full_name="Absent", role=Role.STUDENT, password_hash="x")
+    db.add(absent)
+    db.flush()
+    db.add(Participation(evaluation_id=eid, student_id=absent.id))
+    db.commit()
+    db.close()
+
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+    # L'apprenant a commencé sans rendre : sa dernière poussée peut encore arriver.
+    res = client.post(f"/api/evaluations/{eid}/corrections", headers=t)
+    assert res.status_code == 409 and "relancez" in res.json()["detail"]
+
+    # Son navigateur pousse son dernier état puis rend la copie, même si la
+    # remise anticipée est interdite : l'épreuve est close.
+    res = client.put(f"/api/me/evaluations/{eid}/exercises/{exercise}", headers=s,
+                     json={"code": "print('fini')", "version": 0})
+    assert res.status_code == 200 and res.json()["closed"] is True
+    res = client.post(f"/api/me/evaluations/{eid}/submit", headers=s)
+    assert res.status_code == 200, res.text
+    pulse = client.get(f"/api/me/evaluations/{eid}/status", headers=s).json()
+    assert pulse["submitted_at"] is not None
+
+    # Plus rien d'attendu : la correction part aussitôt.
+    assert client.post(f"/api/evaluations/{eid}/corrections", headers=t).status_code == 202
 
 
 def test_scheduler_closes_expired_sessions(context):

@@ -53,6 +53,7 @@ def structure_manager(user: CurrentUser) -> User:
 
 
 AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
+StaffUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.TEACHER))]
 StructureManager = Annotated[User, Depends(structure_manager)]
 TeacherUser = Annotated[User, Depends(require_roles(Role.TEACHER))]
 StudentUser = Annotated[User, Depends(require_roles(Role.STUDENT))]

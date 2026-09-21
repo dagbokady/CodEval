@@ -227,6 +227,25 @@ class Classroom(Base, SoftDeleteMixin, TimestampMixin):
     # qu'à entrer : le fermer ou le changer laisse les inscrits en place.
     join_code: Mapped[str | None] = mapped_column(String(16), default=None, unique=True, index=True)
     join_code_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None)
+    # L'enseignant qui l'a créée. Nul pour les classes posées par l'administration
+    # et pour celles d'avant cette colonne.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
+
+
+class ClassroomShare(Base, TimestampMixin):
+    """Un enseignant invité dans la classe d'un autre, même d'un autre espace.
+
+    La classe reste où elle est, avec ses inscrits : l'invité y fait passer ses
+    épreuves, et l'apprenant n'a jamais qu'une classe.
+    """
+
+    __tablename__ = "classroom_shares"
+    __table_args__ = (UniqueConstraint("classroom_id", "teacher_id", name="uq_classroom_share"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    classroom_id: Mapped[int] = mapped_column(ForeignKey("classrooms.id"), index=True)
+    teacher_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    invited_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), default=None)
 
 
 class Enrollment(Base):

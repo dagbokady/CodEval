@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import select
 
 from ..audit import log
+from ..classrooms import classroom_for
 from ..config import settings
 from ..deps import CurrentUser, DbSession, StudentUser
 from ..email_verification import check_code
@@ -42,13 +43,12 @@ JOIN_CODE_LENGTH = 12
 
 
 def _staff_classroom(db, user: User, classroom_id: int) -> Classroom:
-    """L'administration et les enseignants de l'établissement gèrent le code."""
+    """L'administration, les enseignants de l'établissement et les invités gèrent le code."""
     if user.role is Role.STUDENT:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Accès non autorisé pour ce rôle")
-    classroom = db.get(Classroom, classroom_id)
-    if classroom is None or classroom.organization_id != user.organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Classe introuvable")
-    return classroom
+    # Un enseignant invité distribue aussi le code : les apprenants qu'il fait
+    # entrer rejoignent la classe là où elle est, jamais une copie.
+    return classroom_for(db, user, classroom_id)
 
 
 def _classroom_by_code(db, request: Request, code: str) -> Classroom:

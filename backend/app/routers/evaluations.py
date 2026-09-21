@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from ..db import soft_delete
 from ..audit import log
+from ..classrooms import can_access
 from ..deps import DbSession, TeacherUser
 from ..grading.languages import LANGUAGES, enabled_keys, enabled_languages
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
@@ -105,12 +106,13 @@ def list_evaluations(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
-    filters = [
-        Evaluation.organization_id == user.organization_id,
-        Evaluation.is_template.isnot(True),
-    ]
+    filters = [Evaluation.is_template.isnot(True)]
+    # Un enseignant retrouve toutes ses épreuves, y compris celles passées dans
+    # la classe partagée d'un autre espace.
     if user.role is Role.TEACHER:
         filters.append(Evaluation.teacher_id == user.id)
+    else:
+        filters.append(Evaluation.organization_id == user.organization_id)
     if group:
         filters.append(Evaluation.status.in_(_STATUS_GROUPS[group]))
     if subject_id:
@@ -183,7 +185,7 @@ def create_evaluation(
             "Le langage de cette matière est désactivé par l'administration",
         )
     evaluation = Evaluation(
-        organization_id=user.organization_id,
+        organization_id=_home(db, user, payload.classroom_id),
         teacher_id=user.id,
         **payload.model_dump(),
     )
@@ -196,12 +198,19 @@ def create_evaluation(
     return _detail(db, evaluation)
 
 
+def _home(db, user: User, classroom_id: int | None) -> int:
+    """L'espace où vit l'épreuve : celui de sa classe. Les apprenants y sont
+    inscrits ; une épreuve rangée ailleurs leur resterait invisible."""
+    classroom = db.get(Classroom, classroom_id) if classroom_id else None
+    return classroom.organization_id if classroom else user.organization_id
+
+
 def _check_refs(
     db, user: User, classroom_id: int | None, subject_id: int | None
 ) -> Subject | None:
     if classroom_id is not None:
         classroom = db.get(Classroom, classroom_id)
-        if classroom is None or classroom.organization_id != user.organization_id:
+        if classroom is None or not can_access(db, user, classroom):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Classe inconnue")
     if subject_id is None:
         return None
@@ -262,7 +271,7 @@ def _clone(
     nouvelle épreuve indépendante. La copie repart toujours en brouillon : rien
     de la session d'origine (dates, participants, corrections) ne la suit."""
     copy = Evaluation(
-        organization_id=source.organization_id,
+        organization_id=_home(db, user, classroom_id),
         teacher_id=user.id,
         subject_id=source.subject_id,
         classroom_id=classroom_id,
@@ -448,6 +457,8 @@ def update_evaluation(
     subject = _check_refs(db, user, data.get("classroom_id"), data.get("subject_id"))
     for field, value in data.items():
         setattr(evaluation, field, value)
+    if "classroom_id" in data:
+        evaluation.organization_id = _home(db, user, evaluation.classroom_id)
     _follow_subject(evaluation, subject)
     log(db, user, user.organization_id, "evaluation.updated", "evaluation", evaluation.id,
         fields=list(data))
@@ -720,7 +731,7 @@ def incidents(
     evaluation_id: int, user: TeacherUser, db: DbSession, limit: int = Query(50, ge=1, le=200)
 ) -> list[IncidentOut]:
     """Journal des sorties d'épreuve détectées (aide à la décision, pas une preuve)."""
-    get_evaluation(db, evaluation_id, user)
+    evaluation = get_evaluation(db, evaluation_id, user)
     names = dict(
         db.execute(
             select(Participation.id, User.full_name)
@@ -731,7 +742,8 @@ def incidents(
     rows = db.scalars(
         select(AuditLog)
         .where(
-            AuditLog.organization_id == user.organization_id,
+            # Les incidents sont journalisés dans l'espace des apprenants.
+            AuditLog.organization_id == evaluation.organization_id,
             AuditLog.action == "integrity.incident",
             AuditLog.target_type == "participation",
             AuditLog.target_id.in_(names.keys() or [0]),

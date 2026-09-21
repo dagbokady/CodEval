@@ -184,18 +184,29 @@ def test_un_etablissement_n_a_pas_de_limite():
         assert res.status_code == 201
     assert client.get("/api/plan", headers=auth(admin)).json()["limits"] is None
 
-    # Un enseignant d'établissement ne crée pas de classe : l'administration s'en charge.
-    client.post(
-        "/api/users",
-        headers=auth(admin),
-        json={"email": "prof@lycee.ci", "full_name": "Prof", "role": "teacher",
-              "password": "motdepasse1"},
-    )
-    prof = client.post(
-        "/api/auth/login", json={"email": "prof@lycee.ci", "password": "motdepasse1"}
-    ).json()["access_token"]
+    # Un enseignant d'établissement crée sa classe et la gère ; ses collègues la
+    # voient sans pouvoir la modifier, l'administration garde la main.
+    profs = []
+    for email in ("prof@lycee.ci", "collegue@lycee.ci"):
+        client.post(
+            "/api/users",
+            headers=auth(admin),
+            json={"email": email, "full_name": "Prof", "role": "teacher",
+                  "password": "motdepasse1"},
+        )
+        profs.append(client.post(
+            "/api/auth/login", json={"email": email, "password": "motdepasse1"}
+        ).json()["access_token"])
+    prof, collegue = profs
     res = client.post("/api/classrooms", headers=auth(prof), json={"name": "C9"})
-    assert res.status_code == 403
+    assert res.status_code == 201, res.text
+    cid = res.json()["id"]
+    assert client.get(f"/api/classrooms/{cid}", headers=auth(prof)).json()["can_manage"] is True
+    assert client.get(f"/api/classrooms/{cid}", headers=auth(collegue)).json()["can_manage"] is False
+    renommer = {"name": "C9 bis"}
+    assert client.patch(f"/api/classrooms/{cid}", headers=auth(collegue), json=renommer).status_code == 403
+    assert client.patch(f"/api/classrooms/{cid}", headers=auth(prof), json=renommer).status_code == 200
+    assert client.patch(f"/api/classrooms/{cid}", headers=auth(admin), json=renommer).status_code == 200
 
 
 def test_l_etudiant_entre_par_le_code_puis_se_connecte(teacher):
@@ -429,6 +440,54 @@ def _nouvel_enseignant(email: str) -> str:
     )
     assert res.status_code == 201, res.text
     return res.json()["access_token"]
+
+
+def test_une_classe_se_partage_avec_un_enseignant_d_un_autre_espace(teacher):
+    from app.models import Evaluation
+
+    cid = client.get("/api/classrooms", headers=auth(teacher)).json()[0]["id"]
+    invite = _nouvel_enseignant("invite@perso.ci")
+    assert client.get(f"/api/classrooms/{cid}", headers=auth(invite)).status_code == 404
+
+    # Seul le gestionnaire partage, et seulement avec un enseignant.
+    partager = f"/api/classrooms/{cid}/shares"
+    assert client.post(partager, headers=auth(invite), json={"email": "kone@perso.ci"}).status_code == 404
+    assert client.post(partager, headers=auth(teacher), json={"email": "awa@etu.ci"}).status_code == 404
+    assert client.post(partager, headers=auth(teacher), json={"email": "nobody@x.ci"}).status_code == 404
+    res = client.post(partager, headers=auth(teacher), json={"email": "INVITE@perso.ci"})
+    assert res.status_code == 201, res.text
+    share_id = res.json()["id"]
+    assert client.post(partager, headers=auth(teacher), json={"email": "invite@perso.ci"}).status_code == 409
+
+    # L'invité voit la classe, sans la gérer.
+    classe = next(c for c in client.get("/api/classrooms", headers=auth(invite)).json() if c["id"] == cid)
+    assert classe["shared"] is True and classe["can_manage"] is False
+    assert client.get(f"/api/classrooms/{cid}/students", headers=auth(invite)).status_code == 200
+    renommer = {"name": "Piratée"}
+    assert client.patch(f"/api/classrooms/{cid}", headers=auth(invite), json=renommer).status_code == 403
+
+    # Son épreuve vit dans l'espace de la classe : les inscrits la reçoivent là
+    # où ils sont, et l'invité la retrouve depuis le sien.
+    res = client.post(
+        "/api/evaluations", headers=auth(invite), json={"title": "Interro", "classroom_id": cid}
+    )
+    assert res.status_code == 201, res.text
+    eid = res.json()["id"]
+    db = SessionLocal()
+    try:
+        classroom = db.get(Classroom, cid)
+        assert db.get(Evaluation, eid).organization_id == classroom.organization_id
+    finally:
+        db.close()
+    assert client.get(f"/api/evaluations/{eid}", headers=auth(invite)).status_code == 200
+    assert eid in [e["id"] for e in client.get("/api/evaluations", headers=auth(invite)).json()["items"]]
+    assert client.get(f"/api/evaluations/{eid}", headers=auth(teacher)).status_code == 403
+
+    # L'invité se retire : la classe disparaît de son espace, son épreuve lui reste.
+    res = client.delete(f"/api/classrooms/{cid}/shares/{share_id}", headers=auth(invite))
+    assert res.status_code == 204
+    assert client.get(f"/api/classrooms/{cid}", headers=auth(invite)).status_code == 404
+    assert client.get(f"/api/evaluations/{eid}", headers=auth(invite)).status_code == 200
 
 
 def test_chacun_change_son_mot_de_passe(teacher):

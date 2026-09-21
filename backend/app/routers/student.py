@@ -558,6 +558,16 @@ def submit(evaluation_id: int, user: StudentUser, db: DbSession) -> dict:
     close_if_expired(db, evaluation)
     if participation.submitted_at is not None:
         return {"submitted_at": participation.submitted_at}
+    if evaluation.status is EvaluationStatus.CLOSED and participation.frozen_at is not None:
+        # Remise après la clôture : le navigateur a poussé son dernier état, la
+        # copie est complète. Elle date du gel, pas de cette requête : la durée
+        # de composition reste celle de l'épreuve. L'enseignant n'a plus à
+        # l'attendre pour lancer la correction.
+        participation.submitted_at = participation.frozen_at
+        log(db, user, user.organization_id, "submission.handed_in", "evaluation", evaluation_id)
+        db.commit()
+        _notify_if_all_submitted(db, evaluation)
+        return {"submitted_at": participation.submitted_at}
     if evaluation.status is not EvaluationStatus.RUNNING:
         raise HTTPException(status.HTTP_409_CONFLICT, "La session est close")
     if (evaluation.rules or {}).get("allow_early_submit") is False:
@@ -569,27 +579,36 @@ def submit(evaluation_id: int, user: StudentUser, db: DbSession) -> dict:
     participation.frozen_at = now
     log(db, user, user.organization_id, "submission.submitted", "evaluation", evaluation_id)
     db.commit()
+    _notify_if_all_submitted(db, evaluation)
+    return {"submitted_at": now}
 
+
+def _notify_if_all_submitted(db, evaluation: Evaluation) -> None:
+    """Prévient l'enseignant quand plus aucune copie n'est attendue : tous ceux
+    qui ont commencé l'épreuve l'ont rendue."""
     from sqlalchemy import func
+
+    started = Participation.started_at.isnot(None)
     total = db.scalar(
-        func.count(Participation.id).select().where(Participation.evaluation_id == evaluation_id)
+        func.count(Participation.id).select().where(
+            Participation.evaluation_id == evaluation.id, started
+        )
     ) or 0
     submitted = db.scalar(
         func.count(Participation.id).select().where(
-            Participation.evaluation_id == evaluation_id,
+            Participation.evaluation_id == evaluation.id,
+            started,
             Participation.submitted_at.isnot(None),
         )
     ) or 0
     if total > 0 and submitted == total:
         notify(
             db, evaluation.teacher_id,
-            f"Tous les étudiants ont soumis : {evaluation.title}",
+            f"Toutes les copies sont rendues : {evaluation.title}",
             f"{submitted}/{total} productions reçues. Vous pouvez lancer la correction.",
-            f"/evaluations/{evaluation_id}/resultats",
+            f"/evaluations/{evaluation.id}/resultats",
         )
         db.commit()
-
-    return {"submitted_at": now}
 
 
 @router.get("/results", response_model=list[StudentResultOut])

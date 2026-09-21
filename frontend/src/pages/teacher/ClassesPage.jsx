@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../../auth';
 import { useClassroomEvaluations, useClassrooms, usePlan } from '../../api/hooks';
 import { ClassroomDialog } from '../admin/ClassroomsAdminPage';
 import { Alert, Button, EmptyState, Loading, PageHeader, Status } from '../../components/ui';
@@ -19,9 +18,6 @@ const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 export default function ClassesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { organizationKind } = useAuth();
-  // Seul dans son espace, l'enseignant ouvre lui-même ses classes.
-  const personal = organizationKind === 'personal';
   const plan = usePlan();
   const classrooms = useClassrooms();
   const evaluations = useClassroomEvaluations();
@@ -47,7 +43,8 @@ export default function ClassesPage() {
   const students = list.reduce((sum, c) => sum + (c.students_count ?? 0), 0);
   const maxClassrooms = plan.data?.limits?.classrooms;
   const full = maxClassrooms !== undefined && list.length >= maxClassrooms;
-  const newClassroom = personal && (
+  // Tout enseignant ouvre ses classes, seul comme en établissement.
+  const newClassroom = (
     <Button
       disabled={full}
       title={full ? `L'offre gratuite est limitée à ${maxClassrooms} classes` : undefined}
@@ -67,20 +64,13 @@ export default function ClassesPage() {
         {classrooms.error && <Alert>{classrooms.error.message}</Alert>}
 
         {!classrooms.error && list.length === 0 ? (
-          personal ? (
-            <EmptyState
-              title="Aucune classe"
-              action={<Button onClick={() => setCreating(true)}>+ Créer ma première classe</Button>}
-            >
-              Créez une classe, puis donnez son code d'accès à vos apprenants : ils s'y
-              inscrivent eux-mêmes.
-            </EmptyState>
-          ) : (
-            <EmptyState title="Aucune classe">
-              Les classes et leurs effectifs sont préparés à l'ouverture de l'année. Elles
-              apparaîtront ici dès qu'on vous en aura confié une.
-            </EmptyState>
-          )
+          <EmptyState
+            title="Aucune classe"
+            action={<Button onClick={() => setCreating(true)}>+ Créer ma première classe</Button>}
+          >
+            Créez une classe, puis donnez son code d'accès à vos apprenants : ils s'y
+            inscrivent eux-mêmes. Un collègue qui a déjà la classe peut aussi vous la partager.
+          </EmptyState>
         ) : (
           <>
             <div className="section-head">
@@ -189,7 +179,10 @@ function ClassRow({ classroom, evaluations, loading }) {
         <Link className="cell-title" to={to} onClick={(e) => e.stopPropagation()}>
           {classroom.name}
         </Link>
-        <span className="sub">{classroom.level ?? 'Classe'}</span>
+        <span className="sub">
+          {classroom.level ?? 'Classe'}
+          {classroom.shared && ` · partagée par ${classroom.owner_name ?? 'un collègue'}`}
+        </span>
       </td>
       <td className="num">{classroom.students_count}</td>
       <td className="num">{loading ? '…' : evaluations.length}</td>
