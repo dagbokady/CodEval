@@ -23,7 +23,6 @@ def list_notifications(user: CurrentUser, db: DbSession, limit: int = 20):
         {
             "id": n.id,
             "title": n.title,
-            "body": n.body,
             "link": n.link,
             "read": n.read,
             "created_at": n.created_at.isoformat(),

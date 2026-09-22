@@ -231,7 +231,6 @@ button { font: inherit; }
   position: absolute; left: 12px; top: 16px;
   width: 6px; height: 6px; border-radius: 50%; background: var(--primary);
 }
-.notif-item-body { font-size: 12.5px; color: var(--text-muted); margin-bottom: 2px; }
 .notif-item-time { font-size: 12px; color: var(--text-faint); }
 
 /* ========== En-tête de page ========== */

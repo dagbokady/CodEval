@@ -206,7 +206,6 @@ function NotificationBell() {
                 {!n.read && <span className="notif-dot" aria-label="Non lue" />}
                 {n.title}
               </div>
-              {n.body && <div className="notif-item-body">{n.body}</div>}
               <div className="notif-item-time">
                 {new Date(n.created_at).toLocaleString('fr-FR', {
                   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
