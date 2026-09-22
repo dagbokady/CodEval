@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import delete, func, select
 
 from ..db import soft_delete
+from ..accounts import delete_account, ensure_not_last_admin
 from ..audit import log
 from ..classrooms import (
     can_manage,
@@ -113,7 +114,7 @@ def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
 ) -> Page:
-    filters = [User.organization_id == admin.organization_id]
+    filters = [User.organization_id == admin.organization_id, User.deleted_at.is_(None)]
     if without_class:
         filters += [User.role == Role.STUDENT, ~User.id.in_(select(Enrollment.student_id))]
     if role is not None:
@@ -247,6 +248,25 @@ def update_user(user_id: int, payload: UserUpdate, admin: AdminUser, db: DbSessi
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_user(user_id: int, admin: AdminUser, db: DbSession) -> None:
+    """L'administration supprime le compte d'un membre de l'établissement.
+
+    Son propre compte se supprime depuis ses paramètres, mot de passe à l'appui."""
+    user = _get_user(db, admin, user_id)
+    if user.id == admin.id:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Supprimez votre propre compte depuis vos paramètres.",
+        )
+    if user.deleted_at is not None:
+        return
+    ensure_not_last_admin(db, user)
+    log(db, admin, admin.organization_id, "user.deleted", "user", user.id, role=user.role.value)
+    delete_account(db, user)
+    db.commit()
 
 
 @router.post("/users/{user_id}/reset-password", response_model=PasswordResetOut)
@@ -933,7 +953,9 @@ def stats_overview(admin: AdminUser, db: DbSession) -> dict:
     if avg_row and avg_row[0] is not None and avg_row[1]:
         average = round(avg_row[0] / avg_row[1] * 100, 1)
     inactive = db.scalar(
-        select(func.count(User.id)).where(User.organization_id == org, User.is_active.is_(False))
+        select(func.count(User.id)).where(
+            User.organization_id == org, User.is_active.is_(False), User.deleted_at.is_(None)
+        )
     ) or 0
     # Un étudiant sans classe ne voit aucune épreuve : c'est un oubli à réparer.
     unassigned = db.scalar(

@@ -189,6 +189,9 @@ class User(Base, TimestampMixin):
     # posé sur chacune de ses épreuves, côté apprenant comme côté correction.
     sheet_header: Mapped[dict | None] = mapped_column(JSONColumn, default=None)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Compte supprimé : ses données personnelles sont effacées, la ligne reste
+    # pour que les copies et les notes déjà rendues gardent leur auteur.
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), default=None, index=True)
 
     organization: Mapped[Organization] = relationship()
 

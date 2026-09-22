@@ -119,6 +119,8 @@ export default function SettingsPage() {
         {user.role === 'teacher' && <SheetHeaderSection />}
 
         {user.role === 'teacher' && <EvaluationDefaultsSection />}
+
+        <DeleteAccountSection />
       </div>
     </>
   );
@@ -269,6 +271,90 @@ function EmailSection() {
               Annuler
             </Button>
             {notice && <span className="sub" role="status">{notice}</span>}
+          </div>
+        </form>
+      )}
+    </Section>
+  );
+}
+
+const DELETE_CONSEQUENCES = {
+  student:
+    'Votre nom, votre adresse, votre matricule et votre photo sont effacés, et vous quittez vos classes. Les copies déjà rendues restent chez vos enseignants, sans votre nom.',
+  teacher:
+    'Votre nom, votre adresse, votre photo et votre en-tête de feuille sont effacés, et vous quittez les classes partagées avec vous. Les épreuves et les corrections déjà faites restent, sans votre nom.',
+  admin:
+    'Votre nom, votre adresse et votre photo sont effacés. Si vous êtes le seul administrateur, nommez-en d’abord un autre : l’établissement ne peut pas rester sans gestionnaire.',
+};
+
+/** Suppression du compte : définitive, mot de passe à l'appui. */
+function DeleteAccountSection() {
+  const { user, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState(null);
+  const [pending, setPending] = useState(false);
+  const ready = password && confirmation.trim().toUpperCase() === 'SUPPRIMER';
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (!ready) return;
+    setError(null);
+    setPending(true);
+    try {
+      await api('/api/auth/me/delete', { method: 'POST', body: { current_password: password } });
+      signOut();
+    } catch (err) {
+      setError(err.message);
+      setPending(false);
+    }
+  }
+
+  return (
+    <Section
+      title="Supprimer mon compte"
+      description="La suppression est définitive : vous ne pourrez plus vous connecter et votre compte ne peut pas être restauré."
+    >
+      <p className="sub" style={{ marginTop: 0 }}>{DELETE_CONSEQUENCES[user.role]}</p>
+      {!open ? (
+        <div className="settings-actions">
+          <Button variant="danger-ghost" onClick={() => setOpen(true)}>
+            Supprimer mon compte…
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={onSubmit} noValidate className="settings-form">
+          <div className="row">
+            <Field label="Mot de passe actuel" id="delete-pwd">
+              <PasswordInput
+                id="delete-pwd"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </Field>
+            <Field label="Tapez SUPPRIMER pour confirmer" id="delete-confirm">
+              <input
+                id="delete-confirm"
+                autoComplete="off"
+                value={confirmation}
+                onChange={(e) => setConfirmation(e.target.value)}
+              />
+            </Field>
+          </div>
+          {error && <Alert>{error}</Alert>}
+          <div className="settings-actions">
+            <Button type="submit" variant="danger" disabled={pending || !ready}>
+              {pending ? 'Suppression…' : 'Supprimer définitivement'}
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={pending}
+              onClick={() => { setOpen(false); setPassword(''); setConfirmation(''); setError(null); }}
+            >
+              Annuler
+            </Button>
           </div>
         </form>
       )}

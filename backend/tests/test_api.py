@@ -2089,3 +2089,51 @@ def test_communaute_publier_recuperer_et_moderer(context):
                          headers=auth(other_admin)).status_code == 403
     assert client.delete(f"/api/community/{subject_item['id']}", headers=a).status_code == 204
     assert client.delete(f"/api/community/{exercise_item['id']}", headers=t).status_code == 204
+
+
+def test_chacun_supprime_son_compte_et_l_admin_ceux_des_autres(context):
+    """La suppression efface l'identité, ferme l'accès et libère l'adresse ;
+    le dernier administrateur ne peut pas partir."""
+    admin = auth(context["admin"])
+
+    def compte(email, role):
+        res = client.post(
+            "/api/users",
+            headers=admin,
+            json={"email": email, "full_name": "À Supprimer", "role": role,
+                  "password": "motdepasse1",
+                  **({"matricule": f"DEL-{email[:6]}"} if role == "student" else {})},
+        )
+        assert res.status_code in (200, 201), res.text
+        token = client.post(
+            "/api/auth/login", json={"email": email, "password": "motdepasse1"}
+        ).json()["access_token"]
+        return res.json()["id"], auth(token)
+
+    # Par soi-même : le mot de passe est exigé.
+    uid, own = compte("partant@test.ci", "student")
+    assert client.post("/api/auth/me/delete", headers=own,
+                       json={"current_password": "mauvais"}).status_code == 400
+    assert client.post("/api/auth/me/delete", headers=own,
+                       json={"current_password": "motdepasse1"}).status_code == 200
+    assert client.get("/api/auth/me", headers=own).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "partant@test.ci",
+                                                "password": "motdepasse1"}).status_code == 401
+    listed = client.get("/api/users", headers=admin, params={"q": "partant"}).json()
+    assert listed["total"] == 0
+    # L'adresse est libérée : on peut recréer un compte avec.
+    compte("partant@test.ci", "student")
+
+    # Par l'administration.
+    uid, _ = compte("renvoye@test.ci", "teacher")
+    assert client.delete(f"/api/users/{uid}", headers=admin).status_code == 204
+    assert client.post("/api/auth/login", json={"email": "renvoye@test.ci",
+                                                "password": "motdepasse1"}).status_code == 401
+
+    # Le seul administrateur doit d'abord en nommer un autre.
+    res = client.post("/api/auth/me/delete", headers=admin,
+                      json={"current_password": "motdepasse1"})
+    assert res.status_code == 409
+    uid, second = compte("admin2@test.ci", "admin")
+    assert client.post("/api/auth/me/delete", headers=second,
+                       json={"current_password": "motdepasse1"}).status_code == 200

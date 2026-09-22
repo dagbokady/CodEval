@@ -9,6 +9,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import func, select
 
+from ..accounts import delete_account, ensure_not_last_admin
 from ..audit import log
 from ..config import settings
 from ..deps import CurrentUser, DbSession
@@ -17,6 +18,7 @@ from ..mail import button, mail_configured, send_email
 from ..models import Organization, PasswordResetToken, Role, User, utcnow
 from ..rate_limit import limiter
 from ..schemas import (
+    AccountDeletion,
     EmailChangeConfirm,
     EmailChangeRequest,
     EmailCodeRequest,
@@ -295,3 +297,16 @@ def confirm_email_change(payload: EmailChangeConfirm, user: CurrentUser, db: DbS
     db.commit()
     db.refresh(user)
     return UserOut.model_validate(user)
+
+
+@router.post("/me/delete")
+def delete_my_account(
+    payload: AccountDeletion, request: Request, user: CurrentUser, db: DbSession
+) -> dict:
+    """Chacun supprime son propre compte, en redonnant son mot de passe."""
+    _check_current_password(request, user, payload.current_password)
+    ensure_not_last_admin(db, user)
+    log(db, user, user.organization_id, "user.deleted_self", "user", user.id)
+    delete_account(db, user)
+    db.commit()
+    return {"ok": True}

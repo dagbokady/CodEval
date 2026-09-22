@@ -85,6 +85,8 @@ export const AUDIT_LABELS = {
   'user.created': 'Compte créé',
   'user.updated': 'Compte modifié',
   'user.password_reset': 'Mot de passe réinitialisé',
+  'user.deleted': 'Compte supprimé',
+  'user.deleted_self': 'Compte supprimé par son titulaire',
   'classroom.created': 'Classe créée',
   'classroom.updated': 'Classe modifiée',
   'classroom.deleted': 'Classe supprimée',

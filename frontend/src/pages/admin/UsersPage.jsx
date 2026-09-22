@@ -49,6 +49,7 @@ export default function UsersPage() {
     ROLES.includes(createRole) ? { role: createRole, classroom_id: params.get('classe') ?? '' } : null,
   );
   const [secret, setSecret] = useState(null);
+  const [removing, setRemoving] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function UsersPage() {
     INVALIDATE,
   );
   const reset = useAction((id) => api(`/api/users/${id}/reset-password`, { method: 'POST' }));
+  const remove = useAction((id) => api(`/api/users/${id}`, { method: 'DELETE' }), INVALIDATE);
 
   function setParam(name, value) {
     const next = new URLSearchParams(params);
@@ -225,6 +227,11 @@ export default function UsersPage() {
                               danger: u.is_active,
                               onClick: () => run(toggle.mutateAsync({ id: u.id, is_active: !u.is_active })),
                             },
+                            u.id !== me.id && {
+                              label: 'Supprimer le compte…',
+                              danger: true,
+                              onClick: () => setRemoving(u),
+                            },
                           ]}
                         />
                       </td>
@@ -251,6 +258,33 @@ export default function UsersPage() {
           onClose={() => setEditing(null)}
         />
       )}
+
+      <Dialog
+        open={Boolean(removing)}
+        onClose={() => !remove.isPending && setRemoving(null)}
+        title="Supprimer ce compte ?"
+        description={
+          removing &&
+          `${removing.full_name} (${removing.email}) ne pourra plus se connecter. Son nom, son adresse et sa photo sont effacés ; les copies et épreuves déjà passées restent, sans son nom. La suppression est définitive.`
+        }
+        footer={
+          <>
+            <Button variant="secondary" disabled={remove.isPending} onClick={() => setRemoving(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={async () => {
+                await run(remove.mutateAsync(removing.id));
+                setRemoving(null);
+              }}
+            >
+              {remove.isPending ? 'Suppression…' : 'Supprimer définitivement'}
+            </Button>
+          </>
+        }
+      />
 
       <Dialog
         open={Boolean(secret)}
