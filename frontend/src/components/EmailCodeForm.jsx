@@ -52,9 +52,12 @@ export default function EmailCodeForm({ email, resendIn, onConfirm, onBack, subm
     <form className="auth-card" onSubmit={onSubmit} noValidate>
       <h1>Vérifiez votre e-mail</h1>
       <p className="subtitle">
-        Nous avons envoyé un code à six chiffres à <strong>{email}</strong>. Pensez à regarder
-        dans les courriers indésirables.
+        Nous avons envoyé un code à six chiffres à <strong>{email}</strong>.
       </p>
+      <Alert tone="info">
+        Rien reçu ? Regardez dans vos <strong>spams</strong> (courriers indésirables). Si le
+        message y est, marquez-le « Non spam » : les suivants arriveront dans la boîte de réception.
+      </Alert>
       <Alert>{error}</Alert>
       <Alert tone="success">{notice}</Alert>
       <Field label="Code de vérification" id="email-code">

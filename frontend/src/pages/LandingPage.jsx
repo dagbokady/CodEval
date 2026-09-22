@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { useDocumentTitle } from '../useDocumentTitle';
 import '../styles/landing.css';
 
 const STEPS = [
@@ -49,7 +48,6 @@ const GUARANTEES = [
 
 /** Page d'accueil publique : ce qu'est CodEval, pour qui, et comment on y entre. */
 export default function LandingPage() {
-  useDocumentTitle('Évaluation pratique en programmation');
   return (
     <div className="landing">
       <header className="landing-top">
@@ -73,6 +71,7 @@ export default function LandingPage() {
         <section className="landing-hero">
           <div className="landing-wrap landing-hero-grid">
             <div className="landing-hero-text">
+              <p className="landing-kicker">CodEval, l'évaluation de code sur machine</p>
               <h1>
                 L'épreuve se passe sur machine.
                 <br />

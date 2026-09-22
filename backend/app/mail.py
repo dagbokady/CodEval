@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import base64
 import html as html_lib
 import logging
 import smtplib
-from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
-from functools import cache
-from pathlib import Path
 
 import httpx
 
@@ -18,12 +14,6 @@ from .config import settings
 logger = logging.getLogger("codeval.mail")
 
 MAILJET_URL = "https://api.mailjet.com/v3.1/send"
-
-# Le logo voyage dans l'e-mail lui-même (pièce jointe « inline », appelée par
-# son Content-ID) : il s'affiche sans charger d'image distante, que la plupart
-# des messageries bloquent par défaut, et sans dépendre d'une adresse publique.
-LOGO_PATH = Path(__file__).parent / "static" / "email-logo.png"
-LOGO_CID = "codeval-logo"
 
 # Messageries gratuites : leurs domaines publient une politique DMARC qu'un
 # service d'envoi tiers (Mailjet, SMTP d'hébergeur) ne peut pas satisfaire.
@@ -56,26 +46,23 @@ def sender_warning() -> str | None:
     return None
 
 
-@cache
-def _logo() -> bytes | None:
-    try:
-        return LOGO_PATH.read_bytes()
-    except OSError:
-        logger.warning("Logo des e-mails introuvable : %s", LOGO_PATH)
-        return None
-
-
 def render_email(body_html: str, preheader: str = "") -> str:
     """Habille le contenu d'un e-mail : logo, nom, pied de page.
 
     Mise en page en tableaux et styles en ligne : c'est ce que toutes les
     messageries (Outlook compris) affichent de la même façon.
     """
+    # Logo dessiné en HTML, sans image : rien à télécharger ni à débloquer,
+    # pas de pièce jointe, et la même taille dans toutes les messageries.
+    # Une image jointe s'affichait à sa taille réelle dans certaines d'entre
+    # elles, puis une seconde fois en bas du message.
     logo = (
-        f'<img src="cid:{LOGO_CID}" width="36" height="36" alt="" '
-        f'style="display:block;border:0;border-radius:8px">'
-        if _logo()
-        else ""
+        '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+        '<td width="34" height="34" align="center" valign="middle" bgcolor="#2458d3" '
+        'style="width:34px;height:34px;background:#2458d3;border-radius:8px;'
+        "font-family:'Courier New',Courier,monospace;font-size:14px;font-weight:700;"
+        'line-height:34px;color:#ffffff;text-align:center">&lt;/&gt;</td>'
+        "</tr></table>"
     )
     name = html_lib.escape(settings.mail_from_name)
     hidden = (
@@ -157,16 +144,6 @@ def _send_mailjet(to: str, subject: str, html: str, text: str | None) -> bool:
     }
     if text:
         message["TextPart"] = text
-    logo = _logo()
-    if logo:
-        message["InlinedAttachments"] = [
-            {
-                "ContentType": "image/png",
-                "Filename": "logo.png",
-                "ContentID": LOGO_CID,
-                "Base64Content": base64.b64encode(logo).decode(),
-            }
-        ]
     try:
         res = httpx.post(
             MAILJET_URL,
@@ -184,25 +161,16 @@ def _send_mailjet(to: str, subject: str, html: str, text: str | None) -> bool:
 
 
 def _send_smtp(to: str, subject: str, html: str, text: str | None) -> bool:
-    # related( alternative(texte, html), logo ) : le logo accompagne le HTML.
-    msg = MIMEMultipart("related")
+    msg = MIMEMultipart("alternative")
     msg["From"] = formataddr((settings.mail_from_name, settings.smtp_from))
     msg["To"] = to
     msg["Subject"] = subject
     # Sans date ni identifiant, un message perd des points auprès des filtres.
     msg["Date"] = formatdate(localtime=False)
     msg["Message-ID"] = make_msgid(domain=settings.smtp_from.rsplit("@", 1)[-1])
-    body = MIMEMultipart("alternative")
     if text:
-        body.attach(MIMEText(text, "plain", "utf-8"))
-    body.attach(MIMEText(html, "html", "utf-8"))
-    msg.attach(body)
-    logo = _logo()
-    if logo:
-        image = MIMEImage(logo, "png")
-        image.add_header("Content-ID", f"<{LOGO_CID}>")
-        image.add_header("Content-Disposition", "inline", filename="logo.png")
-        msg.attach(image)
+        msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=10) as server:
             server.starttls()

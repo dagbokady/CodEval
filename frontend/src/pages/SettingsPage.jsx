@@ -210,7 +210,7 @@ function EmailSection() {
     return run(async () => {
       await api('/api/auth/me/email-code', { method: 'POST', body: { email, current_password: password } });
       setSent(true);
-      setNotice(`Code envoyé à ${email}. Pensez aux courriers indésirables.`);
+      setNotice(`Code envoyé à ${email}. Rien reçu ? Regardez dans vos spams.`);
     });
   };
 

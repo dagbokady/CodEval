@@ -39,6 +39,10 @@ export default function ForgotPasswordPage() {
           <div className="auth-card">
             <h1>E-mail envoyé</h1>
             <p>Si un compte correspond à cette adresse, vous recevrez un lien de réinitialisation.</p>
+            <Alert tone="info">
+              Rien reçu d'ici quelques minutes ? Regardez dans vos <strong>spams</strong> (courriers
+              indésirables).
+            </Alert>
             <div className="auth-footer">
               <Link to="/connexion">Retour à la connexion</Link>
             </div>

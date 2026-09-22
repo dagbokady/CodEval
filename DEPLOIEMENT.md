@@ -133,3 +133,14 @@ CPU et nombre de processus plafonnés, en plus des limites POSIX de
 `app/grading/sandbox.py`. Si l'API exécute aussi du code (essais des
 apprenants), c'est avec les mêmes restrictions, sauf l'accès Internet
 qu'elle garde pour l'envoi des e-mails.
+
+## Référencement (Google, Bing)
+
+1. Sur Vercel, définir `VITE_SITE_URL=https://DOMAINE` (sans « / » final), puis
+   redéployer : le build écrit `sitemap.xml` et `robots.txt` avec cette adresse.
+2. [Google Search Console](https://search.google.com/search-console) : ajouter le
+   domaine (validation par un enregistrement TXT dans la zone DNS), puis
+   *Sitemaps* > soumettre `https://DOMAINE/sitemap.xml`. *Inspection d'URL* >
+   *Demander une indexation* pour la page d'accueil.
+3. [Bing Webmaster Tools](https://www.bing.com/webmasters) : importer le site
+   depuis Search Console (Bing alimente aussi DuckDuckGo et Yahoo).

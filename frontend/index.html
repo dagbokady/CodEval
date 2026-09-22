@@ -2,13 +2,80 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="theme-color" content="#2458d3" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodEval : évaluation pratique en programmation (code, algorithmique)</title>
+    <meta name="description" content="CodEval (Cod Eval) : la plateforme d'évaluation de code pour enseignants et étudiants. Épreuves sur machine en C, C++, Python et algorithmique, correction automatique par jeux de tests, notes à la clôture." />
+    <meta name="keywords" content="CodEval, Cod Eval, Codeval, Code Eval, CodEvaluation, évaluation de code, évaluation programmation, correction automatique, examen sur machine, algorithmique, langage C, C++, Python" />
+    <meta name="application-name" content="CodEval" />
+    <meta name="apple-mobile-web-app-title" content="CodEval" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" id="canonical" href="%VITE_SITE_URL%/" />
+    <script>
+      // Une seule page HTML sert toutes les adresses : le lien canonique suit
+      // la page ouverte, sans paramètres, sur le domaine officiel.
+      document.getElementById('canonical').href = '%VITE_SITE_URL%' + location.pathname;
+    </script>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#2458d3" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="CodEval" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:title" content="CodEval : évaluation pratique en programmation" />
+    <meta property="og:description" content="Épreuves de code sur machine, corrigées automatiquement par jeux de tests. C, C++, Python, algorithmique." />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CodEval, évaluation pratique en programmation" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CodEval : évaluation pratique en programmation" />
+    <meta name="twitter:description" content="Épreuves de code sur machine, corrigées automatiquement par jeux de tests." />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-image.png" />
+
+    <!-- Données structurées : Google y lit le nom du site, ses variantes
+         (Cod Eval, Codeval…) et le logo affiché dans les résultats. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "%VITE_SITE_URL%/#site",
+            "url": "%VITE_SITE_URL%/",
+            "name": "CodEval",
+            "alternateName": ["Cod Eval", "Codeval", "Code Eval", "CodEvaluation"],
+            "inLanguage": "fr",
+            "publisher": { "@id": "%VITE_SITE_URL%/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "%VITE_SITE_URL%/#org",
+            "name": "CodEval",
+            "url": "%VITE_SITE_URL%/",
+            "logo": "%VITE_SITE_URL%/logo-512.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "CodEval",
+            "alternateName": ["Cod Eval", "Codeval", "Code Eval"],
+            "url": "%VITE_SITE_URL%/",
+            "applicationCategory": "EducationalApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "fr",
+            "description": "Plateforme d'évaluation pratique en programmation : épreuves sur machine, correction automatique par jeux de tests, notes à la clôture.",
+            "publisher": { "@id": "%VITE_SITE_URL%/#org" }
+          }
+        ]
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
-    <title>CodEval : Évaluation pratique en programmation</title>
   </head>
   <body>
     <script>
@@ -27,6 +94,16 @@
       })();
     </script>
     <div id="root"></div>
+    <!-- Lu par les moteurs qui n'exécutent pas le JavaScript. -->
+    <noscript>
+      <h1>CodEval : évaluation pratique en programmation</h1>
+      <p>CodEval est la plateforme d'évaluation de code pour les enseignants et leurs
+        étudiants : épreuves sur machine en C, C++, Python et algorithmique, correction
+        automatique par jeux de tests, notes publiées à la clôture.</p>
+      <p><a href="/inscription">Créer un espace enseignant</a> ·
+        <a href="/rejoindre">Rejoindre une classe avec un code</a> ·
+        <a href="/connexion">Se connecter</a></p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
