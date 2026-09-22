@@ -437,6 +437,23 @@ class CommunityItem(Base, SoftDeleteMixin, TimestampMixin):
     uses: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class CommunityRating(Base):
+    """Note en étoiles (1 à 5) qu'un enseignant donne à une publication.
+
+    Une seule par enseignant et par publication : la redonner la remplace.
+    """
+
+    __tablename__ = "community_ratings"
+    __table_args__ = (UniqueConstraint("item_id", "user_id", name="uq_community_rating"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("community_items.id"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    stars: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
+
+
 class Participation(Base):
     __tablename__ = "participations"
     __table_args__ = (UniqueConstraint("evaluation_id", "student_id", name="uq_participation"),)

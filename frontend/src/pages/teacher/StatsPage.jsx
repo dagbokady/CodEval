@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStats } from '../../api/hooks';
-import { Alert, EmptyState, Loading, PageHeader, Segmented, Stat } from '../../components/ui';
+import { Alert, EmptyState, Loading, PageHeader, Pagination, Segmented, Stat } from '../../components/ui';
+import { usePagination } from '../../usePagination';
 
 const PASS = 10;
 const dateFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
@@ -298,6 +299,7 @@ function Histogram({ distribution }) {
 }
 
 function AtRisk({ students }) {
+  const { pageItems, pager } = usePagination(students, 10);
   if (!students.length) {
     return (
       <p className="sub stats-empty">
@@ -306,22 +308,25 @@ function AtRisk({ students }) {
     );
   }
   return (
-    <ul className="at-risk">
-      {students.map((s) => (
-        <li key={s.student_id}>
-          <div className="at-risk-id">
-            <strong>{s.full_name}</strong>
-            <span className="sub">
-              {[s.matricule, s.classroom_name, plural(s.copies, 'copie')].filter(Boolean).join(' · ')}
-            </span>
-          </div>
-          <div className="at-risk-grades">
-            <span className="at-risk-avg">{grade(s.average)}</span>
-            <span className="sub">dernière : {grade(s.last)}</span>
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="at-risk">
+        {pageItems.map((s) => (
+          <li key={s.student_id}>
+            <div className="at-risk-id">
+              <strong>{s.full_name}</strong>
+              <span className="sub">
+                {[s.matricule, s.classroom_name, plural(s.copies, 'copie')].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+            <div className="at-risk-grades">
+              <span className="at-risk-avg">{grade(s.average)}</span>
+              <span className="sub">dernière : {grade(s.last)}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Pagination {...pager} />
+    </>
   );
 }
 
@@ -362,38 +367,42 @@ function Range({ worst, average, best }) {
 }
 
 function EvaluationsTable({ evaluations }) {
+  const { pageItems, pager } = usePagination([...evaluations].reverse(), 15);
   if (!evaluations.length) return <p className="sub">Aucune épreuve corrigée pour cette classe.</p>;
   return (
-    <div className="table-wrap stats-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Épreuve</th>
-            <th>Date</th>
-            <th className="num">Copies</th>
-            <th className="num">Moyenne</th>
-            <th>Étendue (0 à 20)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...evaluations].reverse().map((e) => (
-            <tr key={e.id}>
-              <td>
-                <Link className="cell-title" to={`/evaluations/${e.id}/resultats`}>
-                  {e.title}
-                </Link>
-                <span className="sub">{e.classroom_name ?? 'Sans classe'}</span>
-              </td>
-              <td className="cell-muted nowrap">{e.date ? dateFmt.format(new Date(e.date)) : '-'}</td>
-              <td className="num">{e.copies}</td>
-              <td className={`num strong ${e.average < PASS ? 'is-low' : ''}`}>{grade(e.average)}</td>
-              <td>
-                <Range worst={e.worst} average={e.average} best={e.best} />
-              </td>
+    <>
+      <div className="table-wrap stats-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Épreuve</th>
+              <th>Date</th>
+              <th className="num">Copies</th>
+              <th className="num">Moyenne</th>
+              <th>Étendue (0 à 20)</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {pageItems.map((e) => (
+              <tr key={e.id}>
+                <td>
+                  <Link className="cell-title" to={`/evaluations/${e.id}/resultats`}>
+                    {e.title}
+                  </Link>
+                  <span className="sub">{e.classroom_name ?? 'Sans classe'}</span>
+                </td>
+                <td className="cell-muted nowrap">{e.date ? dateFmt.format(new Date(e.date)) : '-'}</td>
+                <td className="num">{e.copies}</td>
+                <td className={`num strong ${e.average < PASS ? 'is-low' : ''}`}>{grade(e.average)}</td>
+                <td>
+                  <Range worst={e.worst} average={e.average} best={e.best} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination {...pager} />
+    </>
   );
 }

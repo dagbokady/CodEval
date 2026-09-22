@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useClassroomEvaluations, useClassrooms, usePlan } from '../../api/hooks';
 import { ClassroomDialog } from '../admin/ClassroomsAdminPage';
-import { Alert, Button, EmptyState, Loading, PageHeader, Status } from '../../components/ui';
+import { Alert, Button, EmptyState, Loading, PageHeader, Paged, Status } from '../../components/ui';
 import { STATUS_LABELS, formatPercent, formatSchedule, primaryAction } from '../../format';
 import { summarize } from '../../classroomSummary';
 
@@ -94,30 +94,34 @@ export default function ClassesPage() {
             {shown.length === 0 ? (
               <p className="sub">Aucune classe ne correspond à « {search} ».</p>
             ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Classe</th>
-                      <th className="num">Apprenants</th>
-                      <th className="num">Épreuves</th>
-                      <th className="num">Réussite moy.</th>
-                      <th>Prochaine épreuve</th>
-                      <th aria-label="Actions" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shown.map((classroom) => (
-                      <ClassRow
-                        key={classroom.id}
-                        classroom={classroom}
-                        evaluations={byClassroom.get(classroom.id) ?? []}
-                        loading={evaluations.isPending}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Paged items={shown} resetKey={query}>
+                {(page) => (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Classe</th>
+                          <th className="num">Apprenants</th>
+                          <th className="num">Épreuves</th>
+                          <th className="num">Réussite moy.</th>
+                          <th>Prochaine épreuve</th>
+                          <th aria-label="Actions" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {page.map((classroom) => (
+                          <ClassRow
+                            key={classroom.id}
+                            classroom={classroom}
+                            evaluations={byClassroom.get(classroom.id) ?? []}
+                            loading={evaluations.isPending}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Paged>
             )}
           </>
         )}

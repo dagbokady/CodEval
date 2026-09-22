@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth';
-import { Alert, Button, Chips, EmptyState, Field, Loading, Tabs, Tag } from '../../components/ui';
+import { Alert, Button, Chips, EmptyState, Field, Loading, Paged, Tabs, Tag } from '../../components/ui';
 import { cleanJoinCode, typeJoinCode } from '../../joinCode';
 import { useDocumentTitle } from '../../useDocumentTitle';
 import { EVAL_KIND_LABELS, formatDuration } from '../../format';
@@ -589,17 +589,21 @@ export default function StudentHomePage() {
                     }))}
                   />
                 )}
-                {groupByWeek(shownDone).map((week) => (
-                  <section key={week.key} className="stu-section">
-                    <h2 className="stu-section-title stu-week-title">
-                      <span>{week.label}</span>
-                      <span className="stu-week-count">{week.items.length}</span>
-                    </h2>
-                    {week.items.map((evaluation) => (
-                      <DoneCard key={evaluation.id} evaluation={evaluation} />
-                    ))}
-                  </section>
-                ))}
+                <Paged items={shownDone} pageSize={15} resetKey={subject}>
+                  {(page) =>
+                    groupByWeek(page).map((week) => (
+                      <section key={week.key} className="stu-section">
+                        <h2 className="stu-section-title stu-week-title">
+                          <span>{week.label}</span>
+                          <span className="stu-week-count">{week.items.length}</span>
+                        </h2>
+                        {week.items.map((evaluation) => (
+                          <DoneCard key={evaluation.id} evaluation={evaluation} />
+                        ))}
+                      </section>
+                    ))
+                  }
+                </Paged>
               </>
             ))}
         </>

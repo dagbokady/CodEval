@@ -31,7 +31,7 @@ client = TestClient(app)
 MAILBOX: dict[str, str] = {}
 
 
-def _fake_send(to, subject, html, text=None):
+def _fake_send(to, subject, html, text=None, preheader=""):
     MAILBOX[to] = re.search(r"\b(\d{6})\b", text).group(1)
     return True
 
@@ -463,6 +463,13 @@ def test_une_classe_se_partage_avec_un_enseignant_d_un_autre_espace(teacher):
     classe = next(c for c in client.get("/api/classrooms", headers=auth(invite)).json() if c["id"] == cid)
     assert classe["shared"] is True and classe["can_manage"] is False
     assert client.get(f"/api/classrooms/{cid}/students", headers=auth(invite)).status_code == 200
+
+    # Chacun voit toute l'équipe de la classe, soi compris.
+    equipe = client.get(f"/api/classrooms/{cid}/team", headers=auth(invite)).json()
+    roles = {m["teacher_email"]: (m["role"], m["is_self"]) for m in equipe}
+    assert roles["invite@perso.ci"] == ("invited", True)
+    assert ("owner", False) in roles.values()
+    assert next(m for m in equipe if m["role"] == "invited")["share_id"] == share_id
     renommer = {"name": "Piratée"}
     assert client.patch(f"/api/classrooms/{cid}", headers=auth(invite), json=renommer).status_code == 403
 
@@ -545,3 +552,34 @@ def test_mot_de_passe_oublie_par_lien(teacher):
         res = client.post("/api/auth/reset-password", json={"token": token, "password": "autre12345"})
         assert res.status_code == 400
     assert client.post("/api/auth/login", json={"email": "kone@perso.ci", "password": "reinit12345"}).status_code == 200
+
+
+def test_les_e_mails_portent_le_logo_et_restent_lisibles(monkeypatch):
+    import app.mail as mail
+
+    page = mail.render_email("<p>Contenu</p>" + mail.button("https://x.ci/?a=1&b=2", "Ouvrir"))
+    assert f'src="cid:{mail.LOGO_CID}"' in page and "<p>Contenu</p>" in page
+    assert 'href="https://x.ci/?a=1&amp;b=2"' in page
+
+    sent = {}
+
+    class Reply:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"Messages": [{"Status": "success"}]}
+
+    monkeypatch.setattr(mail.settings, "mailjet_api_key", "k")
+    monkeypatch.setattr(mail.settings, "mailjet_api_secret", "s")
+    monkeypatch.setattr(mail.httpx, "post", lambda *a, json, **k: sent.update(json) or Reply)
+    assert mail.send_email("a@b.ci", "Sujet", "<p>Salut</p>", "Salut")
+    message = sent["Messages"][0]
+    assert message["TrackClicks"] == "disabled" and message["TrackOpens"] == "disabled"
+    assert message["InlinedAttachments"][0]["ContentID"] == mail.LOGO_CID
+    assert message["TextPart"] == "Salut"
+
+    monkeypatch.setattr(mail.settings, "smtp_from", "noreply@gmail.com")
+    assert mail.sender_warning()
+    monkeypatch.setattr(mail.settings, "smtp_from", "noreply@codeval.ci")
+    assert mail.sender_warning() is None

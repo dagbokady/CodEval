@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 
 const key = (...parts) => parts.filter((p) => p !== undefined && p !== null);
@@ -95,15 +95,22 @@ export function useBankExercises({ q, language, kind, scope = 'all', subjectId, 
 }
 
 /** La communauté : exercices et sujets complets publiés par tous les établissements. */
-export function useCommunity({ q, itemType, kind, language, scope = 'all', sort = 'recent', page = 1 }) {
-  const params = new URLSearchParams({ page: String(page), page_size: '18', scope, sort });
+/**
+ * La communauté se charge au fil du défilement : chaque page arrive quand on
+ * approche du bas de la liste.
+ */
+export function useCommunity({ q, itemType, kind, language, scope = 'all', sort = 'recent' }) {
+  const params = new URLSearchParams({ page_size: '18', scope, sort });
   if (q) params.set('q', q);
   if (kind) params.set('kind', kind);
   if (itemType) params.set('item_type', itemType);
   if (language) params.set('language', language);
-  return useQuery({
-    queryKey: key('community', scope, sort, itemType, kind, language, q, page),
-    queryFn: () => api(`/api/community?${params}`),
+  return useInfiniteQuery({
+    queryKey: key('community', scope, sort, itemType, kind, language, q),
+    queryFn: ({ pageParam }) => api(`/api/community?${params}&page=${pageParam}`),
+    initialPageParam: 1,
+    getNextPageParam: (last) =>
+      last.page * last.page_size < last.total ? last.page + 1 : undefined,
     placeholderData: (prev) => prev,
   });
 }

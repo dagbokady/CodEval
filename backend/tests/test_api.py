@@ -1956,6 +1956,10 @@ def test_communaute_publier_recuperer_et_moderer(context):
         json={"source_type": "bank_exercise", "source_id": bank["id"]},
     ).json()
     assert exercise_item["title"] == "Maximum"
+    assert exercise_item["exercise_kinds"] == ["code"]
+    assert exercise_item["preview"]["kind"] == "code"
+    assert subject_item["id"] and "exercises" in client.get(
+        f"/api/community/{subject_item['id']}", headers=t).json()["preview"]
 
     # Un autre établissement voit la communauté et en tire des copies.
     other_admin = create_admin("Autre École", "Admin Deux", "admin2@autre.ci")
@@ -2007,6 +2011,27 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert [item["id"] for item in found["items"]] == [subject_item["id"]]
     popular = client.get("/api/community?sort=popular", headers=other).json()["items"]
     assert popular[0]["id"] == subject_item["id"]
+
+    # Les enseignants notent en étoiles ; l'auteur et l'administration non.
+    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=t,
+                      json={"stars": 5}).status_code == 403
+    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=a,
+                      json={"stars": 5}).status_code == 403
+    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+                      json={"stars": 6}).status_code == 422
+    rated = client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+                       json={"stars": 2}).json()
+    assert (rated["rating_avg"], rated["rating_count"], rated["my_rating"]) == (2, 1, 2)
+    rated = client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+                       json={"stars": 4}).json()
+    assert (rated["rating_avg"], rated["rating_count"]) == (4, 1)
+    seen_by_author = client.get(f"/api/community/{exercise_item['id']}", headers=t).json()
+    assert seen_by_author["rating_avg"] == 4 and seen_by_author["my_rating"] is None
+    assert not seen_by_author["can_rate"]
+    best = client.get("/api/community?sort=rated", headers=other).json()["items"]
+    assert best[0]["id"] == exercise_item["id"] and best[0]["my_rating"] == 4
+    cleared = client.delete(f"/api/community/{exercise_item['id']}/rating", headers=other).json()
+    assert cleared["rating_count"] == 0 and cleared["rating_avg"] is None
 
     # L'administration publie et modère ce qui vient de son établissement.
     assert client.post(f"/api/community/{exercise_item['id']}/use", headers=a,

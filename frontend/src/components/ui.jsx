@@ -1,4 +1,5 @@
 import { Children, cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
+import { usePagination } from '../usePagination';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { useDocumentTitle } from '../useDocumentTitle';
@@ -537,6 +538,21 @@ export function Pagination({ page, pageSize, total, onChange }) {
         Suivant
       </Button>
     </nav>
+  );
+}
+
+/**
+ * Une liste découpée en pages : `children` reçoit les éléments de la page
+ * courante, la navigation suit en dessous. Changer `resetKey` (recherche,
+ * filtre) ramène à la première page.
+ */
+export function Paged({ items, pageSize = 20, resetKey = null, children }) {
+  const { pageItems, pager } = usePagination(items, pageSize, resetKey);
+  return (
+    <>
+      {children(pageItems)}
+      <Pagination {...pager} />
+    </>
   );
 }
 

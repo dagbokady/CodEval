@@ -309,6 +309,19 @@ class ShareOut(BaseModel):
     is_self: bool = False
 
 
+class TeamMemberOut(BaseModel):
+    """Un enseignant de la classe, quelle que soit la porte par laquelle il y est."""
+
+    teacher_id: int
+    teacher_name: str
+    teacher_email: str
+    organization_name: str
+    # owner : l'a créée ; invited : invité par partage.
+    role: str
+    share_id: int | None = None
+    is_self: bool = False
+
+
 class JoinCodePayload(BaseModel):
     # Nul : le code reste valable jusqu'à ce qu'on le ferme.
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
@@ -573,7 +586,21 @@ class CommunityItemOut(BaseModel):
     can_delete: bool = False
     # Type d'un exercice seul (QCM, code…), lisible sans charger le contenu.
     exercise_kind: str | None = None
+    # Types d'exercice présents (un seul pour un exercice), pour les couleurs.
+    exercise_kinds: list[str] = []
+    # Miniature du contenu pour la carte : énoncé et début des propositions.
+    preview: dict = {}
+    # Notes des enseignants : moyenne sur 5 (nulle sans note), nombre, et la sienne.
+    rating_avg: float | None = None
+    rating_count: int = 0
+    my_rating: int | None = None
+    # Faux pour l'auteur (on ne note pas son propre travail) et l'administration.
+    can_rate: bool = False
     content: dict | None = None
+
+
+class CommunityRatingIn(BaseModel):
+    stars: int = Field(ge=1, le=5)
 
 
 class EvaluationBase(BaseModel):

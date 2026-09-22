@@ -10,6 +10,7 @@ l'original ni les copies déjà tirées ne se touchent entre eux.
 from __future__ import annotations
 
 import json
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -20,10 +21,12 @@ from ..db import soft_delete
 from ..audit import log
 from ..deps import DbSession, TeacherUser, require_roles
 from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
+from ..grading.questions import questions_of
 from ..models import (
     BankExercise,
     BankTestCase,
     CommunityItem,
+    CommunityRating,
     Evaluation,
     EvaluationKind,
     EvaluationStatus,
@@ -35,7 +38,13 @@ from ..models import (
     TestKind,
     User,
 )
-from ..schemas import CommunityItemOut, CommunityPublishIn, CommunityUseIn, Page
+from ..schemas import (
+    CommunityItemOut,
+    CommunityPublishIn,
+    CommunityRatingIn,
+    CommunityUseIn,
+    Page,
+)
 from .evaluations import _check_refs
 
 router = APIRouter(prefix="/api/community", tags=["communauté"])
@@ -112,7 +121,116 @@ def _can_delete(item: CommunityItem, user: User) -> bool:
     )
 
 
-def _out(db, item: CommunityItem, user: User, *, with_content: bool = False) -> CommunityItemOut:
+_PREVIEW_TEXT = 260
+_PREVIEW_ITEMS = 4
+
+
+def _plain(text: str | None, limit: int = _PREVIEW_TEXT) -> str:
+    """Le texte d'un énoncé sans balises ni retours, coupé proprement."""
+    text = re.sub(r"<[^>]+>", " ", text or "")
+    text = re.sub(r"[`*_#>]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > limit:
+        text = text[: limit - 1].rsplit(" ", 1)[0] + "…"
+    return text
+
+
+def _exercise_preview(exercise: dict) -> dict:
+    """Ce que la carte montre d'un exercice : son énoncé et le début de ce que
+    l'apprenant aura sous les yeux (propositions, paires, affirmations, code)."""
+    kind = exercise.get("kind") or "code"
+    settings = exercise.get("settings") or {}
+    questions = questions_of(kind, settings)
+    first = questions[0] if questions else {}
+    preview: dict = {
+        "kind": kind,
+        "title": _plain(exercise.get("title"), 120),
+        "text": _plain(exercise.get("statement")) or _plain(first.get("text")),
+        "questions_count": len(questions),
+    }
+    if kind == "qcm":
+        preview["choices"] = [
+            _plain(c.get("text"), 80)
+            for c in (first.get("choices") or [])[:_PREVIEW_ITEMS]
+            if isinstance(c, dict)
+        ]
+    elif kind == "matching":
+        preview["pairs"] = [
+            [_plain(p.get("left"), 40), _plain(p.get("right"), 40)]
+            for p in (first.get("pairs") or [])[:_PREVIEW_ITEMS]
+            if isinstance(p, dict)
+        ]
+    elif kind == "truefalse":
+        preview["statements"] = [
+            _plain(st.get("text"), 90)
+            for st in (settings.get("statements") or [])[:_PREVIEW_ITEMS]
+            if isinstance(st, dict)
+        ]
+    elif kind == "code":
+        lines = (exercise.get("starter_code") or "").strip("\n").splitlines()
+        preview["code"] = "\n".join(line[:60] for line in lines[:5])
+    return preview
+
+
+def _preview(item: CommunityItem) -> dict:
+    content = item.content or {}
+    if item.item_type == "subject":
+        return {
+            "exercises": [
+                _exercise_preview(e) for e in (content.get("exercises") or [])[:3]
+            ]
+        }
+    return _exercise_preview(content.get("exercise") or {})
+
+
+def _kinds(item: CommunityItem) -> list[str]:
+    """Les types d'exercice présents, dans l'ordre où ils apparaissent."""
+    content = item.content or {}
+    exercises = (
+        content.get("exercises") or []
+        if item.item_type == "subject"
+        else [content.get("exercise") or {}]
+    )
+    kinds: list[str] = []
+    for exercise in exercises:
+        kind = exercise.get("kind") or "code"
+        if kind not in kinds:
+            kinds.append(kind)
+    return kinds
+
+
+def _can_rate(item: CommunityItem, user: User) -> bool:
+    return user.role is Role.TEACHER and item.author_id != user.id
+
+
+def _ratings(db, ids: list[int], user: User) -> dict[int, dict]:
+    """Moyenne, nombre de notes et note de l'utilisateur, publication par publication."""
+    if not ids:
+        return {}
+    found = {
+        item_id: {"rating_avg": round(float(avg), 2), "rating_count": count, "my_rating": None}
+        for item_id, avg, count in db.execute(
+            select(CommunityRating.item_id, func.avg(CommunityRating.stars),
+                   func.count(CommunityRating.id))
+            .where(CommunityRating.item_id.in_(ids))
+            .group_by(CommunityRating.item_id)
+        )
+    }
+    for item_id, stars in db.execute(
+        select(CommunityRating.item_id, CommunityRating.stars).where(
+            CommunityRating.item_id.in_(ids), CommunityRating.user_id == user.id
+        )
+    ):
+        found[item_id]["my_rating"] = stars
+    return found
+
+
+def _out(
+    db, item: CommunityItem, user: User, *, with_content: bool = False,
+    ratings: dict | None = None,
+) -> CommunityItemOut:
+    if ratings is None:
+        ratings = _ratings(db, [item.id], user)
     author = db.get(User, item.author_id)
     organization = db.get(Organization, item.organization_id)
     return CommunityItemOut(
@@ -134,6 +252,10 @@ def _out(db, item: CommunityItem, user: User, *, with_content: bool = False) -> 
         exercise_kind=(item.content or {}).get("exercise", {}).get("kind")
         if item.item_type == "exercise"
         else None,
+        exercise_kinds=_kinds(item),
+        preview=_preview(item),
+        **ratings.get(item.id, {}),
+        can_rate=_can_rate(item, user),
         content=item.content if with_content else None,
     )
 
@@ -155,7 +277,7 @@ def list_items(
     # Type d'exercice (« qcm », « truefalse », « algo »…) : n'en garde que les exercices.
     kind: str | None = Query(default=None, max_length=20),
     scope: str = Query("all", pattern="^(all|mine|organization)$"),
-    sort: str = Query("recent", pattern="^(recent|popular|type)$"),
+    sort: str = Query("recent", pattern="^(recent|popular|rated|type)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
@@ -186,10 +308,25 @@ def list_items(
             )
         )
     total = db.scalar(select(func.count(CommunityItem.id)).where(*filters)) or 0
-    rows = db.scalars(
-        select(CommunityItem)
-        .where(*filters)
+    query = select(CommunityItem).where(*filters)
+    order = []
+    if sort == "rated":
+        # Les mieux notées d'abord ; à moyenne égale, la plus notée. Sans note : en fin.
+        scores = (
+            select(
+                CommunityRating.item_id,
+                func.avg(CommunityRating.stars).label("avg"),
+                func.count(CommunityRating.id).label("count"),
+            )
+            .group_by(CommunityRating.item_id)
+            .subquery()
+        )
+        query = query.outerjoin(scores, scores.c.item_id == CommunityItem.id)
+        order = [func.coalesce(scores.c.avg, 0).desc(), func.coalesce(scores.c.count, 0).desc()]
+    rows = list(db.scalars(
+        query
         .order_by(
+            *order,
             *((CommunityItem.uses.desc(),) if sort == "popular" else ()),
             *((_ORDRE_TYPES,) if sort == "type" else ()),
             CommunityItem.created_at.desc(),
@@ -197,9 +334,10 @@ def list_items(
         )
         .offset((page - 1) * page_size)
         .limit(page_size)
-    )
+    ))
+    ratings = _ratings(db, [item.id for item in rows], user)
     return Page(
-        items=[_out(db, item, user).model_dump() for item in rows],
+        items=[_out(db, item, user, ratings=ratings).model_dump() for item in rows],
         total=total,
         page=page,
         page_size=page_size,
@@ -348,6 +486,42 @@ def unpublish(item_id: int, user: MemberUser, db: DbSession) -> None:
         title=item.title)
     soft_delete(item)
     db.commit()
+
+
+# ----- Notes -----
+@router.put("/{item_id}/rating", response_model=CommunityItemOut)
+def rate(
+    item_id: int, payload: CommunityRatingIn, user: TeacherUser, db: DbSession
+) -> CommunityItemOut:
+    """Noter une publication de 1 à 5 étoiles ; la noter à nouveau remplace la note."""
+    item = _load(db, item_id)
+    if not _can_rate(item, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "On ne note pas sa propre publication")
+    rating = db.scalar(
+        select(CommunityRating).where(
+            CommunityRating.item_id == item.id, CommunityRating.user_id == user.id
+        )
+    )
+    if rating is None:
+        db.add(CommunityRating(item_id=item.id, user_id=user.id, stars=payload.stars))
+    else:
+        rating.stars = payload.stars
+    db.commit()
+    return _out(db, item, user)
+
+
+@router.delete("/{item_id}/rating", response_model=CommunityItemOut)
+def unrate(item_id: int, user: TeacherUser, db: DbSession) -> CommunityItemOut:
+    item = _load(db, item_id)
+    rating = db.scalar(
+        select(CommunityRating).where(
+            CommunityRating.item_id == item.id, CommunityRating.user_id == user.id
+        )
+    )
+    if rating is not None:
+        db.delete(rating)
+        db.commit()
+    return _out(db, item, user)
 
 
 # ----- Récupération -----

@@ -5,7 +5,7 @@ import { api } from '../api/client';
 import { useAction, useCommunity, useCommunityItem, useLanguages } from '../api/hooks';
 import { useAuth } from '../auth';
 import { SheetExercise } from '../components/SubjectSheet';
-import { IconCheck, IconPlus, IconReuse, IconSearch, IconSheet, IconSheets } from '../components/icons';
+import { IconCheck, IconPlus, IconSearch } from '../components/icons';
 import {
   Alert,
   Button,
@@ -15,7 +15,6 @@ import {
   Loading,
   Menu,
   PageHeader,
-  Pagination,
   Segmented,
   Skeleton,
   Tabs,
@@ -37,6 +36,7 @@ const SCOPES = [
 const SORTS = [
   { value: 'recent', label: 'Les plus récents' },
   { value: 'popular', label: 'Les plus repris' },
+  { value: 'rated', label: 'Les mieux notés' },
   { value: 'type', label: 'Par type (QCM, Vrai/Faux…)' },
 ];
 
@@ -51,15 +51,6 @@ function publishedOn(value) {
   return `le ${dayFmt.format(new Date(value))}`;
 }
 
-function initials(name) {
-  return (name ?? '?')
-    .split(/[\s.-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join('');
-}
-
 /** Ce que contient la publication, en une ligne : « Sujet complet · 3 exercices ». */
 function kindLabel(item) {
   if (item.item_type === 'subject') {
@@ -68,6 +59,81 @@ function kindLabel(item) {
   }
   const kind = item.content?.exercise?.kind ?? item.exercise_kind;
   return kind ? `Exercice · ${exerciseType(kind).badge}` : 'Exercice';
+}
+
+const ratingFmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+
+/** Étoiles de lecture : la moyenne, arrondie à la demi-étoile, et le nombre de notes. */
+function StarsSummary({ avg, count, compact = false }) {
+  if (!count) {
+    return compact ? null : <span className="stars-empty">Pas encore notée</span>;
+  }
+  const rounded = Math.round(avg * 2) / 2;
+  const label = `${ratingFmt.format(avg)} sur 5, ${count} note${count > 1 ? 's' : ''}`;
+  return (
+    <span className="stars-summary" title={label}>
+      <span className="stars" aria-hidden="true">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star key={n} fill={rounded >= n ? 1 : rounded >= n - 0.5 ? 0.5 : 0} />
+        ))}
+      </span>
+      <span className="visually-hidden">{label}</span>
+      <span aria-hidden="true">
+        <b>{ratingFmt.format(avg)}</b> ({count})
+      </span>
+    </span>
+  );
+}
+
+function Star({ fill = 0 }) {
+  const id = `star-half-${fill}`;
+  return (
+    <svg className="star" viewBox="0 0 20 20" width="14" height="14">
+      {fill === 0.5 && (
+        <defs>
+          <linearGradient id={id}>
+            <stop offset="50%" stopColor="var(--star-on)" />
+            <stop offset="50%" stopColor="var(--star-off)" />
+          </linearGradient>
+        </defs>
+      )}
+      <path
+        d="M10 1.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8z"
+        fill={fill === 1 ? 'var(--star-on)' : fill === 0.5 ? `url(#${id})` : 'var(--star-off)'}
+      />
+    </svg>
+  );
+}
+
+/** Donner sa note : cinq étoiles cliquables, recliquer la sienne la retire. */
+function StarInput({ value, disabled, onChange }) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || value || 0;
+  const words = ['', 'Faible', 'Passable', 'Correct', 'Bon', 'Excellent'];
+  return (
+    <div className="star-input" role="radiogroup" aria-label="Votre note" onMouseLeave={() => setHover(0)}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          aria-label={`${n} étoile${n > 1 ? 's' : ''} : ${words[n]}`}
+          title={value === n ? 'Retirer ma note' : words[n]}
+          disabled={disabled}
+          onMouseEnter={() => setHover(n)}
+          onFocus={() => setHover(n)}
+          onBlur={() => setHover(0)}
+          onClick={() => onChange(value === n ? null : n)}
+        >
+          <Star fill={shown >= n ? 1 : 0} />
+        </button>
+      ))}
+      <span className="star-input-word" aria-hidden="true">
+        {shown ? words[shown] : 'Cliquez pour noter'}
+      </span>
+    </div>
+  );
 }
 
 function points(total) {
@@ -94,7 +160,6 @@ export default function CommunityPage() {
   const kind = params.get('format') ?? '';
   const scope = params.get('provenance') ?? 'all';
   const sort = params.get('tri') ?? 'recent';
-  const page = Number(params.get('page')) || 1;
 
   const [search, setSearch] = useState(q);
   const searchRef = useRef(null);
@@ -153,7 +218,7 @@ export default function CommunityPage() {
   const languages = useLanguages();
   const languageLabel = (key) =>
     (languages.data ?? []).find((l) => l.key === key)?.label ?? key?.toUpperCase();
-  const listing = useCommunity({ q, itemType, kind, language, scope, sort, page });
+  const listing = useCommunity({ q, itemType, kind, language, scope, sort });
 
   const useItem = useAction(
     (id) => api(`/api/community/${id}/use`, { method: 'POST', body: {} }),
@@ -203,8 +268,8 @@ export default function CommunityPage() {
   }
 
   const busy = pending !== null;
-  const items = listing.data?.items ?? [];
-  const total = listing.data?.total ?? 0;
+  const items = listing.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = listing.data?.pages[0]?.total ?? 0;
 
   const activeFilters = [
     q && {
@@ -305,19 +370,6 @@ export default function CommunityPage() {
                 <option key={l.key} value={l.key}>{l.label}</option>
               ))}
             </select>
-            {itemType !== 'subject' && (
-              <select
-                className="select-inline"
-                aria-label="Type d'exercice"
-                value={kind}
-                onChange={(e) => setFilter('format', e.target.value)}
-              >
-                <option value="">Tous les types d'exercice</option>
-                {Object.entries(KIND_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            )}
             <select
               className="select-inline cm-sort"
               aria-label="Trier"
@@ -330,6 +382,23 @@ export default function CommunityPage() {
             </select>
           </div>
         </div>
+
+        {itemType !== 'subject' && (
+          <div className="cm-kind-legend" role="group" aria-label="Filtrer par type d'exercice">
+            {Object.entries(KIND_LABELS).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className="cm-kind-chip"
+                data-kind={value}
+                aria-pressed={kind === value}
+                onClick={() => setFilter('format', kind === value ? null : value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="cm-summary" aria-live="polite">
           <span className="cm-count">
@@ -419,23 +488,14 @@ export default function CommunityPage() {
                     onUse={() => use(item)}
                     onAddToBank={() => addToBank(item)}
                     onRemove={() => setConfirmDelete(item)}
-                    onTag={(tag) => {
-                      setSearch(tag);
-                      setFilter('q', tag);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
                   />
                 </li>
               ))}
             </ul>
-            <Pagination
-              page={listing.data.page}
-              pageSize={listing.data.page_size}
-              total={total}
-              onChange={(value) => {
-                setFilter('page', value > 1 ? String(value) : null);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+            <LoadMore
+              hasMore={Boolean(listing.hasNextPage)}
+              loading={listing.isFetchingNextPage}
+              onLoad={() => listing.fetchNextPage()}
             />
           </>
         )}
@@ -508,9 +568,9 @@ export default function CommunityPage() {
 }
 
 /**
- * Une publication : ce que c'est, de quoi ça parle, qui l'a faite, puis les
- * deux gestes qui comptent. Toute la carte ouvre l'aperçu ; les boutons
- * restent au-dessus de ce lien.
+ * Une publication : d'abord ce qu'elle contient, en miniature, puis son titre
+ * et son auteur. Toute la carte ouvre l'aperçu complet ; les boutons restent
+ * au-dessus de ce lien.
  */
 function CommunityCard({
   item,
@@ -523,78 +583,57 @@ function CommunityCard({
   onUse,
   onAddToBank,
   onRemove,
-  onTag,
 }) {
   const subject = item.item_type === 'subject';
-  const hasFacts = item.subject_name || item.language;
+  const kinds = item.exercise_kinds?.length
+    ? item.exercise_kinds
+    : [item.exercise_kind ?? 'code'];
 
   return (
-    <article className={`cm-card ${subject ? 'cm-card--subject' : ''}`.trim()}>
-      <div className="cm-card-head">
-        <span className="cm-kind">
-          {subject ? <IconSheets /> : <IconSheet />}
-          {kindLabel(item)}
-        </span>
-        <span className="cm-points" title="Barème total">{points(item.total_points)}</span>
-        {item.uses > 0 && (
-          <span className="cm-uses" title={`Repris ${item.uses} fois par des enseignants`}>
-            <IconReuse />
-            {item.uses}
-          </span>
+    <article
+      className={`cm-card ${subject ? 'cm-card--subject' : ''}`.trim()}
+      data-kind={subject ? undefined : kinds[0]}
+    >
+      <CardPreview item={item} />
+
+      <div className="cm-card-body">
+        {(item.language || item.can_delete) && (
+          <div className="cm-card-head">
+            {item.language && <span className="cm-lang">{languageLabel(item.language)}</span>}
+            {item.can_delete && (
+              <Menu
+                label={`Actions sur « ${item.title} »`}
+                items={[{ label: 'Retirer de la communauté', danger: true, onClick: onRemove }]}
+              />
+            )}
+          </div>
         )}
-        {item.can_delete && (
-          <Menu
-            label={`Actions sur « ${item.title} »`}
-            items={[{ label: 'Retirer de la communauté', danger: true, onClick: onRemove }]}
-          />
+
+        <h3 className="cm-title">
+          <button type="button" className="cm-open" onClick={onPreview}>
+            {item.title}
+          </button>
+        </h3>
+
+        <p className="cm-byline">
+          {[
+            item.author_name ?? 'Auteur inconnu',
+            publishedOn(item.created_at),
+            item.uses > 0 ? `repris ${item.uses} fois` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </p>
+
+        {item.rating_count > 0 && (
+          <p className="cm-rating">
+            <StarsSummary avg={item.rating_avg} count={item.rating_count} compact />
+            {item.my_rating && <span className="cm-rating-mine">Votre note : {item.my_rating}/5</span>}
+          </p>
         )}
-      </div>
 
-      <h3 className="cm-title">
-        <button type="button" className="cm-open" onClick={onPreview}>
-          {item.title}
-        </button>
-      </h3>
-
-      {item.description && <p className="cm-desc">{item.description}</p>}
-
-      {hasFacts && (
-        <div className="cm-facts">
-          {item.subject_name && <span className="cm-subject">{item.subject_name}</span>}
-          {item.language && <span className="cm-lang">{languageLabel(item.language)}</span>}
-        </div>
-      )}
-
-      {item.tags?.length > 0 && (
-        <div className="cm-tags">
-          {item.tags.slice(0, 5).map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              className="cm-tag"
-              title={`Chercher « ${tag} »`}
-              onClick={() => onTag(tag)}
-            >
-              #{tag}
-            </button>
-          ))}
-          {item.tags.length > 5 && <span className="cm-tag-more">+{item.tags.length - 5}</span>}
-        </div>
-      )}
-
-      <div className="cm-author">
-        <span className="cm-avatar" aria-hidden="true">{initials(item.author_name)}</span>
-        <span className="cm-author-text">
-          <b>{item.author_name ?? 'Auteur inconnu'}</b>
-          <span>
-            {[item.organization_name, publishedOn(item.created_at)].filter(Boolean).join(' · ')}
-          </span>
-        </span>
-      </div>
-
-      <div className="cm-actions">
-        {isTeacher ? (
-          <>
+        {isTeacher && (
+          <div className="cm-actions">
             <Button
               variant="secondary"
               size="small"
@@ -619,16 +658,133 @@ function CommunityCard({
               onClick={onUse}
               title="Crée une évaluation brouillon à partir de cette publication"
             >
-              {pending === `use-${item.id}` ? 'Création…' : 'Créer une évaluation'}
+              {pending === `use-${item.id}` ? 'Création…' : 'Utiliser'}
             </Button>
-          </>
-        ) : (
-          <Button variant="secondary" size="small" onClick={onPreview}>
-            Aperçu
-          </Button>
+          </div>
         )}
       </div>
     </article>
+  );
+}
+
+/**
+ * La miniature : une feuille de sujet posée sur la couleur du type, avec le
+ * vrai contenu en petit. Un exercice
+ * montre son énoncé et le début de ce que l'apprenant aura sous les yeux ; un
+ * sujet empile ses premiers exercices.
+ */
+function CardPreview({ item }) {
+  const preview = item.preview ?? {};
+  const subject = item.item_type === 'subject';
+  const label = subject
+    ? `Sujet · ${item.exercises_count} exercice${item.exercises_count > 1 ? 's' : ''}`
+    : exerciseType(preview.kind ?? item.exercise_kind).badge;
+  return (
+    <div className="cm-preview" aria-hidden="true">
+      <div className="cm-sheet">
+        <div className="cm-sheet-head">
+          <span className="cm-sheet-kind">{label}</span>
+          <span className="cm-sheet-points">{points(item.total_points)}</span>
+        </div>
+        {subject ? (
+          <ol className="cm-preview-list">
+            {(preview.exercises ?? []).map((exercise, index) => (
+              <li key={index} data-kind={exercise.kind}>
+                <span className="cm-preview-num">{index + 1}</span>
+                <span className="cm-preview-ex">
+                  <b>{exercise.title || exerciseType(exercise.kind).badge}</b>
+                  {exercise.text && <span>{exercise.text}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <ExercisePreview preview={preview} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExercisePreview({ preview }) {
+  const { kind, text } = preview;
+  return (
+    <>
+      {text && <p className="cm-preview-text">{text}</p>}
+      {kind === 'qcm' && (preview.choices ?? []).length > 0 && (
+        <ul className="cm-preview-choices">
+          {preview.choices.map((choice, index) => (
+            <li key={index}>{choice || '…'}</li>
+          ))}
+        </ul>
+      )}
+      {kind === 'truefalse' && (preview.statements ?? []).length > 0 && (
+        <ul className="cm-preview-tf">
+          {preview.statements.map((statement, index) => (
+            <li key={index}>
+              <span>{statement || '…'}</span>
+              <span className="cm-preview-vf">V</span>
+              <span className="cm-preview-vf">F</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {kind === 'matching' && (preview.pairs ?? []).length > 0 && (
+        <ul className="cm-preview-pairs">
+          {preview.pairs.map(([left, right], index) => (
+            <li key={index}>
+              <span>{left || '…'}</span>
+              <span className="cm-preview-link" />
+              <span>{right || '…'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {kind === 'short' && (
+        <div className="cm-preview-lines">
+          <span />
+          <span />
+        </div>
+      )}
+      {kind === 'code' && preview.code && <pre className="cm-preview-code">{preview.code}</pre>}
+      {preview.questions_count > 1 && (
+        <span className="cm-preview-more">+ {preview.questions_count - 1} autre{preview.questions_count > 2 ? 's' : ''} question{preview.questions_count > 2 ? 's' : ''}</span>
+      )}
+    </>
+  );
+}
+
+/** Fin de liste : charge la page suivante quand elle entre à l'écran. */
+function LoadMore({ hasMore, loading, onLoad }) {
+  const ref = useRef(null);
+  const onLoadRef = useRef(onLoad);
+  useEffect(() => {
+    onLoadRef.current = onLoad;
+  });
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !hasMore || loading) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadRef.current();
+      },
+      { rootMargin: '400px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loading]);
+
+  if (!hasMore) return null;
+  return (
+    <div ref={ref} className="cm-load-more">
+      {loading ? (
+        <Loading variant="inline" />
+      ) : (
+        <Button variant="ghost" size="small" onClick={onLoad}>
+          Afficher plus
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -654,6 +810,13 @@ function CardsSkeleton() {
 /** Le contenu d'une publication, sur la feuille de sujet, jeux de tests compris. */
 function PreviewDialog({ id, onClose, actions, languageLabel }) {
   const { data: item, isPending, error } = useCommunityItem(id);
+  const rate = useAction(
+    (stars) =>
+      stars
+        ? api(`/api/community/${id}/rating`, { method: 'PUT', body: { stars } })
+        : api(`/api/community/${id}/rating`, { method: 'DELETE' }),
+    [['community'], ['community-item', id]],
+  );
   const exercises =
     item?.item_type === 'subject'
       ? (item.content?.exercises ?? [])
@@ -719,7 +882,26 @@ function PreviewDialog({ id, onClose, actions, languageLabel }) {
                 {item.uses > 0 && <span>repris {item.uses} fois</span>}
               </dd>
             </div>
+            <div>
+              <dt>Note des enseignants</dt>
+              <dd>
+                <StarsSummary avg={item.rating_avg} count={item.rating_count} />
+              </dd>
+            </div>
           </dl>
+          {item.can_rate && (
+            <div className="cm-rate">
+              <span className="cm-rate-label">
+                {item.my_rating ? 'Votre note' : 'Vous avez utilisé ce travail ? Notez-le'}
+              </span>
+              <StarInput
+                value={item.my_rating}
+                disabled={rate.isPending}
+                onChange={(stars) => rate.mutate(stars)}
+              />
+              {rate.error && <Alert>{rate.error.message}</Alert>}
+            </div>
+          )}
           {item.description && <p className="cm-preview-desc">{item.description}</p>}
           {meta?.instructions && <p className="community-instructions">{meta.instructions}</p>}
           <div className="sujet">

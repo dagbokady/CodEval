@@ -84,14 +84,15 @@ def send_code(db, email: str, ip: str, change: bool = False) -> None:
     sent = send_email(
         email,
         f"CodEval : votre code de vérification {code}",
-        f"""<p>Bonjour,</p>
-<p>Voici le code pour confirmer votre adresse e-mail sur CodEval :</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px;font-family:monospace">{code}</p>
-<p>Il est valable {minutes} minutes.</p>
-<p>Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.</p>""",
-        f"Votre code de vérification CodEval : {code}\n\n"
+        f"""<p style="margin:0 0 12px">Bonjour,</p>
+<p style="margin:0 0 16px">Voici le code pour confirmer votre adresse e-mail sur CodEval :</p>
+<p style="margin:0 0 16px;padding:14px 0;text-align:center;background:#f4f4f5;border-radius:6px;font-size:30px;font-weight:700;letter-spacing:8px;font-family:'Courier New',monospace;color:#18181b">{code}</p>
+<p style="margin:0 0 12px">Il est valable {minutes} minutes.</p>
+<p style="margin:0;color:#62626b;font-size:13px">Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.</p>""",
+        f"Bonjour,\n\nVotre code de vérification CodEval : {code}\n\n"
         f"Il est valable {minutes} minutes.\n"
-        f"Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.",
+        f"Si vous n'êtes pas à l'origine de {origin}, ignorez cet e-mail.\n\nCodEval",
+        preheader=f"Votre code est valable {minutes} minutes.",
     )
     if not sent:
         raise HTTPException(

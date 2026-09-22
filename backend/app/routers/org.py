@@ -52,6 +52,7 @@ from ..schemas import (
     PlanOut,
     ShareOut,
     SharePayload,
+    TeamMemberOut,
     SubjectAdminOut,
     SubjectCreate,
     SubjectOut,
@@ -685,6 +686,51 @@ def classroom_shares(classroom_id: int, user: StaffUser, db: DbSession) -> list[
         .order_by(ClassroomShare.created_at)
     )
     return [_share_out(db, share, user) for share in shares]
+
+
+@router.get("/classrooms/{classroom_id}/team", response_model=list[TeamMemberOut])
+def classroom_team(classroom_id: int, user: StaffUser, db: DbSession) -> list[TeamMemberOut]:
+    """Les enseignants de la classe : celui qui l'a créée et ceux qu'il a
+    invités. Chacun s'y retrouve, soi compris."""
+    classroom = _get_classroom(db, user, classroom_id)
+    orgs: dict[int, str] = {}
+
+    def member(teacher: User, role: str, **extra) -> TeamMemberOut:
+        if teacher.organization_id not in orgs:
+            org = db.get(Organization, teacher.organization_id)
+            orgs[teacher.organization_id] = org.name if org else ""
+        return TeamMemberOut(
+            teacher_id=teacher.id,
+            teacher_name=teacher.full_name,
+            teacher_email=teacher.email,
+            organization_name=orgs[teacher.organization_id],
+            role=role,
+            is_self=teacher.id == user.id,
+            **extra,
+        )
+
+    team: dict[int, TeamMemberOut] = {}
+    owner = db.get(User, classroom.owner_id) if classroom.owner_id else None
+    if owner is None:
+        # Classe d'avant la colonne owner_id : l'enseignant de son espace
+        # personnel en est le créateur.
+        org = db.get(Organization, classroom.organization_id)
+        if org is not None and org.is_personal:
+            owner = db.scalar(
+                select(User).where(User.organization_id == org.id, User.role == Role.TEACHER)
+            )
+    if owner is not None:
+        team[owner.id] = member(owner, "owner")
+
+    for share, teacher in db.execute(
+        select(ClassroomShare, User)
+        .join(User, User.id == ClassroomShare.teacher_id)
+        .where(ClassroomShare.classroom_id == classroom.id)
+        .order_by(ClassroomShare.created_at)
+    ):
+        if teacher.id not in team:
+            team[teacher.id] = member(teacher, "invited", share_id=share.id)
+    return list(team.values())
 
 
 @router.post(

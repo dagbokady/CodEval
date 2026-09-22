@@ -10,10 +10,12 @@ import {
   Loading,
   Menu,
   PageHeader,
+  Pagination,
   Segmented,
   Stat,
   Status,
 } from '../../components/ui';
+import { usePagination } from '../../usePagination';
 import CopyDeck from '../../components/CopyDeck';
 import { useAuth } from '../../auth';
 import {
@@ -174,73 +176,77 @@ function ScoreCell({ p }) {
 }
 
 function Releve({ rows, onOpen, sort, onSort }) {
+  const { pageItems, pager } = usePagination(rows, 20, sort);
   const scoreSort = sort === 'score-desc' ? 'descending' : sort === 'score-asc' ? 'ascending' : 'none';
   return (
-    <div className="table-wrap rs-table">
-      <table>
-        <thead>
-          <tr>
-            <th aria-sort={sort === 'name' ? 'ascending' : 'none'}>
-              <button type="button" className="rs-th-sort" onClick={() => onSort('name')}>
-                Étudiant
-              </button>
-            </th>
-            <th aria-sort={scoreSort}>
-              <button
-                type="button"
-                className="rs-th-sort"
-                onClick={() => onSort(sort === 'score-desc' ? 'score-asc' : 'score-desc')}
-              >
-                Note {scoreSort === 'descending' ? '↓' : scoreSort === 'ascending' ? '↑' : ''}
-              </button>
-            </th>
-            <th className="num">Tests</th>
-            <th className="num">Temps passé</th>
-            <th>Statut</th>
-            <th aria-label="Ouvrir" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => (
-            <tr key={p.participation_id} className="rs-row" onClick={() => onOpen(p.participation_id)}>
-              <td>
+    <>
+      <div className="table-wrap rs-table">
+        <table>
+          <thead>
+            <tr>
+              <th aria-sort={sort === 'name' ? 'ascending' : 'none'}>
+                <button type="button" className="rs-th-sort" onClick={() => onSort('name')}>
+                  Étudiant
+                </button>
+              </th>
+              <th aria-sort={scoreSort}>
                 <button
                   type="button"
-                  className="rs-name"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onOpen(p.participation_id);
-                  }}
+                  className="rs-th-sort"
+                  onClick={() => onSort(sort === 'score-desc' ? 'score-asc' : 'score-desc')}
                 >
-                  {p.full_name}
+                  Note {scoreSort === 'descending' ? '↓' : scoreSort === 'ascending' ? '↑' : ''}
                 </button>
-                <span className="sub">{p.matricule ?? 'Sans matricule'}</span>
-              </td>
-              <td>
-                <ScoreCell p={p} />
-              </td>
-              <td className="num">
-                {p.tests_passed}/{p.tests_total}
-              </td>
-              <td className="num">{formatDuration(p.time_spent_seconds)}</td>
-              <td>
-                <Status tone={p.status === 'Réussi' ? 'success' : 'danger'}>{p.status}</Status>
-              </td>
-              <td className="actions">
-                <span className="rs-chevron" aria-hidden="true">›</span>
-              </td>
+              </th>
+              <th className="num">Tests</th>
+              <th className="num">Temps passé</th>
+              <th>Statut</th>
+              <th aria-label="Ouvrir" />
             </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={6} className="sub" style={{ padding: 32, textAlign: 'center' }}>
-                Aucune copie pour ce filtre.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {pageItems.map((p) => (
+              <tr key={p.participation_id} className="rs-row" onClick={() => onOpen(p.participation_id)}>
+                <td>
+                  <button
+                    type="button"
+                    className="rs-name"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpen(p.participation_id);
+                    }}
+                  >
+                    {p.full_name}
+                  </button>
+                  <span className="sub">{p.matricule ?? 'Sans matricule'}</span>
+                </td>
+                <td>
+                  <ScoreCell p={p} />
+                </td>
+                <td className="num">
+                  {p.tests_passed}/{p.tests_total}
+                </td>
+                <td className="num">{formatDuration(p.time_spent_seconds)}</td>
+                <td>
+                  <Status tone={p.status === 'Réussi' ? 'success' : 'danger'}>{p.status}</Status>
+                </td>
+                <td className="actions">
+                  <span className="rs-chevron" aria-hidden="true">›</span>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="sub" style={{ padding: 32, textAlign: 'center' }}>
+                  Aucune copie pour ce filtre.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <Pagination {...pager} />
+    </>
   );
 }
 

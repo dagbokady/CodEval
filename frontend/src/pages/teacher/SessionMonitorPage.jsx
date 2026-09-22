@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAction, useEvaluation, useSessionMonitor } from '../../api/hooks';
-import { Alert, Button, Chips, Loading, PageHeader, Stat, Tag } from '../../components/ui';
+import { Alert, Button, Chips, Loading, Paged, PageHeader, Stat, Tag } from '../../components/ui';
 import { SubjectSheet } from '../../components/SubjectSheet';
 import { useAuth } from '../../auth';
 import { evaluationUsesLanguage } from '../../exerciseTypes';
@@ -130,48 +130,52 @@ export default function SessionMonitorPage() {
 
       <Chips label="Filtrer :" allLabel="Tous" value={filter} onChange={setFilter} options={FILTERS} />
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Apprenant</th>
-              <th>État</th>
-              <th>Exercices rédigés</th>
-              <th>Dernière sauvegarde</th>
-              <th>Sorties</th>
-              <th>Soumission</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participants.map((p) => (
-              <tr key={p.participation_id}>
-                <td>
-                  <div>{p.full_name}</div>
-                  <div className="sub">{p.matricule ?? '-'}</div>
-                </td>
-                <td>
-                  <Tag tone={p.connected ? 'success' : 'neutral'}>
-                    {p.connected ? 'Connecté' : 'Déconnecté'}
-                  </Tag>
-                </td>
-                <td>{p.exercises_done} / {evaluation.data.exercises_count}</td>
-                <td>{formatRelative(p.last_saved_at)}</td>
-                <td>
-                  {p.incidents > 0 ? <Tag tone="danger">{p.incidents}</Tag> : <span className="sub">-</span>}
-                </td>
-                <td>{p.submitted_at ? `Soumis · ${formatRelative(p.submitted_at)}` : '-'}</td>
-              </tr>
-            ))}
-            {participants.length === 0 && (
-              <tr>
-                <td colSpan={6} className="sub" style={{ padding: 32, textAlign: 'center' }}>
-                  Aucun apprenant pour ce filtre.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Paged items={participants} pageSize={50} resetKey={filter}>
+        {(page) => (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Apprenant</th>
+                  <th>État</th>
+                  <th>Exercices rédigés</th>
+                  <th>Dernière sauvegarde</th>
+                  <th>Sorties</th>
+                  <th>Soumission</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.map((p) => (
+                  <tr key={p.participation_id}>
+                    <td>
+                      <div>{p.full_name}</div>
+                      <div className="sub">{p.matricule ?? '-'}</div>
+                    </td>
+                    <td>
+                      <Tag tone={p.connected ? 'success' : 'neutral'}>
+                        {p.connected ? 'Connecté' : 'Déconnecté'}
+                      </Tag>
+                    </td>
+                    <td>{p.exercises_done} / {evaluation.data.exercises_count}</td>
+                    <td>{formatRelative(p.last_saved_at)}</td>
+                    <td>
+                      {p.incidents > 0 ? <Tag tone="danger">{p.incidents}</Tag> : <span className="sub">-</span>}
+                    </td>
+                    <td>{p.submitted_at ? `Soumis · ${formatRelative(p.submitted_at)}` : '-'}</td>
+                  </tr>
+                ))}
+                {participants.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="sub" style={{ padding: 32, textAlign: 'center' }}>
+                      Aucun apprenant pour ce filtre.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Paged>
     </>
   );
 }

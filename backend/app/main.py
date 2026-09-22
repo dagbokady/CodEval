@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
 from .db import init_db
+from .mail import sender_warning
 from .routers import (
     admin,
     auth,
@@ -32,6 +33,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    if warning := sender_warning():
+        logging.getLogger("codeval.mail").warning(warning)
     task = asyncio.create_task(run_scheduler())
     yield
     task.cancel()

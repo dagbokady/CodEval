@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 import os
 import re
@@ -12,7 +13,7 @@ from ..audit import log
 from ..config import settings
 from ..deps import CurrentUser, DbSession
 from ..email_verification import check_code, send_code
-from ..mail import mail_configured, send_email
+from ..mail import button, mail_configured, send_email
 from ..models import Organization, PasswordResetToken, Role, User, utcnow
 from ..rate_limit import limiter
 from ..schemas import (
@@ -154,14 +155,16 @@ def forgot_password(payload: ForgotPasswordPayload, request: Request, db: DbSess
     send_email(
         user.email,
         "CodEval - Réinitialisation de votre mot de passe",
-        f"""<p>Bonjour {user.full_name},</p>
-<p>Cliquez sur le lien ci-dessous pour réinitialiser votre mot de passe :</p>
-<p><a href="{link}">{link}</a></p>
-<p>Ce lien est valable {settings.reset_token_minutes} minutes.</p>
-<p>Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.</p>""",
+        f"""<p style="margin:0 0 12px">Bonjour {html.escape(user.full_name)},</p>
+<p style="margin:0">Vous avez demandé à réinitialiser votre mot de passe CodEval. Choisissez-en un nouveau :</p>
+{button(link, "Choisir un nouveau mot de passe")}
+<p style="margin:0 0 12px">Ce lien est valable {settings.reset_token_minutes} minutes. S'il ne s'ouvre pas, copiez cette adresse dans votre navigateur :</p>
+<p style="margin:0 0 16px;font-size:13px;word-break:break-all"><a href="{html.escape(link, quote=True)}" style="color:#2458d3">{html.escape(link)}</a></p>
+<p style="margin:0;color:#62626b;font-size:13px">Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail : votre mot de passe reste le même.</p>""",
         f"Bonjour {user.full_name},\n\nPour réinitialiser votre mot de passe CodEval, ouvrez ce lien :\n"
         f"{link}\n\nIl est valable {settings.reset_token_minutes} minutes.\n"
-        "Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.",
+        "Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.\n\nCodEval",
+        preheader=f"Lien valable {settings.reset_token_minutes} minutes.",
     )
     return {"ok": True}
 

@@ -11,8 +11,10 @@ import {
   EmptyState,
   Loading,
   PageHeader,
+  Pagination,
   Tabs,
 } from '../../components/ui';
+import { usePagination } from '../../usePagination';
 import { ClassroomDialog } from './ClassroomsAdminPage';
 
 const INVALIDATE = [['admin'], ['classrooms']];
@@ -84,89 +86,93 @@ function StudentsTab({ classroomId, students }) {
     INVALIDATE,
   );
   const list = students.data ?? [];
+  const { pageItems, pager } = usePagination(list, 20);
 
   return (
     <>
-      <div className="section-head">
-        <p className="sub">{list.length} inscrit{list.length > 1 ? 's' : ''}</p>
-        <div className="admin-toolbar">
-          <Link className="btn secondary small" to={`/admin/utilisateurs?nouveau=student&classe=${classroomId}`}>
-            Créer un étudiant
-          </Link>
-          <Button size="small" onClick={() => setPicking(true)}>+ Inscrire des étudiants</Button>
+      <>
+        <div className="section-head">
+          <p className="sub">{list.length} inscrit{list.length > 1 ? 's' : ''}</p>
+          <div className="admin-toolbar">
+            <Link className="btn secondary small" to={`/admin/utilisateurs?nouveau=student&classe=${classroomId}`}>
+              Créer un étudiant
+            </Link>
+            <Button size="small" onClick={() => setPicking(true)}>+ Inscrire des étudiants</Button>
+          </div>
         </div>
-      </div>
-      <Alert>{error ?? students.error?.message}</Alert>
-      {students.isPending ? (
-        <Loading />
-      ) : list.length === 0 ? (
-        <EmptyState compact title="Aucun étudiant inscrit">
-          Inscrivez des étudiants existants, ou créez leur compte directement dans cette classe.
-        </EmptyState>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Étudiant</th>
-                <th>Matricule</th>
-                <th>État</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <span className="cell-title">{s.full_name}</span>
-                    <span className="sub">{s.email}</span>
-                  </td>
-                  <td className="mono">{s.matricule ?? '-'}</td>
-                  <td className="sub">{s.is_active ? 'Actif' : 'Désactivé'}</td>
-                  <td className="actions">
-                    <Button variant="danger-ghost" size="small" onClick={() => setConfirm(s)}>
-                      Désinscrire
-                    </Button>
-                  </td>
+        <Alert>{error ?? students.error?.message}</Alert>
+        {students.isPending ? (
+          <Loading />
+        ) : list.length === 0 ? (
+          <EmptyState compact title="Aucun étudiant inscrit">
+            Inscrivez des étudiants existants, ou créez leur compte directement dans cette classe.
+          </EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Étudiant</th>
+                  <th>Matricule</th>
+                  <th>État</th>
+                  <th aria-label="Actions" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {pageItems.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <span className="cell-title">{s.full_name}</span>
+                      <span className="sub">{s.email}</span>
+                    </td>
+                    <td className="mono">{s.matricule ?? '-'}</td>
+                    <td className="sub">{s.is_active ? 'Actif' : 'Désactivé'}</td>
+                    <td className="actions">
+                      <Button variant="danger-ghost" size="small" onClick={() => setConfirm(s)}>
+                        Désinscrire
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <EnrollDialog
-        open={picking}
-        classroomId={classroomId}
-        enrolled={list}
-        onClose={() => setPicking(false)}
-      />
-      <Dialog
-        open={Boolean(confirm)}
-        onClose={() => setConfirm(null)}
-        title={`Désinscrire ${confirm?.full_name ?? ''} ?`}
-        description="L'étudiant ne verra plus les épreuves de cette classe. Ses copies déjà rendues sont conservées."
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setConfirm(null)}>Annuler</Button>
-            <Button
-              variant="danger"
-              disabled={remove.isPending}
-              onClick={async () => {
-                setError(null);
-                try {
-                  await remove.mutateAsync(confirm.id);
-                } catch (err) {
-                  setError(err.message);
-                }
-                setConfirm(null);
-              }}
-            >
-              Désinscrire
-            </Button>
-          </>
-        }
-      />
+        <EnrollDialog
+          open={picking}
+          classroomId={classroomId}
+          enrolled={list}
+          onClose={() => setPicking(false)}
+        />
+        <Dialog
+          open={Boolean(confirm)}
+          onClose={() => setConfirm(null)}
+          title={`Désinscrire ${confirm?.full_name ?? ''} ?`}
+          description="L'étudiant ne verra plus les épreuves de cette classe. Ses copies déjà rendues sont conservées."
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setConfirm(null)}>Annuler</Button>
+              <Button
+                variant="danger"
+                disabled={remove.isPending}
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    await remove.mutateAsync(confirm.id);
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                  setConfirm(null);
+                }}
+              >
+                Désinscrire
+              </Button>
+            </>
+          }
+        />
+      </>
+      <Pagination {...pager} />
     </>
   );
 }
@@ -276,6 +282,7 @@ function TeachersTab({ classroomId, teachers }) {
     INVALIDATE,
   );
   const list = teachers.data ?? [];
+  const { pageItems, pager } = usePagination(list, 20);
 
   async function submit(event) {
     event.preventDefault();
@@ -290,76 +297,79 @@ function TeachersTab({ classroomId, teachers }) {
 
   return (
     <>
-      <form className="admin-inline-form" onSubmit={submit} aria-label="Attribuer un enseignement">
-        <div className="field">
-          <label htmlFor="t-teacher">Enseignant</label>
-          <select id="t-teacher" required value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
-            <option value="">Choisir…</option>
-            {(teacherAccounts.data?.items ?? []).map((t) => (
-              <option key={t.id} value={t.id}>{t.full_name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="t-subject">Matière</label>
-          <select id="t-subject" required value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">Choisir…</option>
-            {(subjects.data ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
-        <Button type="submit" disabled={!teacherId || !subjectId || assign.isPending}>Attribuer</Button>
-      </form>
-      <Alert>{error ?? teachers.error?.message}</Alert>
-
-      {teachers.isPending ? (
-        <Loading />
-      ) : list.length === 0 ? (
-        <EmptyState compact title="Aucun enseignement attribué">
-          Attribuez à cette classe un enseignant et la matière qu'il y enseigne.
-        </EmptyState>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Enseignant</th>
-                <th>Matière</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((a) => (
-                <tr key={a.id}>
-                  <td>
-                    <span className="cell-title">{a.teacher_name}</span>
-                    <span className="sub">{a.teacher_email}</span>
-                  </td>
-                  <td>{a.subject_name}</td>
-                  <td className="actions">
-                    <Button
-                      variant="danger-ghost"
-                      size="small"
-                      disabled={unassign.isPending}
-                      onClick={async () => {
-                        setError(null);
-                        try {
-                          await unassign.mutateAsync(a.id);
-                        } catch (err) {
-                          setError(err.message);
-                        }
-                      }}
-                    >
-                      Retirer
-                    </Button>
-                  </td>
-                </tr>
+      <>
+        <form className="admin-inline-form" onSubmit={submit} aria-label="Attribuer un enseignement">
+          <div className="field">
+            <label htmlFor="t-teacher">Enseignant</label>
+            <select id="t-teacher" required value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {(teacherAccounts.data?.items ?? []).map((t) => (
+                <option key={t.id} value={t.id}>{t.full_name}</option>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="t-subject">Matière</label>
+            <select id="t-subject" required value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+              <option value="">Choisir…</option>
+              {(subjects.data ?? []).map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+          <Button type="submit" disabled={!teacherId || !subjectId || assign.isPending}>Attribuer</Button>
+        </form>
+        <Alert>{error ?? teachers.error?.message}</Alert>
+
+        {teachers.isPending ? (
+          <Loading />
+        ) : list.length === 0 ? (
+          <EmptyState compact title="Aucun enseignement attribué">
+            Attribuez à cette classe un enseignant et la matière qu'il y enseigne.
+          </EmptyState>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Enseignant</th>
+                  <th>Matière</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((a) => (
+                  <tr key={a.id}>
+                    <td>
+                      <span className="cell-title">{a.teacher_name}</span>
+                      <span className="sub">{a.teacher_email}</span>
+                    </td>
+                    <td>{a.subject_name}</td>
+                    <td className="actions">
+                      <Button
+                        variant="danger-ghost"
+                        size="small"
+                        disabled={unassign.isPending}
+                        onClick={async () => {
+                          setError(null);
+                          try {
+                            await unassign.mutateAsync(a.id);
+                          } catch (err) {
+                            setError(err.message);
+                          }
+                        }}
+                      >
+                        Retirer
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+      <Pagination {...pager} />
     </>
   );
 }

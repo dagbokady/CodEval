@@ -65,6 +65,6 @@ def managed_classroom(db: Session, user: User, classroom_id: int) -> Classroom:
     if not can_manage(user, classroom):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "Seuls le créateur de la classe et l'administration peuvent la modifier",
+            "Seul le créateur de la classe peut la modifier",
         )
     return classroom

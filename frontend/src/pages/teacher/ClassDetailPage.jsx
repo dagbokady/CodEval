@@ -12,11 +12,13 @@ import {
   EmptyState,
   Loading,
   PageHeader,
+  Pagination,
   Segmented,
   Stat,
   Status,
   Tabs,
 } from '../../components/ui';
+import { usePagination } from '../../usePagination';
 import {
   EVAL_KIND_LABELS,
   STATUS_LABELS,
@@ -347,24 +349,23 @@ function EvaluationList({ items, showRate = false }) {
   );
 }
 
+const TEAM_ROLES = { owner: 'Créateur', invited: 'Invité' };
+
 /**
- * Le code que l'enseignant donne à sa classe. Il ne sert qu'à entrer : le
- * changer ou le fermer laisse les apprenants déjà inscrits à leur place.
- */
-/**
- * Les enseignants de la classe. Le créateur (ou l'administration) invite un
- * collègue par son e-mail, même d'un autre espace : la classe reste une, ses
- * apprenants aussi, et l'invité y fait passer ses propres épreuves.
+ * Les enseignants de la classe, chacun compris : celui qui l'a créée et ceux
+ * qu'il a invités. Le créateur invite un collègue par son e-mail, même d'un
+ * autre espace : la classe reste une, ses apprenants aussi, et l'invité y fait
+ * passer ses propres épreuves.
  */
 function TeachersTab({ classroom }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const key = ['classroom-shares', String(classroom.id)];
-  const shares = useQuery({
+  const key = ['classroom-team', String(classroom.id)];
+  const team = useQuery({
     queryKey: key,
-    queryFn: () => api(`/api/classrooms/${classroom.id}/shares`),
+    queryFn: () => api(`/api/classrooms/${classroom.id}/team`),
   });
   const invite = useAction(
     (address) =>
@@ -389,29 +390,26 @@ function TeachersTab({ classroom }) {
     }
   }
 
-  async function withdraw(share) {
+  async function withdraw(member) {
     setError(null);
     setNotice(null);
     try {
-      await remove.mutateAsync(share.id);
-      if (share.is_self) navigate('/classes');
+      await remove.mutateAsync(member.share_id);
+      if (member.is_self) navigate('/classes');
     } catch (err) {
       setError(err.message);
     }
   }
 
-  const list = shares.data ?? [];
+  const list = team.data ?? [];
 
   return (
     <section>
       <header className="section-head">
         <h2 className="section-title">Enseignants de la classe</h2>
-        <span className="section-count">{list.length + 1}</span>
+        {!team.isPending && <span className="section-count">{list.length}</span>}
       </header>
       <p className="sub">
-        {classroom.owner_name
-          ? `Créée par ${classroom.owner_name}.`
-          : "Classe gérée par l'administration."}{' '}
         Les enseignants invités font passer leurs épreuves à ces mêmes apprenants : personne
         n'a à s'inscrire dans une seconde classe.
       </p>
@@ -437,11 +435,13 @@ function TeachersTab({ classroom }) {
       )}
       <Alert>{error}</Alert>
       {notice && <Alert tone="success">{notice}</Alert>}
-      {shares.error && <Alert>{shares.error.message}</Alert>}
-      {shares.isPending && <Loading />}
+      {team.error && <Alert>{team.error.message}</Alert>}
+      {team.isPending && <Loading />}
 
-      {!shares.isPending && list.length === 0 && (
-        <p className="sub classe-table-vide">La classe n'est partagée avec aucun enseignant.</p>
+      {!team.isPending && list.length === 0 && (
+        <p className="sub classe-table-vide">
+          Aucun enseignant n'est encore lié à cette classe.
+        </p>
       )}
       {list.length > 0 && (
         <div className="table-wrap">
@@ -450,25 +450,30 @@ function TeachersTab({ classroom }) {
               <tr>
                 <th>Enseignant</th>
                 <th>E-mail</th>
+                <th>Rôle</th>
                 <th>Espace</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {list.map((share) => (
-                <tr key={share.id}>
-                  <td className="cell-title">{share.teacher_name}</td>
-                  <td>{share.teacher_email}</td>
-                  <td className="cell-muted">{share.organization_name}</td>
+              {list.map((member) => (
+                <tr key={member.teacher_id}>
+                  <td className="cell-title">
+                    {member.teacher_name}
+                    {member.is_self && <span className="cell-muted"> (vous)</span>}
+                  </td>
+                  <td>{member.teacher_email}</td>
+                  <td>{TEAM_ROLES[member.role] ?? member.role}</td>
+                  <td className="cell-muted">{member.organization_name}</td>
                   <td className="actions">
-                    {(classroom.can_manage || share.is_self) && (
+                    {member.share_id && (classroom.can_manage || member.is_self) && (
                       <Button
                         variant="secondary"
                         size="small"
                         disabled={remove.isPending}
-                        onClick={() => withdraw(share)}
+                        onClick={() => withdraw(member)}
                       >
-                        {share.is_self ? 'Quitter la classe' : 'Retirer'}
+                        {member.is_self ? 'Quitter la classe' : 'Retirer'}
                       </Button>
                     )}
                   </td>
@@ -482,6 +487,10 @@ function TeachersTab({ classroom }) {
   );
 }
 
+/**
+ * Le code que l'enseignant donne à sa classe. Il ne sert qu'à entrer : le
+ * changer ou le fermer laisse les apprenants déjà inscrits à leur place.
+ */
 function JoinCodePanel({ classroom }) {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(null);
@@ -650,108 +659,112 @@ function StudentsTab({ classroom, students, pending, error, canRemove }) {
         `${s.full_name} ${s.matricule ?? ''} ${s.email}`.toLowerCase().includes(query),
       )
     : students;
+  const { pageItems, pager } = usePagination(shown, 20, query);
 
   return (
-    <section>
-      <header className="section-head">
-        <h2 className="section-title">Apprenants inscrits</h2>
-        <span className="section-count">{students.length}</span>
-        {students.length > 0 && (
-          <input
-            type="search"
-            className="search-input"
-            aria-label="Rechercher un apprenant"
-            placeholder="Nom, matricule ou e-mail"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+    <>
+      <section>
+        <header className="section-head">
+          <h2 className="section-title">Apprenants inscrits</h2>
+          <span className="section-count">{students.length}</span>
+          {students.length > 0 && (
+            <input
+              type="search"
+              className="search-input"
+              aria-label="Rechercher un apprenant"
+              placeholder="Nom, matricule ou e-mail"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          )}
+        </header>
+
+        <JoinCodePanel classroom={classroom} />
+        {error && <Alert>{error.message}</Alert>}
+        <Alert>{removeError}</Alert>
+        {pending && <Loading />}
+
+        {!pending && students.length === 0 && (
+          <p className="sub classe-table-vide">Aucun apprenant inscrit dans cette classe.</p>
         )}
-      </header>
+        {!pending && students.length > 0 && shown.length === 0 && (
+          <p className="sub classe-table-vide">Aucun apprenant ne correspond à « {search} ».</p>
+        )}
 
-      <JoinCodePanel classroom={classroom} />
-      {error && <Alert>{error.message}</Alert>}
-      <Alert>{removeError}</Alert>
-      {pending && <Loading />}
-
-      {!pending && students.length === 0 && (
-        <p className="sub classe-table-vide">Aucun apprenant inscrit dans cette classe.</p>
-      )}
-      {!pending && students.length > 0 && shown.length === 0 && (
-        <p className="sub classe-table-vide">Aucun apprenant ne correspond à « {search} ».</p>
-      )}
-
-      {shown.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Matricule</th>
-                <th>E-mail</th>
-                <th>Compte</th>
-                {canRemove && <th aria-label="Actions" />}
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((student) => (
-                <tr key={student.id}>
-                  <td>
-                    <span className="student-cell">
-                      <Avatar user={student} />
-                      <span className="cell-title">{student.full_name}</span>
-                    </span>
-                  </td>
-                  <td className="mono">{student.matricule ?? '-'}</td>
-                  <td className="cell-muted">{student.email}</td>
-                  <td>
-                    <Status tone={student.is_active ? 'success' : 'neutral'}>
-                      {student.is_active ? 'Actif' : 'Désactivé'}
-                    </Status>
-                  </td>
-                  {canRemove && (
-                    <td className="actions">
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        disabled={remove.isPending}
-                        onClick={() => setRemoving(student)}
-                      >
-                        Retirer
-                      </Button>
-                    </td>
-                  )}
+        {shown.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Matricule</th>
+                  <th>E-mail</th>
+                  <th>Compte</th>
+                  {canRemove && <th aria-label="Actions" />}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {pageItems.map((student) => (
+                  <tr key={student.id}>
+                    <td>
+                      <span className="student-cell">
+                        <Avatar user={student} />
+                        <span className="cell-title">{student.full_name}</span>
+                      </span>
+                    </td>
+                    <td className="mono">{student.matricule ?? '-'}</td>
+                    <td className="cell-muted">{student.email}</td>
+                    <td>
+                      <Status tone={student.is_active ? 'success' : 'neutral'}>
+                        {student.is_active ? 'Actif' : 'Désactivé'}
+                      </Status>
+                    </td>
+                    {canRemove && (
+                      <td className="actions">
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          disabled={remove.isPending}
+                          onClick={() => setRemoving(student)}
+                        >
+                          Retirer
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {removing && (
-        <Dialog
-          open
-          onClose={() => setRemoving(null)}
-          title={`Retirer ${removing.full_name} ?`}
-          description={`${removing.full_name} quittera la classe ${classroom.name}.`}
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setRemoving(null)}>
-                Annuler
-              </Button>
-              <Button variant="danger" disabled={remove.isPending} onClick={confirmRemove}>
-                {remove.isPending ? 'Retrait…' : 'Retirer de la classe'}
-              </Button>
-            </>
-          }
-        >
-          <p className="sub">
-            Son compte et ses copies passées sont conservés. Il ne verra plus les épreuves de
-            cette classe ; s'il n'appartient plus à aucune classe, on lui demandera un code à sa
-            prochaine connexion.
-          </p>
-        </Dialog>
-      )}
-    </section>
+        {removing && (
+          <Dialog
+            open
+            onClose={() => setRemoving(null)}
+            title={`Retirer ${removing.full_name} ?`}
+            description={`${removing.full_name} quittera la classe ${classroom.name}.`}
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setRemoving(null)}>
+                  Annuler
+                </Button>
+                <Button variant="danger" disabled={remove.isPending} onClick={confirmRemove}>
+                  {remove.isPending ? 'Retrait…' : 'Retirer de la classe'}
+                </Button>
+              </>
+            }
+          >
+            <p className="sub">
+              Son compte et ses copies passées sont conservés. Il ne verra plus les épreuves de
+              cette classe ; s'il n'appartient plus à aucune classe, on lui demandera un code à sa
+              prochaine connexion.
+            </p>
+          </Dialog>
+        )}
+      </section>
+      <Pagination {...pager} />
+    </>
   );
 }
 
@@ -760,6 +773,7 @@ function EvaluationsTab({ evaluations, summary, pending, onNew }) {
   const [filter, setFilter] = useState(null);
   const groups = { upcoming: summary.upcoming, running: summary.running, done: summary.done };
   const rows = filter ? groups[filter] : evaluations;
+  const { pageItems, pager } = usePagination(rows, 20, filter);
 
   if (pending) return <Loading />;
 
@@ -775,83 +789,86 @@ function EvaluationsTab({ evaluations, summary, pending, onNew }) {
   }
 
   return (
-    <section>
-      <header className="section-head">
-        <h2 className="section-title">Épreuves de la classe</h2>
-        <Segmented
-          label="Filtrer les épreuves"
-          allLabel="Toutes"
-          value={filter}
-          onChange={setFilter}
-          options={EVAL_FILTERS.map((option) => ({
-            ...option,
-            count: groups[option.value].length,
-          }))}
-        />
-      </header>
+    <>
+      <section>
+        <header className="section-head">
+          <h2 className="section-title">Épreuves de la classe</h2>
+          <Segmented
+            label="Filtrer les épreuves"
+            allLabel="Toutes"
+            value={filter}
+            onChange={setFilter}
+            options={EVAL_FILTERS.map((option) => ({
+              ...option,
+              count: groups[option.value].length,
+            }))}
+          />
+        </header>
 
-      {rows.length === 0 ? (
-        <p className="sub classe-table-vide">Aucune épreuve dans cette catégorie.</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Épreuve</th>
-                <th>Date</th>
-                <th>Statut</th>
-                <th className="num">Participants</th>
-                <th>Réussite</th>
-                <th aria-label="Action" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((evaluation) => {
-                const action = primaryAction(evaluation);
-                return (
-                  <tr
-                    key={evaluation.id}
-                    className="row-link"
-                    onClick={() => navigate(action.to)}
-                  >
-                    <td>
-                      <span className="cell-title">{evaluation.title}</span>
-                      <span className="sub">
-                        {EVAL_KIND_LABELS[evaluation.kind]} ·{' '}
-                        {plural(evaluation.exercises_count, 'exercice')}
-                      </span>
-                    </td>
-                    <td className="cell-muted">
-                      {evaluation.scheduled_start ? formatSchedule(evaluation) : 'sans date'}
-                    </td>
-                    <td>
-                      <Status tone={STATUS_TONES[evaluation.status]}>
-                        {STATUS_LABELS[evaluation.status]}
-                      </Status>
-                    </td>
-                    <td className="num">{evaluation.participants_count}</td>
-                    <td>
-                      <SuccessMeter value={evaluation.success_rate} />
-                    </td>
-                    <td className="actions">
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          navigate(action.to);
-                        }}
-                      >
-                        {action.label}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+        {rows.length === 0 ? (
+          <p className="sub classe-table-vide">Aucune épreuve dans cette catégorie.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Épreuve</th>
+                  <th>Date</th>
+                  <th>Statut</th>
+                  <th className="num">Participants</th>
+                  <th>Réussite</th>
+                  <th aria-label="Action" />
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((evaluation) => {
+                  const action = primaryAction(evaluation);
+                  return (
+                    <tr
+                      key={evaluation.id}
+                      className="row-link"
+                      onClick={() => navigate(action.to)}
+                    >
+                      <td>
+                        <span className="cell-title">{evaluation.title}</span>
+                        <span className="sub">
+                          {EVAL_KIND_LABELS[evaluation.kind]} ·{' '}
+                          {plural(evaluation.exercises_count, 'exercice')}
+                        </span>
+                      </td>
+                      <td className="cell-muted">
+                        {evaluation.scheduled_start ? formatSchedule(evaluation) : 'sans date'}
+                      </td>
+                      <td>
+                        <Status tone={STATUS_TONES[evaluation.status]}>
+                          {STATUS_LABELS[evaluation.status]}
+                        </Status>
+                      </td>
+                      <td className="num">{evaluation.participants_count}</td>
+                      <td>
+                        <SuccessMeter value={evaluation.success_rate} />
+                      </td>
+                      <td className="actions">
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(action.to);
+                          }}
+                        >
+                          {action.label}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <Pagination {...pager} />
+    </>
   );
 }

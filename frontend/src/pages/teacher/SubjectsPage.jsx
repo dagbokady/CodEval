@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { useAction, useDisciplines, useSubjects } from '../../api/hooks';
 import { useAuth } from '../../auth';
-import { Alert, Button, Dialog, EmptyState, Field, Loading, Menu, PageHeader, Tag } from '../../components/ui';
+import { Alert, Button, Dialog, EmptyState, Field, Loading, Menu, PageHeader, Pagination, Tag } from '../../components/ui';
+import { usePagination } from '../../usePagination';
 import { useDocumentTitle } from '../../useDocumentTitle';
 
 const INVALIDATE = [['subjects'], ['admin']];
@@ -180,36 +181,40 @@ export default function SubjectsPage() {
 }
 
 function SubjectTable({ subjects, labels, actions }) {
+  const { pageItems, pager } = usePagination(subjects);
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Matière</th>
-            <th>Langage</th>
-            {actions && <th aria-label="Actions" />}
-          </tr>
-        </thead>
-        <tbody>
-          {subjects.map((s) => (
-            <tr key={s.id}>
-              <td className="cell-title">{s.name}</td>
-              <td>
-                {labels[s.language] ?? (
-                  <>
-                    {s.language} <Tag tone="warning">fermé</Tag>
-                  </>
-                )}
-              </td>
-              {actions && (
-                <td className="actions">
-                  <Menu label={`Actions pour ${s.name}`} items={actions(s)} />
-                </td>
-              )}
+    <>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Matière</th>
+              <th>Langage</th>
+              {actions && <th aria-label="Actions" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {pageItems.map((s) => (
+              <tr key={s.id}>
+                <td className="cell-title">{s.name}</td>
+                <td>
+                  {labels[s.language] ?? (
+                    <>
+                      {s.language} <Tag tone="warning">fermé</Tag>
+                    </>
+                  )}
+                </td>
+                {actions && (
+                  <td className="actions">
+                    <Menu label={`Actions pour ${s.name}`} items={actions(s)} />
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination {...pager} />
+    </>
   );
 }

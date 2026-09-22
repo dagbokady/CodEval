@@ -53,6 +53,8 @@
   --warning: #8a5a00;
   --warning-bg: #fdf7e7;
   --warning-dot: #d4a72c;
+  --star-on: #e3a008;            /* étoiles des notes */
+  --star-off: #d4d4d8;
   --danger: #c4323f;
   --danger-hover: #a52632;
   --danger-bg: #fdf2f3;
@@ -81,6 +83,14 @@
   --on-dark-soft: #a1a1aa;
 
   /* ─── Coloration du code (thème clair) ─── */
+  /* ─── Types d'exercice : une couleur chacun, partout où le type s'affiche ─── */
+  --kind-qcm: #2458c9;
+  --kind-matching: #7a3fd1;
+  --kind-truefalse: #0e7a70;
+  --kind-short: #a35a00;
+  --kind-code: #1f7a3a;
+  --kind-algo: #b8246b;
+
   --code-bg: #f7f7f8;
   --code-text: #24292f;
   --code-comment: #6a737d;
@@ -173,6 +183,8 @@
   --warning: #e0b54a;
   --warning-bg: #2a2412;
   --warning-dot: #d4a72c;
+  --star-on: #e3b341;
+  --star-off: #3f3f46;
   --danger: #f2767b;
   --danger-hover: #e5484d;
   --danger-bg: #2c1719;
@@ -192,6 +204,14 @@
   --exam-done: #57c078;
   --exam-timer: #f2767b;
   --exam-timer-bg: #2c1719;
+
+  /* ─── Types d'exercice (thème sombre) ─── */
+  --kind-qcm: #7ea6ff;
+  --kind-matching: #bb9bff;
+  --kind-truefalse: #4fcfc0;
+  --kind-short: #f0b35a;
+  --kind-code: #63cf88;
+  --kind-algo: #f37db3;
 
   /* ─── Coloration du code (thème sombre) ─── */
   --code-bg: #1c1c1f;

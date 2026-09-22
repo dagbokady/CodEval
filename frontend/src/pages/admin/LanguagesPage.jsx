@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { useAction } from '../../api/hooks';
 import { useAdminLanguages, useAdminSubjects } from '../../api/admin';
-import { Alert, EmptyState, Loading, PageHeader, Tag } from '../../components/ui';
+import { Alert, EmptyState, Loading, Paged, PageHeader, Tag } from '../../components/ui';
 
 const INVALIDATE = [['admin'], ['disciplines'], ['languages']];
 
@@ -80,40 +80,44 @@ export default function LanguagesPage() {
             langages ouverts ci-dessus.
           </EmptyState>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Matière</th>
-                  <th>Langage</th>
-                  <th>Créée par</th>
-                  <th className="num">Évaluations</th>
-                  <th className="num">Exercices en banque</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.map((s) => (
-                  <tr key={s.id}>
-                    <td className="cell-title">{s.name}</td>
-                    <td>
-                      {labels[s.language] ?? s.language}
-                      {!enabled.has(s.language) && languages.data && (
-                        <>
-                          {' '}
-                          <Tag tone="warning">fermé</Tag>
-                        </>
-                      )}
-                    </td>
-                    {/* Sans auteur : créée par l'administration, avant que les matières
-                        ne reviennent aux enseignants. */}
-                    <td>{s.author_name ?? <span className="sub">Administration</span>}</td>
-                    <td className="num">{s.evaluations_count}</td>
-                    <td className="num">{s.bank_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Paged items={list}>
+            {(page) => (
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Matière</th>
+                      <th>Langage</th>
+                      <th>Créée par</th>
+                      <th className="num">Évaluations</th>
+                      <th className="num">Exercices en banque</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {page.map((s) => (
+                      <tr key={s.id}>
+                        <td className="cell-title">{s.name}</td>
+                        <td>
+                          {labels[s.language] ?? s.language}
+                          {!enabled.has(s.language) && languages.data && (
+                            <>
+                              {' '}
+                              <Tag tone="warning">fermé</Tag>
+                            </>
+                          )}
+                        </td>
+                        {/* Sans auteur : créée par l'administration, avant que les matières
+                            ne reviennent aux enseignants. */}
+                        <td>{s.author_name ?? <span className="sub">Administration</span>}</td>
+                        <td className="num">{s.evaluations_count}</td>
+                        <td className="num">{s.bank_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Paged>
         )}
       </div>
     </>

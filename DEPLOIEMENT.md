@@ -33,6 +33,31 @@ Chez le registraire du domaine, dans la zone DNS :
 
 Attendre que `ping DOMAINE` réponde avec l'IP du VPS avant l'étape 5.
 
+### E-mails : éviter les indésirables
+
+Les e-mails (code de vérification, mot de passe oublié) partent par Mailjet.
+Pour qu'ils arrivent en boîte de réception, l'adresse d'expédition doit être
+**sur ce domaine** (`noreply@DOMAINE`), jamais une adresse Gmail, Yahoo ou
+Outlook : ces messageries interdisent qu'un autre service envoie en leur nom,
+et le message arrive alors non authentifié, donc en indésirables. L'API le
+signale au démarrage dans ses journaux.
+
+1. Dans Mailjet, *Paramètres du compte > Domaines et expéditeurs* : ajouter le
+   domaine, puis l'expéditeur `noreply@DOMAINE`.
+2. Mailjet affiche deux enregistrements à recopier dans la zone DNS du domaine :
+
+| Type | Nom | Valeur |
+|------|-----|--------|
+| TXT  | @   | `v=spf1 include:spf.mailjet.com ~all` (s'il existe déjà un `v=spf1`, y ajouter seulement `include:spf.mailjet.com`) |
+| TXT  | `mailjet._domainkey` | la clé DKIM donnée par Mailjet |
+| TXT  | `_dmarc` | `v=DMARC1; p=none; rua=mailto:postmaster@DOMAINE` |
+
+3. Revenir dans Mailjet et cliquer *Vérifier* : SPF et DKIM doivent passer au
+   vert (quelques minutes à quelques heures).
+4. Dans `deploy/.env` (ou sur Render), mettre `CODEVAL_SMTP_FROM=noreply@DOMAINE`.
+
+Le logo est joint à chaque e-mail : il s'affiche sans dépendre d'une image en ligne.
+
 ## 3. Préparer le serveur
 
 ```bash
