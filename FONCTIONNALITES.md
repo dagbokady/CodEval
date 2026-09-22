@@ -179,30 +179,27 @@ il nomme l'épreuve pour la classe et dans les listes.
 restent dans `grading/languages.py`, prêtes à être rouvertes en ajoutant leur
 clé à `ENABLED_LANGUAGES`.
 
-### 4.2 Les six étapes de l'assistant
+### 4.2 Les quatre étapes de l'assistant
 
 L'éditeur d'évaluation se traverse toujours dans le même ordre :
 
 | # | Étape | Ce qui s'y décide |
 |---|---|---|
-| 1 | Paramètres | l'en-tête de l'épreuve (§4.1) |
-| 2 | Exercices | type, intitulé, énoncé, questions |
-| 3 | **Outils & code de départ** | l'environnement donné à l'apprenant : la **boîte à outils** d'un exercice algorithmique, le **code de départ** d'un exercice de code |
-| 4 | Barème & tests | ce que la copie doit contenir, et sur quoi elle est exécutée |
-| 5 | **Points** | ce que vaut chaque exercice : et, au barème détaillé, chaque déclaration et chaque test |
-| 6 | **Modalités de passage** | surveillance, sorties autorisées, annonce à la classe |
-| 7 | Affectation & publication | classe, publication, lancement |
+| 1 | Paramètres | l'en-tête de l'épreuve (§4.1), et, repliées dessous, les **modalités de passage** (surveillance, sorties autorisées, délai d'entrée, annonce, corrigé) |
+| 2 | Exercices | type, intitulé, énoncé, questions, et l'environnement de l'apprenant sur la même carte : la **boîte à outils** d'un exercice algorithmique (bloc toujours visible), le **code de départ** d'un exercice de code (déjà rempli, replié) |
+| 3 | Correction | ce que la copie doit contenir, et sur quoi elle est exécutée ; la comparaison se règle sur chaque test (« trim » par défaut) |
+| 4 | **Points & publication** | ce que vaut chaque exercice (et, au barème détaillé, chaque déclaration et chaque test), puis un seul bouton qui enregistre et publie |
 
 Trois principes tiennent cet ordre :
 
 - **les points viennent en dernier.** On ne pèse pas un test au moment de
   l'écrire, sans savoir combien il y en aura : ni l'éditeur de barème ni la
-  carte d'un test ne portent plus de champ « points ». Tout se pose à l'étape 5,
-  barème complet sous les yeux ;
-- **les modalités se règlent juste avant la publication.** On ne décide pas du
-  plein écran ni du nombre de sorties tolérées en saisissant un titre : on en
-  décide une fois le sujet écrit, au moment de choisir comment il sera composé :
-  et c'est là qu'on dit si la classe doit savoir qu'une épreuve l'attend ;
+  carte d'un test ne portent de champ « points ». Tout se pose à l'étape 4,
+  barème complet sous les yeux. Tant qu'aucun exercice n'a été pesé plus qu'un
+  autre, le total annoncé y arrive **déjà réparti à parts égales** ;
+- **les modalités partent des valeurs par défaut** réglées dans Paramètres :
+  elles conviennent presque toujours, et restent repliées sous les paramètres
+  de l'épreuve plutôt que d'occuper une étape traversée sans rien y changer ;
 - **l'environnement se règle avant la correction**, et de la même façon pour les
   deux exercices pratiques : c'est la même question posée deux fois : que
   trouve l'apprenant devant lui en ouvrant l'exercice ?
@@ -311,12 +308,14 @@ Exercices réutilisables, indépendants des évaluations : titre, énoncé, lang
 type, points, code de départ ou outils autorisés, étiquettes, jeux de tests,
 matière.
 
-L'assistant de création suit la trame de l'éditeur d'évaluation (§4.2) :
-configuration → environnement de l'apprenant (**outils autorisés** pour un
-exercice algorithmique, **code de départ** pour un exercice de code) → ce que la
-copie doit contenir → jeux de tests → comparaison des résultats → **points**. Les
-types sans exécution (QCM, correspondance, Vrai/Faux, question-réponse) en
-traversent trois : configuration, questions, points.
+L'assistant de création suit la trame de l'éditeur d'évaluation (§4.2), en
+trois écrans pour un exercice pratique : **énoncé et environnement** (intitulé,
+énoncé, **outils autorisés** pour un exercice algorithmique ou **code de départ**
+pour un exercice de code, corrigé ; matière et étiquettes repliées) →
+**correction** (déclarations exigées puis jeux de tests, chacun avec sa
+comparaison) → **points** (5 par défaut, répartis à parts égales). Les types sans
+exécution (QCM, correspondance, Vrai/Faux, question-réponse) en traversent deux :
+énoncé et questions, puis points.
 
 - **Visibilité** : ses propres exercices, plus ceux **partagés** dans
   l'établissement (`is_shared`).

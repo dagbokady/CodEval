@@ -8,7 +8,7 @@ import { KIND_LABELS, exerciseType, hasQuestions, needsTests } from '../../exerc
 import BaremeEditor from '../../components/BaremeEditor';
 import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
-import TestsEditor, { ComparisonEditor } from '../../components/TestsEditor';
+import TestsEditor from '../../components/TestsEditor';
 import SolutionEditor from '../../components/SolutionEditor';
 import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
 import { SheetExercise } from '../../components/SubjectSheet';
@@ -21,6 +21,7 @@ import {
   Alert,
   Button,
   Chips,
+  Disclosure,
   EmptyState,
   Field,
   Loading,
@@ -38,7 +39,7 @@ const EMPTY = {
   title: '',
   statement: '',
   language: 'c',
-  points: '',
+  points: 5,
   starter_code: defaultStarter('c', 'code'),
   kind: 'code',
   settings: {},
@@ -51,45 +52,30 @@ const EMPTY = {
 /**
  * Le titre de chaque étape de l'assistant, dans l'ordre où on les traverse.
  *
- * Un exercice pratique se construit toujours dans le même ordre, quel que soit
- * ce qu'on y écrit : ce qu'est l'exercice, l'environnement qu'on donne à
- * l'apprenant, ce que sa copie doit contenir, sur quoi on l'exécute, comment on
- * compare, et enfin ce que tout cela vaut. Seule la deuxième étape diffère : un
- * exercice de code se donne avec son squelette de départ (que l'enseignant
- * écrit comme il veut) là où un exercice algorithmique a une structure imposée
- * et se règle par les outils qu'on y autorise.
+ * Un exercice pratique se construit toujours dans le même ordre : ce qu'est
+ * l'exercice et l'environnement donné à l'apprenant, puis la correction (ce que
+ * la copie doit contenir, les tests, la comparaison), et enfin ce que tout cela
+ * vaut. L'ordre ne change pas, mais il tient sur trois écrans au lieu de six :
+ * chaque écran regroupe ce qui s'écrit d'un même geste. Seul le bloc
+ * d'environnement diffère : un exercice de code se donne avec son squelette de
+ * départ, un exercice algorithmique se règle par les outils qu'on y autorise.
  *
- * Les points viennent toujours en dernier : on ne pèse un test qu'une fois tous
- * les tests écrits. Les types sans exécution (QCM, correspondance…) traversent
- * les mêmes temps, en plus court.
+ * Les points viennent toujours en dernier, déjà répartis à parts égales : on ne
+ * les touche que pour peser une ligne plus qu'une autre.
  */
-const CODE_STEPS = {
-  1: 'configuration',
-  2: 'code de départ',
-  3: 'ce que le code doit contenir',
-  4: 'jeux de tests',
-  5: 'comparaison des résultats',
-  6: 'points',
-};
-
-const ALGO_STEPS = {
-  1: 'configuration',
-  2: 'outils autorisés',
-  3: "ce que l'algorithme doit contenir",
-  4: 'jeux de tests',
-  5: 'comparaison des résultats',
-  6: 'points',
-};
-
-const QUESTION_STEPS = {
-  1: 'configuration',
-  2: 'questions et réponses attendues',
+const PRACTICAL_STEPS = {
+  1: 'énoncé et environnement',
+  2: 'correction',
   3: 'points',
 };
 
+const QUESTION_STEPS = {
+  1: 'énoncé et questions',
+  2: 'points',
+};
+
 function stepsOf(kind) {
-  if (!needsTests(kind)) return QUESTION_STEPS;
-  return kind === 'algo' ? ALGO_STEPS : CODE_STEPS;
+  return needsTests(kind) ? PRACTICAL_STEPS : QUESTION_STEPS;
 }
 
 function stepLabel(kind, step) {
@@ -307,6 +293,9 @@ export default function BankPage() {
             </p>
             <div className="editeur-apercu-duo">
               <div className="editeur-apercu-champs">
+            {/* Étape 1 : l'exercice et ce que l'apprenant trouve en l'ouvrant.
+                Le classement (matière, étiquettes) ne sert qu'à retrouver
+                l'exercice dans la banque : il reste replié. */}
             {step === 1 && (
               <>
               <div className="row">
@@ -314,6 +303,7 @@ export default function BankPage() {
                   <input
                     id="b-title"
                     required
+                    autoFocus={!form.title}
                     value={form.title}
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                   />
@@ -333,35 +323,10 @@ export default function BankPage() {
                     </select>
                   </Field>
                 )}
-                <Field label="Matière" id="b-subject">
-                  <select
-                    id="b-subject"
-                    value={form.subject_id}
-                    onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                  >
-                    <option value="">-</option>
-                    {(subjects.data ?? []).map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Étiquettes" id="b-tags" hint="séparées par des virgules">
-                  <input
-                    id="b-tags"
-                    value={form.tags}
-                    onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                  />
-                </Field>
               </div>
-              {hasQuestions(form.kind) ? (
-                <p className="sub" style={{ margin: '4px 0 0' }}>
-                  Cet exercice porte plusieurs questions, chacune avec son propre énoncé :
-                  vous les écrirez à l'étape suivante.
-                </p>
-              ) : (
-                <Field label="Description" id="b-statement" hint="l'énoncé lu par l'apprenant">
+
+              {!hasQuestions(form.kind) && (
+                <Field label="Énoncé" id="b-statement" hint="ce que lit l'apprenant">
                   <textarea
                     id="b-statement"
                     value={form.statement}
@@ -369,26 +334,6 @@ export default function BankPage() {
                   />
                 </Field>
               )}
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setForm(null)}>
-                  Annuler
-                </Button>
-                <Button type="button" disabled={!form.title.trim()} onClick={() => setStep(2)}>
-                  Étape suivante →
-                </Button>
-              </div>
-              </>
-            )}
-
-            {/* Étape 2 : l'environnement de travail donné à l'apprenant.
-                Un exercice de code se donne avec son squelette de départ, que
-                l'enseignant écrit comme il l'entend ; un exercice algorithmique
-                n'en a pas (sa structure est imposée par le cours) et se règle
-                par les outils qu'on y autorise. Les types sans exécution y
-                écrivent leurs questions. */}
-            {step === 2 && (
-              <>
 
               {hasQuestions(form.kind) && (
                 <QuestionListEditor
@@ -406,27 +351,32 @@ export default function BankPage() {
                 />
               )}
 
+              {/* Les outils autorisés gardent leur bloc à eux, ouvert : c'est le
+                  seul réglage qu'un exercice algorithmique ne peut pas taire. */}
               {form.kind === 'algo' && (
-                <ToolboxEditor
-                  value={form.settings.allowed_elements || DEFAULT_ELEMENTS}
-                  onChange={(allowed_elements) =>
-                    setForm({ ...form, settings: { ...form.settings, allowed_elements } })
-                  }
-                  ecritureCours={Boolean(form.settings.ecriture_cours)}
-                  onEcritureCours={(ecriture_cours) =>
-                    setForm({ ...form, settings: { ...form.settings, ecriture_cours } })
-                  }
-                />
+                <div className="form-section">
+                  <h3 className="form-section-title">Outils autorisés</h3>
+                  <ToolboxEditor
+                    value={form.settings.allowed_elements || DEFAULT_ELEMENTS}
+                    onChange={(allowed_elements) =>
+                      setForm({ ...form, settings: { ...form.settings, allowed_elements } })
+                    }
+                    ecritureCours={Boolean(form.settings.ecriture_cours)}
+                    onEcritureCours={(ecriture_cours) =>
+                      setForm({ ...form, settings: { ...form.settings, ecriture_cours } })
+                    }
+                  />
+                </div>
               )}
 
+              {/* Le squelette du langage est déjà posé : on ne l'ouvre que pour
+                  le réécrire. */}
               {form.kind === 'code' && (
-                <>
-                  <p className="sub" style={{ margin: '0 0 12px' }}>
-                    Le code déjà présent dans l'éditeur quand l'apprenant ouvre l'exercice :
-                    les inclusions, un squelette de fonction, un commentaire. Laissez vide
-                    pour une page blanche.
-                  </p>
-                  <Field label="Code de départ (facultatif)" id="b-starter">
+                <Disclosure
+                  summary="Code de départ"
+                  hint="Déjà rempli avec le squelette du langage. Ouvrez pour le modifier."
+                >
+                  <Field label="Code présent dans l'éditeur à l'ouverture" id="b-starter">
                     <textarea
                       id="b-starter"
                       rows={12}
@@ -435,7 +385,7 @@ export default function BankPage() {
                       onChange={(e) => setForm({ ...form, starter_code: e.target.value })}
                     />
                   </Field>
-                </>
+                </Disclosure>
               )}
 
               <div style={{ marginTop: 14 }}>
@@ -447,6 +397,35 @@ export default function BankPage() {
                 />
               </div>
 
+              <Disclosure
+                summary="Classement dans la banque"
+                hint="Facultatif : matière et étiquettes, pour retrouver l'exercice."
+              >
+                <div className="row">
+                  <Field label="Matière" id="b-subject">
+                    <select
+                      id="b-subject"
+                      value={form.subject_id}
+                      onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
+                    >
+                      <option value="">-</option>
+                      {(subjects.data ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Étiquettes" id="b-tags" hint="séparées par des virgules">
+                    <input
+                      id="b-tags"
+                      value={form.tags}
+                      onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                    />
+                  </Field>
+                </div>
+              </Disclosure>
+
               {!needsTests(form.kind) && (
                 <p className="sub" style={{ margin: '12px 0' }}>
                   {exerciseType(form.kind).gradingNote}
@@ -454,19 +433,21 @@ export default function BankPage() {
               )}
 
               <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
-                  ← Étape précédente
+                <Button type="button" variant="secondary" onClick={() => setForm(null)}>
+                  Annuler
                 </Button>
-                <Button type="button" onClick={() => setStep(3)}>
+                <Button type="button" disabled={!form.title.trim()} onClick={() => setStep(2)}>
                   Étape suivante →
                 </Button>
               </div>
               </>
             )}
 
-            {/* Étape 3 : ce que la copie doit contenir : les déclarations exigées.
-                Ce qu'elles valent se décidera à la dernière étape. */}
-            {step === 3 && needsTests(form.kind) && (
+            {/* Étape 2 : la correction d'un bloc. Ce que la copie doit déclarer,
+                puis les tests, chacun avec sa comparaison (« trim » par défaut,
+                qui convient presque toujours). Ce que tout cela vaut se décide
+                à l'étape suivante. */}
+            {step === 2 && needsTests(form.kind) && (
               <>
               <div style={{ margin: '0 0 16px' }}>
                 <BaremeEditor
@@ -478,52 +459,19 @@ export default function BankPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(2)}>
-                  ← Étape précédente
-                </Button>
-                <Button type="button" onClick={() => setStep(4)}>
-                  Étape suivante →
-                </Button>
-              </div>
-              </>
-            )}
-
-            {/* Les jeux de tests ont leur étape à eux : les écrire demande d'avoir
-                l'énoncé et les déclarations attendues déjà posés. */}
-            {step === 4 && needsTests(form.kind) && (
-              <>
               <TestsEditor
                 exercise={form}
                 tests={form.tests}
                 template={EMPTY_TEST}
+                showComparison
                 onChange={(tests) => setForm({ ...form, tests })}
               />
 
               <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(3)}>
+                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
                   ← Étape précédente
                 </Button>
-                <Button type="button" onClick={() => setStep(5)}>
-                  Étape suivante →
-                </Button>
-              </div>
-              </>
-            )}
-
-            {step === 5 && needsTests(form.kind) && (
-              <>
-              <ComparisonEditor
-                exercise={form}
-                tests={form.tests}
-                onChange={(tests) => setForm({ ...form, tests })}
-              />
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(4)}>
-                  ← Étape précédente
-                </Button>
-                <Button type="button" onClick={() => setStep(6)}>
+                <Button type="button" onClick={() => setStep(3)}>
                   Étape suivante →
                 </Button>
               </div>

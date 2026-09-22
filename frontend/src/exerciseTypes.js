@@ -148,7 +148,7 @@ export function hasQuestions(kind) {
   return Boolean(exerciseType(kind).multiQuestion);
 }
 
-/** Types corrigés par jeux de tests : les seuls à ouvrir l'étape « Barème & tests ». */
+/** Types corrigés par jeux de tests : les seuls à ouvrir l'étape « Correction ». */
 export function needsTests(kind) {
   return exerciseType(kind).needsTests;
 }

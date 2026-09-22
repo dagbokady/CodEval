@@ -2534,7 +2534,7 @@ tr.row-confirm:hover { background: none; }
 .test-carte--incomplet { border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }
 .test-alerte { margin: 0; font-size: 12px; font-weight: 500; color: var(--warning); }
 
-/* L'étape « Barème & tests » : un bandeau qui dit où l'on en est, la liste des
+/* L'étape « Correction » : un bandeau qui dit où l'on en est, la liste des
    exercices, puis l'exercice ouvert en deux temps numérotés. */
 .step-intro {
   display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
