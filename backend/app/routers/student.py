@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
@@ -240,6 +241,21 @@ def _not_open_reason(evaluation: Evaluation) -> str:
     return "La session est close : votre production est figée"
 
 
+def _entry_closed(evaluation: Evaluation, participation: Participation) -> bool:
+    """Délai d'entrée : passé ce temps après l'ouverture, un apprenant qui n'a
+    pas encore ouvert l'épreuve ne peut plus y entrer. Celui qui l'a déjà
+    commencée garde le droit d'y revenir (coupure réseau, onglet fermé…)."""
+    if participation.started_at is not None or evaluation.started_at is None:
+        return False
+    try:
+        limit = int((evaluation.rules or {}).get("late_entry_minutes") or 0)
+    except (TypeError, ValueError):
+        return False
+    if limit <= 0:
+        return False
+    return utcnow() > evaluation.started_at + timedelta(minutes=limit)
+
+
 @router.get("/evaluations", response_model=list[StudentEvaluationOut])
 def my_evaluations(user: StudentUser, db: DbSession) -> list[StudentEvaluationOut]:
     rows = db.execute(
@@ -295,6 +311,8 @@ def my_evaluations(user: StudentUser, db: DbSession) -> list[StudentEvaluationOu
                     "solutions_available": evaluation.status is EvaluationStatus.VALIDATED
                     and _solutions_shown(evaluation),
                     "status_label": _CORRECTION_LABELS.get(evaluation.status, ""),
+                    "entry_closed": evaluation.status is EvaluationStatus.RUNNING
+                    and _entry_closed(evaluation, participation),
                 }
             )
         )
@@ -312,6 +330,13 @@ def open_exam(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentEx
     close_if_expired(db, evaluation)
     if evaluation.status is not EvaluationStatus.RUNNING:
         raise HTTPException(status.HTTP_403_FORBIDDEN, _not_open_reason(evaluation))
+    if _entry_closed(evaluation, participation):
+        limit = int((evaluation.rules or {}).get("late_entry_minutes") or 0)
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"L'entrée dans l'épreuve est fermée : elle n'était possible que pendant "
+            f"les {limit} minutes suivant l'ouverture de la session",
+        )
 
     now = utcnow()
     if participation.started_at is None:

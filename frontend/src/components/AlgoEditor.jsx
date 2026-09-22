@@ -318,7 +318,7 @@ export default function AlgoEditor({ value, onChange, allowed, readOnly = false 
             ↓
           </button>
         )}
-        <button type="button" onClick={onRemove} title="Supprimer" aria-label="Supprimer">
+        <button type="button" className="algo-remove" onClick={onRemove} title="Supprimer" aria-label="Supprimer">
           ×
         </button>
       </span>
@@ -328,7 +328,13 @@ export default function AlgoEditor({ value, onChange, allowed, readOnly = false 
   function mini(label, onClick, title = label) {
     if (readOnly) return null;
     return (
-      <button type="button" className="algo-mini" onClick={onClick} title={title}>
+      <button
+        type="button"
+        className={`algo-mini ${label === '×' ? 'algo-remove' : ''}`.trim()}
+        onClick={onClick}
+        title={title}
+        aria-label={title}
+      >
         {label}
       </button>
     );

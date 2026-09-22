@@ -761,6 +761,8 @@ class StudentEvaluationOut(ORMModel):
     published: bool = False
     solutions_available: bool = False
     status_label: str = ""
+    # Délai d'entrée dépassé sans avoir ouvert l'épreuve : elle reste visible, fermée.
+    entry_closed: bool = False
     # Renseigné à l'ouverture de l'épreuve seulement : le logo pèse trop pour la liste.
     sheet_header: dict | None = None
 

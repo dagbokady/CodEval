@@ -911,6 +911,55 @@ def test_appreciation_refusee_avant_toute_correction(context):
     client.post(f"/api/evaluations/{eid}/close", headers=t)
 
 
+def test_delai_d_entree_ferme_l_epreuve_aux_retardataires(context):
+    """Passé le délai d'entrée, l'épreuve se ferme à qui ne l'a pas ouverte ;
+    celui qui l'a commencée peut toujours y revenir."""
+    from datetime import timedelta
+
+    from app.models import Evaluation, Participation
+    from app.services import utcnow
+
+    t, s = auth(context["teacher"]), auth(context["student"])
+    eid = client.post(
+        "/api/evaluations",
+        headers=t,
+        json={"title": "Retard", "duration_minutes": 60, "classroom_id": context["classroom"],
+              "total_points": 4, "rules": {"late_entry_minutes": 10}},
+    ).json()["id"]
+    client.put(
+        f"/api/evaluations/{eid}/exercises",
+        headers=t,
+        json=[{"title": "Q", "language": "python", "points": 4, "tests": []}],
+    )
+    client.post(f"/api/evaluations/{eid}/publish", headers=t)
+    client.post(f"/api/evaluations/{eid}/start", headers=t)
+
+    def reculer_l_ouverture(minutes):
+        db = SessionLocal()
+        evaluation = db.get(Evaluation, eid)
+        evaluation.started_at = utcnow() - timedelta(minutes=minutes)
+        db.commit()
+        db.close()
+
+    reculer_l_ouverture(15)
+    res = client.get(f"/api/me/evaluations/{eid}", headers=s)
+    assert res.status_code == 403
+    assert "délai" in res.text or "fermée" in res.text
+    listed = next(e for e in client.get("/api/me/evaluations", headers=s).json() if e["id"] == eid)
+    assert listed["entry_closed"] is True
+
+    # Dans les temps, l'étudiant entre ; ensuite le délai ne le concerne plus.
+    reculer_l_ouverture(5)
+    assert client.get(f"/api/me/evaluations/{eid}", headers=s).status_code == 200
+    reculer_l_ouverture(30)
+    assert client.get(f"/api/me/evaluations/{eid}", headers=s).status_code == 200
+
+    db = SessionLocal()
+    assert db.query(Participation).filter_by(evaluation_id=eid).one().started_at is not None
+    db.close()
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+
+
 def test_vrai_faux_et_question_reponse_de_bout_en_bout(context):
     """Les deux nouveaux types : le corrigé reste au serveur, la note se calcule.
 

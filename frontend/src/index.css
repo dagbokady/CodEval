@@ -1043,7 +1043,7 @@ tr.row-confirm:hover { background: none; }
 }
 .algo-comment .algo-field { font-size: 12px; color: var(--text-muted); }
 
-.algo-actions { margin-left: auto; display: flex; gap: 2px; opacity: 0.35; transition: opacity 0.12s; }
+.algo-actions { margin-left: auto; display: flex; gap: 2px; opacity: 0.55; transition: opacity 0.12s; }
 .algo-line:hover .algo-actions, .algo-line:focus-within .algo-actions,
 .algo-decl-ligne:hover .algo-actions, .algo-decl-ligne:focus-within .algo-actions { opacity: 1; }
 .algo-actions button {
@@ -1090,6 +1090,12 @@ tr.row-confirm:hover { background: none; }
 }
 .algo-mini:hover { color: var(--primary); background: var(--bg-subtle); }
 .algo-mini-add { justify-self: start; }
+/* Les croix de suppression sont rouges : on les distingue d'un coup d'œil des
+   flèches de déplacement, et l'on sait qu'elles retirent quelque chose. */
+.algo-actions button.algo-remove, .algo-mini.algo-remove { color: var(--danger); font-weight: 700; }
+.algo-actions button.algo-remove:hover, .algo-mini.algo-remove:hover {
+  color: var(--danger); background: var(--danger-bg);
+}
 .algo-end-champ { display: flex; align-items: center; gap: 8px; }
 
 /* ========== Evaluation editor: split layout + sheet preview ========== */

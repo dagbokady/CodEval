@@ -281,9 +281,15 @@ function RunningCard({ evaluation }) {
             {remaining != null ? formatDuration(remaining) : '-'}
           </div>
         </div>
-        <Button onClick={() => navigate(`/epreuve/${evaluation.id}`)}>
-          {answered > 0 ? "Reprendre l'épreuve" : "Commencer l'épreuve"}
-        </Button>
+        {evaluation.entry_closed ? (
+          <Button disabled title="Le délai d’entrée fixé par l’enseignant est dépassé">
+            Entrée fermée
+          </Button>
+        ) : (
+          <Button onClick={() => navigate(`/epreuve/${evaluation.id}`)}>
+            {answered > 0 ? "Reprendre l'épreuve" : "Commencer l'épreuve"}
+          </Button>
+        )}
       </div>
     </article>
   );

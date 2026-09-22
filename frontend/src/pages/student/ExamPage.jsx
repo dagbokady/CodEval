@@ -263,6 +263,8 @@ function Exam({ evaluationId, data }) {
 
   const current = currentId ?? data.exercises[0]?.id ?? null;
   const exercise = data.exercises.find((item) => item.id === current);
+  const currentIndex = data.exercises.findIndex((item) => item.id === current);
+  const nextExercise = currentIndex >= 0 ? data.exercises[currentIndex + 1] : undefined;
   const codeOf = useCallback(
     (exerciseId) => edits[exerciseId] ?? data.drafts[exerciseId] ?? '',
     [edits, data.drafts],
@@ -866,9 +868,22 @@ function Exam({ evaluationId, data }) {
           {formatDuration(secondsLeft)}
         </span>
         {allowSubmit && !submittedAt && !locked && (
-          <Button onClick={() => setConfirmSubmit(true)} disabled={submitting}>
-            Soumettre
-          </Button>
+          nextExercise ? (
+            /* Tant qu'il reste une feuille, le bouton mène à la suivante : un
+               « Soumettre » dès la première laisserait croire que tout est fini. */
+            <Button
+              onClick={() => {
+                setCurrentId(nextExercise.id);
+                setShowSubject(false);
+              }}
+            >
+              Continuer →
+            </Button>
+          ) : (
+            <Button onClick={() => setConfirmSubmit(true)} disabled={submitting}>
+              Soumettre
+            </Button>
+          )
         )}
       </header>
 

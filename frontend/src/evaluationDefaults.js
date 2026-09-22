@@ -24,6 +24,9 @@ export const FACTORY_DEFAULTS = {
     // Une sortie d'épreuve, et la copie se ferme : c'est la règle par défaut,
     // celle qu'un surveillant applique en salle. L'enseignant peut l'assouplir.
     max_incidents: 1,
+    // Passé ce délai après l'ouverture, un étudiant qui n'est pas encore entré
+    // dans l'épreuve ne le peut plus. 0 : l'entrée reste ouverte jusqu'à la fin.
+    late_entry_minutes: 0,
     // La classe voit qu'une épreuve l'attend. L'enseignant peut préparer une
     // interrogation sans l'annoncer : elle n'apparaîtra qu'à son ouverture.
     announce_to_students: true,

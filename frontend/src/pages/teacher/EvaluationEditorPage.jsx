@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import {
   useAction,
@@ -194,10 +194,14 @@ export default function EvaluationEditorPage() {
 function Editor({ evaluationId, evaluation }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState(0);
+  // À la création, l'enregistrement change l'URL et remonte l'éditeur : l'étape
+  // et le message voyagent dans l'état de navigation pour ne pas être perdus
+  // (sans quoi il fallait cliquer deux fois sur « Enregistrer et continuer »).
+  const { state: arrival } = useLocation();
+  const [step, setStep] = useState(arrival?.step ?? 0);
   const [error, setError] = useState(null);
   const [titleError, setTitleError] = useState(null);
-  const [notice, setNotice] = useState(null);
+  const [notice, setNotice] = useState(arrival?.notice ?? null);
 
   const classrooms = useClassrooms();
   const subjects = useSubjects();
@@ -258,8 +262,14 @@ function Editor({ evaluationId, evaluation }) {
     }
     try {
       const saved = await saveParams.mutateAsync(payloadFromForm());
+      if (!evaluationId) {
+        navigate(`/evaluations/${saved.id}`, {
+          replace: true,
+          state: { step: next ? 1 : 0, notice: 'Paramètres enregistrés.' },
+        });
+        return;
+      }
       setNotice('Paramètres enregistrés.');
-      if (!evaluationId) navigate(`/evaluations/${saved.id}`, { replace: true });
       if (next) setStep(1);
     } catch (err) {
       setError(err.message);
@@ -467,6 +477,12 @@ function Editor({ evaluationId, evaluation }) {
               <li className="sub">
                 Sorties autorisées : {form.rules.max_incidents ?? 1}
                 {form.rules.max_incidents ? ' avant verrouillage' : ', aucun verrouillage'}
+              </li>
+              <li className="sub">
+                Entrée dans l’épreuve :{' '}
+                {Number(form.rules.late_entry_minutes) > 0
+                  ? `fermée ${form.rules.late_entry_minutes} min après l’ouverture`
+                  : 'possible jusqu’à la fin'}
               </li>
               <li className="sub">
                 Corrigé :{' '}
@@ -972,6 +988,26 @@ function ModalitiesStep({ form, setForm, readOnly, onBack, onNext, pending }) {
           value={rules.max_incidents ?? 1}
           disabled={readOnly}
           onChange={(e) => setRule('max_incidents', Number(e.target.value))}
+        />
+      </Field>
+
+      <Field
+        label="Délai d’entrée (minutes)"
+        id="late-entry"
+        hint={
+          Number(rules.late_entry_minutes) > 0
+            ? `Un étudiant qui n’a pas ouvert l’épreuve ${rules.late_entry_minutes} min après l’ouverture de la session ne peut plus y entrer. Celui qui l’a commencée peut toujours y revenir.`
+            : 'Temps après l’ouverture au-delà duquel on ne peut plus entrer dans l’épreuve. 0 : entrée possible jusqu’à la fin.'
+        }
+      >
+        <input
+          id="late-entry"
+          type="number"
+          min="0"
+          max="600"
+          value={rules.late_entry_minutes ?? 0}
+          disabled={readOnly}
+          onChange={(e) => setRule('late_entry_minutes', Math.max(0, Number(e.target.value) || 0))}
         />
       </Field>
 
