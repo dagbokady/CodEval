@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol
 
 from ..config import settings
@@ -29,11 +30,12 @@ class ExecResult:
 
 class Sandbox(Protocol):
     def run(
-        self, workdir: str, cmd: list[str], stdin: str = "", timeout: float | None = None
+        self, workdir: str, cmd: list[str], stdin: str = "", timeout: float | None = None,
+        memory_mb: int | None = None,
     ) -> ExecResult: ...
 
 
-def _limits() -> None:  # pragma: no cover - exécuté dans le processus fils
+def _limits(memory_mb: int | None = None) -> None:  # pragma: no cover - processus fils
     """Applique les limites de ressources (best effort selon la plateforme)."""
     import resource
 
@@ -45,7 +47,7 @@ def _limits() -> None:  # pragma: no cover - exécuté dans le processus fils
     ]
     # RLIMIT_AS est inexploitable sur macOS : les runtimes y réservent de larges plages.
     if sys.platform.startswith("linux"):
-        mem = settings.sandbox_memory_mb * 1024 * 1024
+        mem = (memory_mb or settings.sandbox_memory_mb) * 1024 * 1024
         caps.append((resource.RLIMIT_AS, (mem, mem)))
         caps.append(
             (
@@ -68,7 +70,8 @@ class SubprocessSandbox:
     """Isolation locale : suffisante pour le MVP, remplaçable en production."""
 
     def run(
-        self, workdir: str, cmd: list[str], stdin: str = "", timeout: float | None = None
+        self, workdir: str, cmd: list[str], stdin: str = "", timeout: float | None = None,
+        memory_mb: int | None = None,
     ) -> ExecResult:
         limit = timeout or settings.sandbox_wall_timeout
         env = {"PATH": "/usr/bin:/bin:/usr/local/bin", "HOME": workdir, "LANG": "C.UTF-8"}
@@ -81,7 +84,7 @@ class SubprocessSandbox:
                 text=True,
                 timeout=limit,
                 env=env,
-                preexec_fn=_limits if os.name == "posix" else None,
+                preexec_fn=partial(_limits, memory_mb) if os.name == "posix" else None,
                 errors="replace",
             )
         except subprocess.TimeoutExpired:

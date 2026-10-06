@@ -1,9 +1,9 @@
 # Image unique pour l'API et le worker de correction.
 FROM python:3.12-slim
 
-# gcc / g++ : compilation des productions C et C++ des apprenants
+# gcc / g++ : compilation des productions C et C++ des apprenants ; JDK : Java
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc g++ libc6-dev \
+    && apt-get install -y --no-install-recommends gcc g++ libc6-dev default-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1

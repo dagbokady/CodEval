@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import CodeMirror from '@uiw/react-codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
+import { java } from '@codemirror/lang-java';
 import { api, sendOnLeave } from '../../api/client';
 import AlgoEditor from '../../components/AlgoEditor';
 import CodeBlock from '../../components/CodeBlock';
@@ -27,7 +28,7 @@ import {
   pushOfflineIncident, readOfflineIncidents, clearOfflineIncidents,
 } from '../../examStorage';
 
-const EXTENSIONS = { c: [cpp()], cpp: [cpp()], python: [python()] };
+const EXTENSIONS = { c: [cpp()], cpp: [cpp()], java: [java()], python: [python()] };
 const LOCAL_SAVE_MS = 400; // écriture dans le navigateur, sans appel réseau
 const SYNC_MS = 15000; // envoi en arrière-plan de ce qui a changé
 const PULSE_MS = 20000; // état de l'épreuve : prolongation, clôture, verrouillage

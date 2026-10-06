@@ -1,12 +1,16 @@
-"""Exercices des TD d'Initiation à l'algorithmique (Licence 1 SRIT), publiés dans
-la communauté : python -m app.seed_community
+"""Exercices publiés dans la communauté : python -m app.seed_community
+
+- les TD d'Initiation à l'algorithmique (Licence 1 SRIT) ;
+- une série d'algorithmique avancée : pointeurs et listes chaînées ;
+- des séries de programmation en C, C++, Java et Python
+  (voir `seed_community_prog`).
 
 Chaque exercice devient un élément « exercice » de la communauté, rattaché au
-premier administrateur. Les exercices à programmer sont des exercices
-d'algorithmique corrigés par jeux de tests ; les attendus sont calculés par une
-solution de référence écrite ici en Python, pour qu'ils ne puissent pas être
-faux. Les questions de cours (simulations, erreurs, complexité) deviennent des
-questions-réponses ou des Vrai/Faux.
+premier administrateur. Les exercices à programmer sont corrigés par jeux de
+tests ; les attendus sont calculés par une solution de référence écrite ici en
+Python, pour qu'ils ne puissent pas être faux. Les questions de cours
+(simulations, erreurs, complexité) deviennent des questions-réponses ou des
+Vrai/Faux.
 
 Rejouable : un exercice déjà publié sous le même titre n'est pas recréé.
 """
@@ -28,6 +32,7 @@ BASE_TAGS = ["L1 SRIT", "algorithmique"]
 BASE = ["constante", "declaration", "lire", "ecrire", "affectation", "si", "sinon", "pour",
         "tantque"]
 SOUS_PROG = ["fonction", "procedure", "retour", "appel"]
+POINTEURS = BASE + SOUS_PROG + ["type", "repeter", "sinonsi", "allouer", "liberer"]
 
 LIGNES = (
     "Chaque valeur affichée est suivie d'un passage à la ligne (CRLF) ; "
@@ -642,9 +647,226 @@ def exercises() -> list[tuple[str, dict]]:
     return items
 
 
+# ----- Algorithmique avancée : pointeurs et listes chaînées -----
+CELLULE = (
+    "On utilise le type\n"
+    "Cellule : STRUCTURE\n  valeur : ENTIER\n  suivant : ^Cellule\nFINSTRUCTURE\n"
+    "Une liste est désignée par le pointeur sur sa première cellule (tete), NIL si "
+    "elle est vide. ALLOUER(p) crée une cellule, p^.valeur et p^.suivant en sont les "
+    "champs, LIBERER(p) la rend.\n"
+)
+SAISIE = "L'algorithme lit des entiers jusqu'à la valeur -1 (non comprise). "
+AFFICHE = (
+    "Il affiche ensuite les valeurs de la liste, de la tête à la fin, une par ligne "
+    "(CRLF après chacune), ou « liste vide » si la liste ne contient rien. "
+)
+
+
+def _liste(valeurs) -> list:
+    return list(valeurs) if valeurs else ["liste vide"]
+
+
+def _sentinelle(*listes) -> str:
+    return _stdin(*[v for l in listes for v in (*l, -1)])
+
+
+def _inserer_trie(valeurs):
+    resultat = []
+    for v in valeurs:
+        i = 0
+        while i < len(resultat) and resultat[i] <= v:
+            i += 1
+        resultat.insert(i, v)
+    return resultat
+
+
+def _commandes(operations, *, file: bool, vide: str) -> list:
+    """Pile (dernier entré, premier sorti) ou file (premier entré, premier sorti)."""
+    contenu, sorties = [], []
+    for op in operations:
+        if op[0] == "E":
+            contenu.append(op[1])
+        elif contenu:
+            sorties.append(contenu.pop(0) if file else contenu.pop())
+        else:
+            sorties.append(vide)
+    return sorties
+
+
+def _stdin_commandes(operations) -> str:
+    return _stdin(*[v for op in operations for v in op], "F")
+
+
+LISTES = [[4, 8, 15, 16, 23, 42], [7], [], [3, -2, 3, 9, 3]]
+OPERATIONS = [
+    [("E", 5), ("E", 8), ("D",), ("E", 1), ("D",), ("D",), ("D",)],
+    [("D",), ("E", 42), ("D",)],
+    [("E", 1), ("E", 2), ("E", 3), ("D",), ("D",), ("D",)],
+]
+
+
+def exercises_avances() -> list[tuple[str, dict]]:
+    items = []
+    add = items.append
+    td = "Pointeurs et listes chaînées"
+
+    add(truefalse(td, "Notions de pointeurs",
+        "On déclare p, q : ^ENTIER. Dites si chaque affirmation est vraie.",
+        [
+            ("p contient une adresse ; p^ désigne la valeur rangée à cette adresse.", True),
+            ("Après la déclaration, p désigne déjà une zone où l'on peut écrire p^ ← 3.",
+             False),
+            ("Après ALLOUER(p) puis q ← p, modifier q^ modifie aussi p^.", True),
+            ("q ← p copie la zone pointée : p et q désignent deux zones distinctes.", False),
+            ("Après LIBERER(p), on ne doit plus utiliser p^.", True),
+            ("NIL est la valeur d'un pointeur qui ne désigne aucune zone.", True),
+        ],
+        notes="Un pointeur ne désigne rien tant qu'on ne lui a pas donné une adresse "
+              "(ALLOUER ou affectation). L'affectation q ← p copie l'adresse, pas la zone."))
+    add(short(td, "Simulation de pointeurs",
+        "ALGORITHME Simul\n  VARIABLES\n    p, q : ^ENTIER\nDEBUT\n  ALLOUER(p)\n"
+        "  p^ ← 5\n  q ← p\n  q^ ← q^ + 3\n  ECRIRE(p^, CRLF)\n  ALLOUER(q)\n"
+        "  q^ ← p^ * 2\n  p^ ← 1\n  ECRIRE(p^, \" \", q^, CRLF)\nFIN",
+        [
+            ("Quelle valeur affiche le premier ECRIRE ?", ["8"]),
+            ("Que affiche le second ECRIRE (deux valeurs séparées par une espace) ?",
+             ["1 16"]),
+            ("Combien de zones ont été allouées en tout ?", ["2", "deux"]),
+        ],
+        notes="q ← p fait désigner la même zone aux deux pointeurs : q^ ← 8 se lit aussi "
+              "par p^. Le second ALLOUER(q) crée une autre zone : q^ ← 16, puis p^ ← 1 "
+              "ne touche que la première."))
+    add(algo(td, "Échange de deux entiers par pointeurs",
+        "Déclarez p, q : ^ENTIER. L'algorithme alloue les deux zones, y lit deux entiers "
+        "(LIRE(p^) puis LIRE(q^)), échange les valeurs pointées à l'aide d'une variable "
+        "auxiliaire, puis affiche p^ puis q^. " + LIGNES,
+        [(_stdin(a, b), [b, a]) for a, b in [(3, 7), (-1, 5), (4, 4)]],
+        tools=POINTEURS,
+        solution="ALLOUER(p)\nALLOUER(q)\nLIRE(p^)\nLIRE(q^)\naux ← p^\np^ ← q^\n"
+                 "q^ ← aux\nECRIRE(p^, CRLF)\nECRIRE(q^, CRLF)"))
+    add(algo(td, "Liste chaînée : saisie et affichage",
+        CELLULE + SAISIE + "Chaque valeur est ajoutée en fin de liste (on garde un "
+        "pointeur queue sur la dernière cellule). " + AFFICHE,
+        [(_sentinelle(l), _liste(l)) for l in LISTES],
+        comparison="trim", tools=POINTEURS,
+        solution="tete ← NIL\nLIRE(x)\nTANTQUE x <> -1 FAIRE\n  ALLOUER(p)\n"
+                 "  p^.valeur ← x\n  p^.suivant ← NIL\n  SI tete = NIL ALORS\n"
+                 "    tete ← p\n  SINON\n    queue^.suivant ← p\n  FINSI\n  queue ← p\n"
+                 "  LIRE(x)\nFINTANTQUE\nSI tete = NIL ALORS\n  ECRIRE(\"liste vide\", CRLF)\n"
+                 "FINSI\np ← tete\nTANTQUE p <> NIL FAIRE\n  ECRIRE(p^.valeur, CRLF)\n"
+                 "  p ← p^.suivant\nFINTANTQUE"))
+    add(algo(td, "Liste chaînée : insertion en tête",
+        CELLULE + SAISIE + "Chaque valeur est insérée en tête de liste : la liste "
+        "se retrouve dans l'ordre inverse de la saisie. " + AFFICHE,
+        [(_sentinelle(l), _liste(l[::-1])) for l in LISTES],
+        comparison="trim", tools=POINTEURS,
+        solution="ALLOUER(p)\np^.valeur ← x\np^.suivant ← tete\ntete ← p"))
+    add(algo(td, "Longueur et somme d'une liste chaînée",
+        CELLULE + SAISIE + "Écrivez les fonctions Longueur(tete : ^Cellule) : ENTIER et "
+        "Somme(tete : ^Cellule) : ENTIER, puis affichez la longueur de la liste puis la "
+        "somme de ses valeurs (0 et 0 pour une liste vide). " + LIGNES,
+        [(_sentinelle(l), [len(l), sum(l)]) for l in LISTES],
+        tools=POINTEURS,
+        solution="FONCTION Longueur(tete : ^Cellule) : ENTIER\n  n ← 0\n  p ← tete\n"
+                 "  TANTQUE p <> NIL FAIRE\n    n ← n + 1\n    p ← p^.suivant\n"
+                 "  FINTANTQUE\n  RETOURNER(n)\nFIN"))
+    add(algo(td, "Recherche dans une liste chaînée",
+        CELLULE + SAISIE + "Il lit ensuite une valeur x et affiche la position (à partir "
+        "de 1) de sa première occurrence dans la liste, ou 0 si x n'y est pas. " + LIGNES,
+        [(_sentinelle(l) + "\n" + str(x), [l.index(x) + 1 if x in l else 0])
+         for l, x in [(LISTES[0], 15), (LISTES[0], 4), (LISTES[0], 99), (LISTES[3], 3),
+                      ([], 5)]],
+        tools=POINTEURS))
+    add(algo(td, "Suppression des occurrences d'une valeur",
+        CELLULE + SAISIE + "Il lit ensuite une valeur x, supprime de la liste toutes les "
+        "cellules qui contiennent x (en les libérant avec LIBERER), puis affiche la "
+        "liste. Pensez au cas où la cellule à supprimer est la tête. "
+        + AFFICHE,
+        [(_sentinelle(l) + "\n" + str(x), _liste([v for v in l if v != x]))
+         for l, x in [(LISTES[3], 3), (LISTES[0], 42), (LISTES[0], 4), ([7], 7),
+                      ([1, 2], 5)]],
+        comparison="trim", tools=POINTEURS))
+    add(algo(td, "Insertion dans une liste triée",
+        CELLULE + SAISIE + "Chaque valeur lue est insérée à sa place, de sorte que la "
+        "liste reste toujours triée par ordre croissant (une valeur égale se place après "
+        "celles déjà présentes). " + AFFICHE,
+        [(_sentinelle(l), _liste(_inserer_trie(l)))
+         for l in [[5, 1, 4, 2, 3], [9, 9, -4, 0], [], [1, 2, 3]]],
+        comparison="trim", tools=POINTEURS))
+    add(algo(td, "Inversion d'une liste chaînée",
+        CELLULE + SAISIE + "Les valeurs sont ajoutées en fin de liste. Écrivez la "
+        "procédure Inverser((E/S) tete : ^Cellule) qui retourne la liste sur place, sans "
+        "allouer de nouvelle cellule (en changeant seulement les champs suivant), puis "
+        "affichez la liste inversée. " + AFFICHE,
+        [(_sentinelle(l), _liste(l[::-1])) for l in LISTES],
+        comparison="trim", tools=POINTEURS,
+        solution="PROCEDURE Inverser((E/S) tete : ^Cellule)\n  prec ← NIL\n"
+                 "  cour ← tete\n  TANTQUE cour <> NIL FAIRE\n    suiv ← cour^.suivant\n"
+                 "    cour^.suivant ← prec\n    prec ← cour\n    cour ← suiv\n"
+                 "  FINTANTQUE\n  tete ← prec\nFIN"))
+    add(algo(td, "Fusion de deux listes triées",
+        CELLULE + "L'algorithme lit deux listes triées par ordre croissant, chacune "
+        "terminée par -1, et les range dans deux listes chaînées. Il construit la fusion "
+        "des deux, triée elle aussi, en réutilisant leurs cellules (sans en allouer de "
+        "nouvelles). " + AFFICHE,
+        [(_sentinelle(a, b), _liste(sorted(a + b)))
+         for a, b in [([1, 4, 9], [2, 3, 10, 11]), ([], [5, 6]), ([1, 1], [1]), ([], [])]],
+        comparison="trim", tools=POINTEURS))
+    add(algo(td, "Pile implémentée par une liste chaînée",
+        CELLULE + "Une pile est une liste chaînée où l'on empile et dépile en tête. "
+        "L'algorithme lit des commandes jusqu'à « F » : « E » suivi d'un entier empile "
+        "cet entier ; « D » dépile et affiche la valeur retirée, ou « pile vide » si la "
+        "pile ne contient rien. " + LIGNES,
+        [(_stdin_commandes(ops), _commandes(ops, file=False, vide="pile vide"))
+         for ops in OPERATIONS],
+        comparison="trim", tools=POINTEURS))
+    add(algo(td, "File implémentée par une liste chaînée",
+        CELLULE + "Une file est une liste chaînée où l'on ajoute en queue et retire en "
+        "tête (deux pointeurs : tete et queue). L'algorithme lit des commandes jusqu'à "
+        "« F » : « E » suivi d'un entier enfile cet entier ; « D » défile et affiche la "
+        "valeur retirée, ou « file vide » si la file ne contient rien. " + LIGNES,
+        [(_stdin_commandes(ops), _commandes(ops, file=True, vide="file vide"))
+         for ops in OPERATIONS],
+        comparison="trim", tools=POINTEURS))
+    add(algo(td, "Liste doublement chaînée",
+        "On utilise le type\nCellule2 : STRUCTURE\n  valeur : ENTIER\n"
+        "  precedent : ^Cellule2\n  suivant : ^Cellule2\nFINSTRUCTURE\n"
+        + SAISIE + "Chaque valeur est ajoutée en fin de liste. L'algorithme affiche "
+        "ensuite les valeurs de la tête vers la queue, puis de la queue vers la tête (en "
+        "suivant les champs precedent), une par ligne, ou « liste vide ». " + LIGNES,
+        [(_sentinelle(l), (l + l[::-1]) if l else ["liste vide"])
+         for l in [[1, 2, 3], [42], [], [5, -5, 10, 0]]],
+        comparison="trim", tools=POINTEURS))
+    add(short(td, "Tableau ou liste chaînée ?",
+        "Comparez un tableau et une liste chaînée simplement chaînée de n éléments.",
+        [
+            ("Complexité de l'accès au k-ième élément d'une liste chaînée ?", ["O(n)", "O(k)"]),
+            ("Complexité de l'accès au k-ième élément d'un tableau ?", ["O(1)"]),
+            ("Complexité de l'insertion en tête d'une liste chaînée ?", ["O(1)"]),
+            ("Complexité de l'insertion en tête d'un tableau (décalage compris) ?", ["O(n)"]),
+            ("Citez un avantage de la liste chaînée sur le tableau.", []),
+        ],
+        points=3.0,
+        notes="La liste chaînée n'a pas de taille fixée à l'avance et insère ou supprime "
+              "sans décaler ; elle perd l'accès direct par indice."))
+    return items
+
+
 TYPE_TAGS = {"qcm": "QCM", "truefalse": "Vrai/Faux", "short": "Questions-réponses",
-             "algo": "Algorithme à écrire"}
+             "algo": "Algorithme à écrire", "code": "Programme à écrire"}
 ORDRE_TYPES = {k: i for i, k in enumerate(TYPE_TAGS)}
+
+
+def collections() -> list[tuple[str, list[str], str, list[tuple[str, dict]]]]:
+    """(matière, étiquettes, cours, exercices) de chaque série publiée."""
+    from .seed_community_prog import collections as programmation
+
+    return [
+        (SUBJECT, BASE_TAGS, "Initiation à l'algorithmique (L1 SRIT)", exercises()),
+        ("Algorithmique avancée", ["algorithmique avancée", "pointeurs", "listes chaînées"],
+         "Algorithmique avancée", exercises_avances()),
+        *programmation(),
+    ]
 
 
 def main() -> None:
@@ -657,27 +879,28 @@ def main() -> None:
             select(CommunityItem).where(CommunityItem.author_id == admin.id)
         )}
         created = 0
-        for td, exercise in sorted(exercises(), key=lambda e: ORDRE_TYPES.get(e[1]["kind"], 9)):
-            tags = [td, TYPE_TAGS.get(exercise["kind"], "Autre"), *BASE_TAGS]
-            if exercise["title"] in existing:
-                item = existing[exercise["title"]]
-                item.content = {"exercise": exercise}
-                item.tags = tags
-                continue
-            db.add(CommunityItem(
-                organization_id=admin.organization_id,
-                author_id=admin.id,
-                item_type="exercise",
-                title=exercise["title"],
-                description=f"{td}, Initiation à l'algorithmique (L1 SRIT).",
-                language="algo",
-                subject_name=SUBJECT,
-                tags=tags,
-                content={"exercise": exercise},
-                exercises_count=1,
-                total_points=exercise["points"],
-            ))
-            created += 1
+        for subject, base_tags, cours, items in collections():
+            for td, exercise in sorted(items, key=lambda e: ORDRE_TYPES.get(e[1]["kind"], 9)):
+                tags = [td, TYPE_TAGS.get(exercise["kind"], "Autre"), *base_tags]
+                if exercise["title"] in existing:
+                    item = existing[exercise["title"]]
+                    item.content = {"exercise": exercise}
+                    item.tags = tags
+                    continue
+                db.add(CommunityItem(
+                    organization_id=admin.organization_id,
+                    author_id=admin.id,
+                    item_type="exercise",
+                    title=exercise["title"],
+                    description=f"{td}, {cours}.",
+                    language=exercise["language"],
+                    subject_name=subject,
+                    tags=tags,
+                    content={"exercise": exercise},
+                    exercises_count=1,
+                    total_points=exercise["points"],
+                ))
+                created += 1
         db.commit()
         print(f"Communauté : {created} exercice(s) ajouté(s)")
     finally:

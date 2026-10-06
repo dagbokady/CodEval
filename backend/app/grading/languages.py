@@ -15,6 +15,12 @@ class Language:
     # de départ : un programme vide mais compilable, pour que personne ne perde du
     # temps d'épreuve à retaper l'ossature du langage.
     starter_code: str = ""
+    # Plafond d'espace d'adressage propre au langage, en Mo (sinon celui du bac à
+    # sable). La JVM réserve d'emblée de larges plages qu'elle n'utilise pas : son
+    # tas réel est borné par -Xmx, pas par cette limite.
+    memory_mb: int | None = None
+    # Vérification de syntaxe sans édition de liens ; à défaut, celle de gcc/g++.
+    syntax_cmd: list[str] | None = None
 
 
 C_STARTER = """#include <stdio.h>
@@ -36,6 +42,21 @@ int main()
     return 0;
 }
 """
+
+JAVA_STARTER = """import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        // Écrivez votre programme ici
+
+    }
+}
+"""
+
+# Une JVM sobre : un seul cœur annoncé (moins de fils d'exécution), ramasse-miettes
+# série, compilation à la volée minimale. Le démarrage reste sous la demi-seconde.
+_JVM = ["-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:ActiveProcessorCount=1"]
 
 PYTHON_STARTER = """def main():
     # Écrivez votre programme ici
@@ -66,6 +87,20 @@ LANGUAGES: dict[str, Language] = {
         editor_mode="cpp",
         starter_code=CPP_STARTER,
     ),
+    "java": Language(
+        key="java",
+        label="Java",
+        filename="Main.java",
+        compile_cmd=["javac", "-J-Xmx256m", *(f"-J{o}" for o in _JVM), "-encoding", "UTF-8",
+                     "Main.java"],
+        run_cmd=["java", "-Xmx128m", "-Xss16m", *_JVM, "-cp", ".", "Main"],
+        editor_mode="java",
+        starter_code=JAVA_STARTER,
+        memory_mb=2048,
+        # javac n'a pas de -fsyntax-only : la compilation complète en tient lieu.
+        syntax_cmd=["javac", "-J-Xmx256m", *(f"-J{o}" for o in _JVM), "-encoding", "UTF-8",
+                    "-d", "classes", "Main.java"],
+    ),
     "python": Language(
         key="python",
         label="Python 3",
@@ -86,11 +121,12 @@ ALGO = "algo"
 DISCIPLINES: dict[str, str] = {
     "c": "Langage C",
     "cpp": "C++",
+    "java": "Java",
     "python": "Python",
     ALGO: "Algorithmique",
 }
 # Ouverts tant que l'administration n'a rien réglé.
-DEFAULT_ENABLED = ("c", ALGO)
+DEFAULT_ENABLED = ("c", "cpp", "java", "python", ALGO)
 _SETTING_KEY = "enabled_languages"
 
 

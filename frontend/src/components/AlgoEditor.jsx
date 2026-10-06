@@ -274,13 +274,26 @@ export default function AlgoEditor({ value, onChange, allowed, readOnly = false 
     });
   }
 
-  /** Insère un opérateur là où se trouve le curseur, dans le dernier champ touché. */
-  function insertOperator(texte) {
+  /**
+   * Insère un opérateur là où se trouve le curseur, dans le dernier champ touché.
+   * Un opérateur `colle` (le ^ du pointeur) s'accroche au nom qui le précède.
+   */
+  function insertOperator(texte, colle = false) {
     const cible = focusRef.current;
     if (!cible?.el || readOnly || !document.contains(cible.el)) return;
     const { el } = cible;
     const debut = el.selectionStart ?? el.value.length;
     const fin = el.selectionEnd ?? debut;
+    if (colle) {
+      const avantColle = el.value.slice(0, debut).replace(/\s+$/, '');
+      cible.onValue(`${avantColle}${texte}${el.value.slice(fin)}`);
+      const position = `${avantColle}${texte}`.length;
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(position, position);
+      });
+      return;
+    }
     const avant = el.value.slice(0, debut).replace(/\s+$/, '');
     const apres = el.value.slice(fin).replace(/^\s+/, '');
     const suivant = `${avant}${avant ? ' ' : ''}${texte} ${apres}`.replace(/\s+$/, apres ? '' : ' ');
@@ -737,6 +750,14 @@ export default function AlgoEditor({ value, onChange, allowed, readOnly = false 
         );
       case 'repeter':
         return <Kw>REPETER</Kw>;
+      case 'allouer':
+      case 'liberer':
+        return (
+          <span className="algo-colle">
+            <Kw>{node.type === 'allouer' ? 'ALLOUER' : 'LIBERER'}</Kw>(
+            {field(node.cible, (v) => set({ cible: v }), 'p', node.type === 'allouer' ? 'Pointeur qui recevra la nouvelle zone' : 'Pointeur dont la zone est libérée')})
+          </span>
+        );
       default:
         return null;
     }
@@ -1071,7 +1092,7 @@ export default function AlgoEditor({ value, onChange, allowed, readOnly = false 
                   title={`${op.aide} : s'insère dans le champ en cours`}
                   // Garder le focus dans le champ : l'opérateur s'y insère.
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertOperator(op.texte)}
+                  onClick={() => insertOperator(op.texte, op.colle)}
                 >
                   {op.texte}
                 </button>

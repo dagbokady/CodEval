@@ -279,9 +279,13 @@ def _syntax_check(sandbox: Sandbox, source: str, lang) -> str:
         return ""
     with Workspace() as ws:
         ws.write(lang.filename, source)
-        std = [arg for arg in lang.compile_cmd if arg.startswith("-std=")]
-        cmd = [lang.compile_cmd[0], *std, "-fsyntax-only", lang.filename]
-        res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
+        if lang.syntax_cmd:
+            cmd = list(lang.syntax_cmd)
+        else:
+            std = [arg for arg in lang.compile_cmd if arg.startswith("-std=")]
+            cmd = [lang.compile_cmd[0], *std, "-fsyntax-only", lang.filename]
+        res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout,
+                          memory_mb=lang.memory_mb)
     if res.exit_code != 0:
         return (res.stderr or res.stdout or "Échec de compilation")[:4000]
     return ""
@@ -293,7 +297,8 @@ def _compile(sandbox: Sandbox, ws: Workspace, lang, source_name: str, flags: lis
         return ""
     cmd = [source_name if arg == lang.filename else arg for arg in lang.compile_cmd]
     cmd = cmd[:1] + list(flags) + cmd[1:]
-    comp = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
+    comp = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout,
+                       memory_mb=lang.memory_mb)
     if comp.exit_code != 0:
         return (comp.stderr or comp.stdout or "Échec de compilation")[:4000]
     return ""
@@ -301,7 +306,8 @@ def _compile(sandbox: Sandbox, ws: Workspace, lang, source_name: str, flags: lis
 
 def _run_case(sandbox: Sandbox, ws: Workspace, lang, test: TestCase, stdin: str, index: int | None):
     cmd = list(lang.run_cmd) + ([str(index)] if index is not None else [])
-    return sandbox.run(ws.path, cmd, stdin=stdin, timeout=test.timeout_ms / 1000)
+    return sandbox.run(ws.path, cmd, stdin=stdin, timeout=test.timeout_ms / 1000,
+                       memory_mb=lang.memory_mb)
 
 
 def _probe_compile(sandbox: Sandbox, ws: Workspace, lang) -> str:
@@ -518,7 +524,8 @@ def _run_group(
         # millisecondes. On l'absorbe hors barème pour ne pas pénaliser
         # arbitrairement le premier test du groupe.
         if signature is None:
-            sandbox.run(ws.path, lang.run_cmd, stdin="", timeout=settings.sandbox_wall_timeout)
+            sandbox.run(ws.path, lang.run_cmd, stdin="", timeout=settings.sandbox_wall_timeout,
+                        memory_mb=lang.memory_mb)
 
         for index, test in enumerate(cases):
             if signature is not None:

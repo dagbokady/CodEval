@@ -8,7 +8,8 @@ dans un environnement contraint.
 
 - Python 3.12
 - PostgreSQL 17 (local ou `docker compose up -d db`)
-- `gcc` et `g++` sur la machine qui exécute le worker (correction C / C++)
+- `gcc` et `g++` sur la machine qui exécute le worker (correction C / C++), et un JDK
+  (`javac`, `java`) pour la correction Java
 
 ## Installation
 

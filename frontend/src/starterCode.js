@@ -27,6 +27,16 @@ int main()
     return 0;
 }
 `,
+  java: `import java.util.Scanner;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        // Écrivez votre programme ici
+
+    }
+}
+`,
   python: `def main():
     # Écrivez votre programme ici
     pass

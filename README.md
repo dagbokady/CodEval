@@ -15,8 +15,8 @@ docs/       Banc de mesure du moteur de correction          → docs/recherche/b
 
 ## Démarrage rapide
 
-Prérequis : Python 3.12, Node.js 20 ou plus, PostgreSQL, et `gcc` sur la machine qui
-exécute le worker.
+Prérequis : Python 3.12, Node.js 20 ou plus, PostgreSQL, et `gcc` / `g++` ainsi qu'un
+JDK (`javac`, `java`) sur la machine qui exécute le worker.
 
 **1. Base de données.** Un PostgreSQL local (voir `backend/README.md`) ou, à défaut, le
 conteneur fourni :

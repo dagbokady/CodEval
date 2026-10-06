@@ -1649,18 +1649,20 @@ def test_admin_opens_and_closes_languages(context):
     a = auth(context["admin"])
     t = auth(context["teacher"])
     languages = {l["key"]: l for l in client.get("/api/admin/languages", headers=a).json()}
-    assert languages["c"]["enabled"] and languages["algo"]["enabled"]
-    assert not languages["python"]["enabled"]
+    # Tant que l'administration n'a rien réglé, tous les langages sont ouverts.
+    assert all(languages[k]["enabled"] for k in ("c", "cpp", "java", "python", "algo"))
     assert languages["algo"]["kind"] == "algo"
     assert client.get("/api/admin/languages", headers=t).status_code == 403
 
     # Fermé : aucun enseignant ne crée de matière dans ce langage.
+    res = client.put("/api/admin/languages/python", headers=a, json={"enabled": False})
+    assert {l["key"] for l in res.json() if l["enabled"]} == {"c", "cpp", "java", "algo"}
     assert client.post("/api/subjects", headers=t,
                        json={"name": "Python 1", "language": "python"}).status_code == 400
     res = client.put("/api/admin/languages/python", headers=a, json={"enabled": True})
-    assert {l["key"] for l in res.json() if l["enabled"]} == {"c", "python", "algo"}
+    assert {l["key"] for l in res.json() if l["enabled"]} == {"c", "cpp", "java", "python", "algo"}
     keys = [l["key"] for l in client.get("/api/evaluations/languages", headers=t).json()]
-    assert keys == ["c", "python"]
+    assert keys == ["c", "cpp", "java", "python"]
     subject = client.post("/api/subjects", headers=t,
                           json={"name": "Python 1", "language": "python"}).json()
 

@@ -231,6 +231,20 @@ export const ELEMENTS = {
     aide: 'Dans une fonction : rend le résultat et termine la fonction.',
     make: () => ({ type: 'retour', expression: '' }),
   },
+  allouer: {
+    group: 'Pointeurs',
+    label: 'ALLOUER',
+    apercu: 'ALLOUER(p)',
+    aide: 'Réserve une zone du type pointé et range son adresse dans p (déclaré p : ^Type). On y accède par p^ ou p^.champ.',
+    make: () => ({ type: 'allouer', cible: '' }),
+  },
+  liberer: {
+    group: 'Pointeurs',
+    label: 'LIBERER',
+    apercu: 'LIBERER(p)',
+    aide: 'Rend la zone désignée par p ; p ne désigne plus rien (NIL).',
+    make: () => ({ type: 'liberer', cible: '' }),
+  },
 };
 
 /**
@@ -340,6 +354,7 @@ export const TOOL_GROUPS = [
   'Conditions',
   'Boucles',
   'Sous-programmes',
+  'Pointeurs',
 ];
 
 /**
@@ -385,6 +400,8 @@ export const OPERATEURS = [
   { texte: 'VRAI', aide: 'booléen vrai' },
   { texte: 'FAUX', aide: 'booléen faux' },
   { texte: 'CRLF', aide: 'passage à la ligne' },
+  { texte: '^', aide: 'zone pointée (p^, p^.suivant)', colle: true },
+  { texte: 'NIL', aide: 'pointeur qui ne désigne rien' },
 ];
 
 /* ----- Relecture en texte ----- */
@@ -454,6 +471,8 @@ function blocksText(blocs, indent = 0) {
     else if (b.type === 'ecrire') lines.push(`${pad}ECRIRE(${b.expression ?? ''})`);
     else if (b.type === 'affectation') lines.push(`${pad}${b.cible} ← ${b.expression}`);
     else if (b.type === 'retour') lines.push(`${pad}RETOURNER(${b.expression ?? ''})`);
+    else if (b.type === 'allouer') lines.push(`${pad}ALLOUER(${b.cible ?? ''})`);
+    else if (b.type === 'liberer') lines.push(`${pad}LIBERER(${b.cible ?? ''})`);
     else if (b.type === 'appel') lines.push(`${pad}${b.nom}(${b.arguments ?? ''})`);
     else if (b.type === 'tableau') lines.push(`${pad}TABLEAU ${b.nom} DE TAILLE ${b.taille}`);
     else if (b.type === 'pour') {

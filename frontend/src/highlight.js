@@ -28,11 +28,15 @@ const C_LIKE = new Set([
   'namespace', 'new', 'nullptr', 'operator', 'private', 'protected', 'public', 'return',
   'sizeof', 'static', 'struct', 'switch', 'template', 'this', 'throw', 'true', 'try',
   'typedef', 'union', 'using', 'virtual', 'volatile', 'while', 'NULL',
+  // Java
+  'abstract', 'extends', 'final', 'finally', 'implements', 'import', 'instanceof',
+  'interface', 'null', 'package', 'super', 'synchronized', 'throws',
 ]);
 
 const C_TYPES = new Set([
   'bool', 'char', 'double', 'float', 'int', 'long', 'short', 'signed', 'size_t',
-  'string', 'unsigned', 'void', 'wchar_t',
+  'string', 'unsigned', 'void', 'wchar_t', 'boolean', 'byte', 'String', 'Integer',
+  'ArrayList', 'List', 'Scanner',
 ]);
 
 const C_BUILTINS = new Set([
@@ -52,7 +56,7 @@ const ALGO_KEYWORDS = new Set([
   'REPETER', 'RÉPÉTER', 'JUSQU', 'LIRE', 'ECRIRE', 'ÉCRIRE', 'RETOURNE', 'RETOUR',
   'FONCTION', 'FINFONCTION', 'ET', 'OU', 'NON', 'VRAI', 'FAUX', 'MOD', 'DIV',
   'SINONSI', 'SELON', 'DANS', 'FINSELON', 'PROCEDURE', 'PROCÉDURE', 'RETOURNER', 'CRLF',
-  'ENRG', 'FINENRG',
+  'ENRG', 'FINENRG', 'ALLOUER', 'LIBERER', 'NIL',
   // anciennes copies
   'VARIABLE', 'TANT', 'QUE', 'CONSTANTE', 'DÉCLARATION',
 ]);
@@ -62,7 +66,8 @@ export function highlightFamily(language) {
   const value = String(language ?? '').toLowerCase();
   if (value === 'algo' || value === 'pseudo' || value === 'pseudocode') return 'algo';
   if (value === 'python' || value === 'py') return 'python';
-  if (value === 'c' || value === 'cpp' || value === 'c++') return 'c';
+  // Java partage la syntaxe du C : même coloriseur, mots-clés compris.
+  if (value === 'c' || value === 'cpp' || value === 'c++' || value === 'java') return 'c';
   return 'c';
 }
 

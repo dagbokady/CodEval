@@ -124,7 +124,7 @@ export default function LandingPage() {
               <ul className="landing-langs">
                 <li><b>Langage C</b><span>compilé avec gcc, exécuté sur vos tests</span></li>
                 <li><b>Algorithmique</b><span>la notation de votre cours, mots-clés en rouge</span></li>
-                <li><b>C++ et Python</b><span>Bientôt disponibles</span></li>
+                <li><b>C++, Java et Python</b><span>compilés ou interprétés, notés sur les mêmes tests</span></li>
               </ul>
             </div>
             <AlgoSheet />

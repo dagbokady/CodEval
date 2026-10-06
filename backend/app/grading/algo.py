@@ -13,7 +13,9 @@ La notation est celle du polycopié d'Initiation à l'algorithmique :
 virgule décimale (`4,5`), ECRIRE qui ne passe pas à la ligne et la constante
 CRLF qui y passe, la concaténation de chaînes avec `+`, les tableaux indicés à
 partir de 1 (à une ou deux dimensions), les enregistrements, les procédures à
-paramètres d'entrée (E), de sortie (S) et d'entrée-sortie (E/S).
+paramètres d'entrée (E), de sortie (S) et d'entrée-sortie (E/S), les
+pointeurs (`p : ^Noeud`, ALLOUER(p), LIBERER(p), `p^.suivant`, NIL) qui
+permettent les listes chaînées.
 """
 
 from __future__ import annotations
@@ -54,6 +56,23 @@ class Chaine(str):
 
 class _Enreg:
     """Une variable de type enregistrement (STRUCTURE … FINSTRUCTURE)."""
+
+
+class _Pointeur:
+    """L'adresse d'une zone créée par ALLOUER. `p^` se traduit `p.cible`.
+
+    Copier un pointeur ne copie pas la zone pointée : deux pointeurs peuvent
+    désigner la même cellule, c'est tout l'intérêt d'une liste chaînée. Deux
+    pointeurs sont égaux s'ils désignent la même zone.
+    """
+
+    __slots__ = ("cible",)
+
+    def __init__(self, cible):
+        self.cible = cible
+
+    def __deepcopy__(self, memo):
+        return self
 
 
 def _copie(valeur):
@@ -135,6 +154,8 @@ ELEMENTS = {
     "procedure": ("Sous-programmes", "PROCEDURE"),
     "retour": ("Sous-programmes", "RETOURNER(…)"),
     "appel": ("Sous-programmes", "Appel de procédure"),
+    "allouer": ("Pointeurs", "ALLOUER(p)"),
+    "liberer": ("Pointeurs", "LIBERER(p)"),
 }
 
 DEFAULT_ELEMENTS = ["constante", "declaration", "lire", "ecrire", "si", "sinon", "pour",
@@ -153,7 +174,7 @@ _RESERVED = {"Chaine", "LIRE", "ECRIRE", "TABLEAU", "CRLF"}
 _METHODES = {nom for base in (str, list, int, float, dict, bool) for nom in dir(base)}
 _MOTS = {
     "et": "and", "ou": "or", "non": "not", "vrai": "True", "faux": "False",
-    "mod": "%", "div": "//",
+    "mod": "%", "div": "//", "nil": "None",
 }
 
 
@@ -263,6 +284,7 @@ def _expression(source: str) -> str:
     if re.search(r"\w\x00\d+\x00|\x00\d+\x00\w", texte):
         raise AlgoError("Expression non autorisée.")
     texte = texte.replace("≠", "<>").replace("≤", "<=").replace("≥", ">=")
+    texte = _dereferencer(texte)
     for c in texte:
         if not (c.isalnum() or c == "_" or c in _SYMBOLES or c == "\x00"):
             raise AlgoError(f"Caractère non autorisé dans l'expression « {source} ».")
@@ -288,6 +310,17 @@ def _expression(source: str) -> str:
     # Au cours, « = » est l'égalité ; l'affectation s'écrit avec la flèche.
     texte = re.sub(r"(?<![=!<>])=(?!=)", "==", texte)
     return re.sub(r"\x00(\d+)\x00", lambda m: f"Chaine({chaines[int(m.group(1))]})", texte)
+
+
+# `p^` : un chapeau collé à ce qu'il suit (nom, case, champ) et suivi d'autre
+# chose qu'un opérande. `x ^ 2` reste une puissance, que le cours n'emploie pas
+# dans les expressions évaluées : elle est refusée plus loin.
+_DEREF = re.compile(r"(?<=[\w\])])\s*\^(?!\s*[\w(\x00])")
+
+
+def _dereferencer(texte: str) -> str:
+    """`p^.valeur` → `p.cible.valeur` : la zone que désigne le pointeur."""
+    return _DEREF.sub(".cible", texte)
 
 
 def _nom(source: str) -> str:
@@ -336,6 +369,11 @@ def _acces(source: str) -> tuple[str, str, list]:
             accès.append(champ.group(0))
             i = champ.end()
             continue
+        if c == "^":
+            python += ".cible"
+            accès.append("^")
+            i += 1
+            continue
         raise AlgoError(f"« {source} » ne peut pas recevoir de valeur.")
     return base, python, accès
 
@@ -373,13 +411,13 @@ def parse_type(texte: str) -> tuple:
     """Lit un type écrit au cours.
 
     Rend ("scalaire", clé) | ("tableau", [(début, fin), …], élément) |
-    ("nomme", Nom) | ("pointeur",).
+    ("nomme", Nom) | ("pointeur", type pointé).
     """
     brut = _normaliser(texte).replace("’", "'")
     if not brut:
         return ("scalaire", "entier")
     if brut.startswith("^"):
-        return ("pointeur",)
+        return ("pointeur", brut[1:].strip())
     m = re.match(r"(?i)^tableau\s*((?:\[[^\]]*\]\s*)*)\s*(?:de\s+|d')\s*(.+)$", brut)
     if m:
         dimensions = []
@@ -469,30 +507,38 @@ class _Contexte:
             valeur = f"[{valeur} for _ in range(int({_expression(fin)}) + 1)]"
         return valeur
 
-    def genre_lu(self, source: str) -> str:
-        """Le type de ce que LIRE va remplir : il décide de la conversion."""
+    def genre_de(self, source: str) -> tuple | None:
+        """Le type déclaré de `t[i].champ`, `p^.suivant`… ; None s'il est inconnu."""
         try:
             base, _, accès = _acces(source)
         except AlgoError:
-            return "auto"
+            return None
         genre = self.portee.get(base)
         if genre is None:
-            return "auto"
+            return None
         for pas in accès:
             genre = self.resoudre(genre)
             if pas == "[]":
                 if genre[0] != "tableau":
-                    return "auto"
+                    return None
                 dims = genre[1][1:]
                 genre = ("tableau", dims, genre[2]) if dims else genre[2]
+            elif pas == "^":
+                if genre[0] != "pointeur" or not genre[1]:
+                    return None
+                genre = parse_type(genre[1])
             else:
                 if genre[0] != "nomme" or genre[1] not in self.structures:
-                    return "auto"
+                    return None
                 genre = self.structures[genre[1]].get(pas)
                 if genre is None:
-                    return "auto"
-        genre = self.resoudre(genre)
-        return genre[1] if genre[0] == "scalaire" else "auto"
+                    return None
+        return self.resoudre(genre)
+
+    def genre_lu(self, source: str) -> str:
+        """Le type de ce que LIRE va remplir : il décide de la conversion."""
+        genre = self.genre_de(source)
+        return genre[1] if genre is not None and genre[0] == "scalaire" else "auto"
 
 
 # ----- Corps -----
@@ -523,6 +569,22 @@ def _bloc(noeud: dict, niveau: int, ctx: _Contexte, lignes: list[str]) -> None:
     elif type_ == "affectation":
         _, cible, _ = _acces(noeud.get("cible"))
         lignes.append(f"{marge}{cible} = _copie({_expression(noeud.get('expression'))})")
+    elif type_ == "allouer":
+        # ALLOUER(p) réserve une zone du type pointé et range son adresse dans p.
+        cible = noeud.get("cible") or ""
+        _, python, _ = _acces(cible)
+        genre = ctx.genre_de(cible)
+        if genre is None or genre[0] != "pointeur" or not genre[1]:
+            raise AlgoError(
+                f"ALLOUER({_normaliser(cible)}) : « {_normaliser(cible)} » n'est pas déclaré "
+                "comme un pointeur (^Type)."
+            )
+        zone = ctx.constructeur(parse_type(genre[1]))
+        lignes.append(f"{marge}{python} = _Pointeur({zone})")
+    elif type_ == "liberer":
+        # LIBERER(p) rend la zone : p ne désigne plus rien (NIL).
+        _, python, _ = _acces(noeud.get("cible") or "")
+        lignes.append(f"{marge}{python} = None")
     elif type_ == "retour":
         if not ctx.dans_sous_programme:
             raise AlgoError("RETOURNER ne s'emploie que dans une fonction.")
