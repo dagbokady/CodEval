@@ -40,7 +40,7 @@ export default function EmailCodeForm({ email, resendIn, onConfirm, onBack, subm
     setError(null);
     setNotice(null);
     try {
-      setWait(await requestEmailCode(email));
+      setWait((await requestEmailCode(email)).resendIn);
       setCode('');
       setNotice('Un nouveau code vient de partir.');
     } catch (err) {

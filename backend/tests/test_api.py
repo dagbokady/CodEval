@@ -17,6 +17,8 @@ os.environ.setdefault(
     ),
 )
 os.environ.setdefault("CODEVAL_SECRET_KEY", "test-secret-key-with-enough-entropy")
+# Le .env local peut couper la vérification des e-mails : les tests la veulent.
+os.environ["CODEVAL_EMAIL_VERIFICATION"] = "true"
 
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.grading.engine import process_run  # noqa: E402
@@ -372,17 +374,23 @@ def test_algorithme_en_blocs_est_traduit_et_corrige():
     from app.grading.engine import grade_exercise
     from app.models import Exercise, TestCase, TestKind
 
-    algorithme = [
-        {"type": "lire", "cible": "n"},
-        {"type": "variable", "nom": "s", "valeur": "0"},
-        {"type": "pour", "variable": "i", "debut": "1", "fin": "n",
-         "corps": [{"type": "affectation", "cible": "s", "expression": "s + i"}]},
-        {"type": "ecrire", "expression": "s"},
-    ]
+    algorithme = {
+        "variables": [
+            {"nom": "n", "type": "entier"},
+            {"nom": "s", "type": "entier", "valeur": "0"},
+            {"nom": "i", "type": "entier"},
+        ],
+        "corps": [
+            {"type": "lire", "cible": "n"},
+            {"type": "pour", "variable": "i", "debut": "1", "fin": "n",
+             "corps": [{"type": "affectation", "cible": "s", "expression": "s + i"}]},
+            {"type": "ecrire", "expression": "s"},
+        ],
+    }
     exercise = Exercise(
         id=902, evaluation_id=1, position=1, title="Somme", statement="", language="c",
         points=6, starter_code="", kind="algo",
-        settings={"allowed_elements": ["lire", "ecrire", "variable", "affectation", "pour"]},
+        settings={"allowed_elements": ["declaration", "lire", "ecrire", "affectation", "pour"]},
     )
     tests = [
         TestCase(id=1, exercise_id=902, position=1, name="n = 5", kind=TestKind.OFFICIAL,
@@ -394,7 +402,8 @@ def test_algorithme_en_blocs_est_traduit_et_corrige():
     assert outcome.score == 6.0 and outcome.status.value == "ok"
 
     # Un élément hors palette est refusé avant toute exécution.
-    hors_palette = _json.dumps(algorithme + [{"type": "tantque", "condition": "n > 0", "corps": []}])
+    hors_palette = _json.dumps({**algorithme, "corps": algorithme["corps"] + [
+        {"type": "tantque", "condition": "n > 0", "corps": []}]})
     refus = grade_exercise(hors_palette, exercise, tests)
     assert refus.status.value == "compile_error"
     assert "TANTQUE" in refus.compile_log

@@ -17,6 +17,8 @@ os.environ.setdefault(
     ),
 )
 os.environ.setdefault("CODEVAL_SECRET_KEY", "test-secret-key-with-enough-entropy")
+# Le .env local peut couper la vérification des e-mails : les tests la veulent.
+os.environ["CODEVAL_EMAIL_VERIFICATION"] = "true"
 
 from app import email_verification  # noqa: E402
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
@@ -558,7 +560,8 @@ def test_les_e_mails_portent_le_logo_et_restent_lisibles(monkeypatch):
     import app.mail as mail
 
     page = mail.render_email("<p>Contenu</p>" + mail.button("https://x.ci/?a=1&b=2", "Ouvrir"))
-    assert f'src="cid:{mail.LOGO_CID}"' in page and "<p>Contenu</p>" in page
+    # Le logo est dessiné en HTML : aucune image à charger ni à joindre.
+    assert "&lt;/&gt;</td>" in page and "<img" not in page and "<p>Contenu</p>" in page
     assert 'href="https://x.ci/?a=1&amp;b=2"' in page
 
     sent = {}
@@ -576,10 +579,86 @@ def test_les_e_mails_portent_le_logo_et_restent_lisibles(monkeypatch):
     assert mail.send_email("a@b.ci", "Sujet", "<p>Salut</p>", "Salut")
     message = sent["Messages"][0]
     assert message["TrackClicks"] == "disabled" and message["TrackOpens"] == "disabled"
-    assert message["InlinedAttachments"][0]["ContentID"] == mail.LOGO_CID
+    assert "InlinedAttachments" not in message
     assert message["TextPart"] == "Salut"
 
     monkeypatch.setattr(mail.settings, "smtp_from", "noreply@gmail.com")
     assert mail.sender_warning()
     monkeypatch.setattr(mail.settings, "smtp_from", "noreply@codeval.ci")
     assert mail.sender_warning() is None
+
+
+def test_l_administration_voit_les_inscrits_et_ne_compte_plus_les_supprimes(teacher):
+    """Les enseignants inscrits seuls et leurs apprenants figurent dans la liste
+    et le tableau de bord de l'administration ; un compte supprimé n'y compte plus."""
+    limiter._attempts.clear()
+    admin = auth(create_admin("Plateforme", "Admin", "admin@plateforme.ci"))
+
+    def overview():
+        return client.get("/api/stats/overview", headers=admin).json()
+
+    before = overview()
+    res = client.post(
+        "/api/auth/register-teacher",
+        json={"full_name": "Prof Libre", "email": "libre@perso.ci", "password": "motdepasse1",
+              "photo": PHOTO, "gender": "M", "email_code": email_code("libre@perso.ci")},
+    )
+    assert res.status_code == 201, res.text
+    prof = auth(res.json()["access_token"])
+    cid = client.post("/api/classrooms", headers=prof, json={"name": "Terminale D"}).json()["id"]
+    code = client.post(f"/api/classrooms/{cid}/join-code", headers=prof, json={}).json()["join_code"]
+    res = client.post(
+        "/api/join",
+        json={"code": code, "full_name": "Élève Libre", "email": "eleve@libre.ci",
+              "password": "motdepasse1", "matricule": "LIB-1", "photo": PHOTO, "gender": "F",
+              "email_code": email_code("eleve@libre.ci")},
+    )
+    assert res.status_code == 201, res.text
+
+    listed = {u["email"]: u for u in client.get(
+        "/api/users", headers=admin, params={"q": "libre", "page_size": 100}).json()["items"]}
+    assert listed["libre@perso.ci"]["space"] == "Espace de Prof Libre"
+    assert listed["libre@perso.ci"]["classrooms"] == ["Terminale D"]
+    assert listed["eleve@libre.ci"]["classrooms"] == ["Terminale D"]
+    after = overview()
+    assert after["teachers"] == before["teachers"] + 1
+    assert after["students"] == before["students"] + 1
+
+    # Un espace personnel n'a pas d'administration : son rôle ne change pas.
+    res = client.patch(f"/api/users/{listed['eleve@libre.ci']['id']}", headers=admin,
+                       json={"role": "admin"})
+    assert res.status_code == 409
+
+    # Supprimés, ils sortent de la liste comme des compteurs.
+    for email in ("libre@perso.ci", "eleve@libre.ci"):
+        assert client.delete(f"/api/users/{listed[email]['id']}", headers=admin).status_code == 204
+    assert client.get("/api/users", headers=admin, params={"q": "libre"}).json()["total"] == 0
+    assert (overview()["teachers"], overview()["students"]) == (
+        before["teachers"], before["students"])
+
+
+def test_sans_verification_l_inscription_se_passe_de_code(teacher, monkeypatch):
+    """En développement (`CODEVAL_EMAIL_VERIFICATION=false`), enseignant et
+    apprenant s'inscrivent sans code ; activée, la vérification reste exigée."""
+    from app.config import settings
+
+    limiter._attempts.clear()
+    signup = {"full_name": "Prof Local", "email": "prof@esatic.edu.ci",
+              "password": "motdepasse1", "photo": PHOTO, "gender": "M"}
+    assert client.post("/api/auth/register-teacher", json=signup).status_code == 400
+
+    monkeypatch.setattr(settings, "email_verification", False)
+    res = client.post("/api/auth/email-code", json={"email": "prof@esatic.edu.ci"})
+    assert res.json() == {"ok": True, "required": False}
+    assert "prof@esatic.edu.ci" not in MAILBOX
+    res = client.post("/api/auth/register-teacher", json=signup)
+    assert res.status_code == 201, res.text
+    prof = auth(res.json()["access_token"])
+    cid = client.post("/api/classrooms", headers=prof, json={"name": "L2 Réseaux"}).json()["id"]
+    code = client.post(f"/api/classrooms/{cid}/join-code", headers=prof, json={}).json()["join_code"]
+    res = client.post(
+        "/api/join",
+        json={"code": code, "full_name": "Étudiant Local", "email": "etudiant@esatic.edu.ci",
+              "password": "motdepasse1", "matricule": "ESA-1", "photo": PHOTO, "gender": "F"},
+    )
+    assert res.status_code == 201, res.text

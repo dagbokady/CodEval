@@ -48,7 +48,10 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     reset_token_minutes: int = 30
 
-    # Code envoyé pour confirmer l'adresse avant la création d'un compte
+    # Code envoyé pour confirmer l'adresse avant la création d'un compte.
+    # À False (développement local seulement), enseignants et apprenants
+    # s'inscrivent sans code : n'importe quelle adresse est acceptée.
+    email_verification: bool = True
     email_code_minutes: int = 15
     email_code_max_attempts: int = 5
     email_code_resend_seconds: int = 60

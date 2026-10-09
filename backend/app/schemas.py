@@ -47,7 +47,8 @@ class RegisterTeacher(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     # Code reçu à l'adresse saisie : il confirme qu'elle appartient à l'inscrit.
-    email_code: str = Field(min_length=6, max_length=6)
+    # Absent seulement quand la vérification est coupée (développement).
+    email_code: str | None = Field(default=None, min_length=6, max_length=6)
     photo: str
     gender: Gender
 
@@ -115,7 +116,7 @@ class JoinClassSignup(JoinClassPayload):
     full_name: str = Field(min_length=2, max_length=160)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    email_code: str = Field(min_length=6, max_length=6)
+    email_code: str | None = Field(default=None, min_length=6, max_length=6)
     # Obligatoire : c'est lui qui identifie la copie sur les relevés de notes.
     matricule: str = Field(max_length=60)
     photo: str
@@ -230,6 +231,8 @@ class AdminUserOut(UserOut):
     created_at: datetime | None = None
     last_login_at: datetime | None = None
     classrooms: list[str] = []
+    # Nom de l'espace personnel du compte, s'il n'est pas de l'établissement.
+    space: str | None = None
 
 
 class PasswordResetOut(BaseModel):

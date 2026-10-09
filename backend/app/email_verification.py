@@ -101,7 +101,14 @@ def send_code(db, email: str, ip: str, change: bool = False) -> None:
         )
 
 
-def check_code(db, email: str, code: str) -> None:
+def check_signup_code(db, email: str, code: str | None) -> None:
+    """Le code d'une inscription, sauf quand la vérification est coupée
+    (`CODEVAL_EMAIL_VERIFICATION=false`, en développement)."""
+    if settings.email_verification:
+        check_code(db, email, code)
+
+
+def check_code(db, email: str, code: str | None) -> None:
     """Vérifie le code saisi. En cas de succès, les codes de l'adresse sont
     effacés dans la transaction en cours : l'appelant la valide avec le compte."""
     email = email.lower()
@@ -109,7 +116,7 @@ def check_code(db, email: str, code: str) -> None:
     invalid = HTTPException(
         status.HTTP_400_BAD_REQUEST, "Code de vérification incorrect ou expiré"
     )
-    if last is None or last.expires_at <= utcnow():
+    if not code or last is None or last.expires_at <= utcnow():
         raise invalid
     if last.attempts >= settings.email_code_max_attempts:
         raise HTTPException(

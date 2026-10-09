@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 
 from ..db import soft_delete
 from ..accounts import delete_account, ensure_not_last_admin
@@ -29,6 +29,7 @@ from ..models import (
     Evaluation,
     EvaluationStatus,
     Organization,
+    OrganizationKind,
     Participation,
     Role,
     RunStatus,
@@ -70,9 +71,25 @@ router = APIRouter(prefix="/api", tags=["établissement"])
 
 
 # ----- Utilisateurs -----
+def _personal_spaces():
+    return select(Organization.id).where(Organization.kind == OrganizationKind.PERSONAL.value)
+
+
+def _managed_users(admin: User):
+    """Les comptes que l'administration gère : ceux de son établissement, et ceux
+    des espaces personnels (enseignants inscrits seuls, apprenants entrés par le
+    code de leurs classes), qui n'ont pas d'administration à eux."""
+    return or_(
+        User.organization_id == admin.organization_id,
+        User.organization_id.in_(_personal_spaces()),
+    )
+
+
 def _get_user(db, admin: User, user_id: int) -> User:
     user = db.get(User, user_id)
-    if user is None or user.organization_id != admin.organization_id:
+    if user is None or (
+        user.organization_id != admin.organization_id and not user.organization.is_personal
+    ):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Utilisateur introuvable")
     return user
 
@@ -114,7 +131,7 @@ def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
 ) -> Page:
-    filters = [User.organization_id == admin.organization_id, User.deleted_at.is_(None)]
+    filters = [_managed_users(admin), User.deleted_at.is_(None)]
     if without_class:
         filters += [User.role == Role.STUDENT, ~User.id.in_(select(Enrollment.student_id))]
     if role is not None:
@@ -147,6 +164,7 @@ def list_users(
     ids = [u.id for u in users]
     classrooms: dict[int, list[str]] = {}
     last_login: dict[int, object] = {}
+    spaces: dict[int, str] = {}
     if ids:
         for student_id, name in db.execute(
             select(Enrollment.student_id, Classroom.name)
@@ -155,14 +173,28 @@ def list_users(
             .order_by(Classroom.name)
         ):
             classrooms.setdefault(student_id, []).append(name)
-        for teacher_id, name in db.execute(
-            select(TeacherAssignment.teacher_id, Classroom.name)
-            .join(Classroom, Classroom.id == TeacherAssignment.classroom_id)
-            .where(TeacherAssignment.teacher_id.in_(ids))
-            .distinct()
-            .order_by(Classroom.name)
-        ):
-            classrooms.setdefault(teacher_id, []).append(name)
+        # Un enseignant tient ses classes de ses enseignements, ou les a créées
+        # lui-même (c'est toujours le cas dans un espace personnel).
+        taught: dict[int, set[str]] = {}
+        for teacher_id, name in [
+            *db.execute(
+                select(TeacherAssignment.teacher_id, Classroom.name)
+                .join(Classroom, Classroom.id == TeacherAssignment.classroom_id)
+                .where(TeacherAssignment.teacher_id.in_(ids))
+            ),
+            *db.execute(select(Classroom.owner_id, Classroom.name).where(Classroom.owner_id.in_(ids))),
+        ]:
+            taught.setdefault(teacher_id, set()).add(name)
+        for teacher_id, names in taught.items():
+            classrooms.setdefault(teacher_id, []).extend(sorted(names))
+        spaces = dict(
+            db.execute(
+                select(Organization.id, Organization.name).where(
+                    Organization.id.in_({u.organization_id for u in users}),
+                    Organization.kind == OrganizationKind.PERSONAL.value,
+                )
+            ).all()
+        )
         last_login = dict(
             db.execute(
                 select(AuditLog.actor_id, func.max(AuditLog.created_at))
@@ -176,6 +208,7 @@ def list_users(
             created_at=u.created_at,
             last_login_at=last_login.get(u.id),
             classrooms=classrooms.get(u.id, []),
+            space=spaces.get(u.organization_id),
         ).model_dump(mode="json")
         for u in users
     ]
@@ -230,6 +263,12 @@ def update_user(user_id: int, payload: UserUpdate, admin: AdminUser, db: DbSessi
         if _email_taken(db, data["email"], except_id=user.id):
             raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
     if data.get("role") not in (None, user.role):
+        # Un espace personnel a un enseignant et ses apprenants, jamais d'administration.
+        if user.organization_id != admin.organization_id:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Le rôle d'un compte d'espace personnel ne se change pas.",
+            )
         # Les rattachements d'un rôle n'ont plus de sens dans l'autre.
         if user.role is Role.STUDENT:
             db.execute(delete(Enrollment).where(Enrollment.student_id == user.id))
@@ -907,10 +946,11 @@ def my_plan(user: CurrentUser, db: DbSession) -> PlanOut:
 @router.get("/stats/overview")
 def stats_overview(admin: AdminUser, db: DbSession) -> dict:
     org = admin.organization_id
+    # Les mêmes comptes que la liste des utilisateurs : un compte supprimé n'y
+    # figure plus, ceux des espaces personnels si.
+    managed = [_managed_users(admin), User.deleted_at.is_(None)]
     counts = {
-        role.value: db.scalar(
-            select(func.count(User.id)).where(User.organization_id == org, User.role == role)
-        )
+        role.value: db.scalar(select(func.count(User.id)).where(*managed, User.role == role))
         or 0
         for role in Role
     }
@@ -953,14 +993,12 @@ def stats_overview(admin: AdminUser, db: DbSession) -> dict:
     if avg_row and avg_row[0] is not None and avg_row[1]:
         average = round(avg_row[0] / avg_row[1] * 100, 1)
     inactive = db.scalar(
-        select(func.count(User.id)).where(
-            User.organization_id == org, User.is_active.is_(False), User.deleted_at.is_(None)
-        )
+        select(func.count(User.id)).where(*managed, User.is_active.is_(False))
     ) or 0
     # Un étudiant sans classe ne voit aucune épreuve : c'est un oubli à réparer.
     unassigned = db.scalar(
         select(func.count(User.id)).where(
-            User.organization_id == org,
+            *managed,
             User.role == Role.STUDENT,
             User.is_active.is_(True),
             ~User.id.in_(select(Enrollment.student_id)),
