@@ -10,6 +10,8 @@ import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
 import TestsEditor from '../../components/TestsEditor';
 import SolutionEditor from '../../components/SolutionEditor';
+import ProjectFilesEditor from '../../components/ProjectFilesEditor';
+import { isProject } from '../../project';
 import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
 import { SheetExercise } from '../../components/SubjectSheet';
 import {
@@ -373,18 +375,15 @@ export default function BankPage() {
                   le réécrire. */}
               {form.kind === 'code' && (
                 <Disclosure
-                  summary="Code de départ"
-                  hint="Déjà rempli avec le squelette du langage. Ouvrez pour le modifier."
+                  summary={isProject(form) ? 'Fichiers du projet' : 'Code de départ'}
+                  hint="Déjà rempli avec le squelette du langage. Ouvrez pour le modifier, ou découper le code en plusieurs fichiers."
+                  defaultOpen={isProject(form)}
                 >
-                  <Field label="Code présent dans l'éditeur à l'ouverture" id="b-starter">
-                    <textarea
-                      id="b-starter"
-                      rows={12}
-                      style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-                      value={form.starter_code}
-                      onChange={(e) => setForm({ ...form, starter_code: e.target.value })}
-                    />
-                  </Field>
+                  <ProjectFilesEditor
+                    exercise={form}
+                    name="b-starter"
+                    onChange={(patch) => setForm({ ...form, ...patch })}
+                  />
                 </Disclosure>
               )}
 

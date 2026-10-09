@@ -259,6 +259,18 @@ autorisée.
 Un exercice de code n'a pas d'équivalent : son ossature est justement ce que
 l'enseignante écrit librement, dans le champ « code de départ » de la même étape.
 
+**Projet en plusieurs fichiers (C, C++).** Le même champ propose « Plusieurs
+fichiers » : l'enseignante déclare les fichiers du projet (`Etudiant.h`,
+`Fonctions.h`, `Fonctions.c`, `main.c`…), chacun avec son code de départ, rangés
+dans `settings.files` (`backend/app/grading/project.py`, doublé par
+`frontend/src/project.js`). L'apprenant les retrouve en onglets ; sa copie est le
+document `{"files": {...}}`. La correction vérifie la syntaxe de chaque `.c`,
+cherche chaque déclaration attendue dans chacun des fichiers, compile tous les
+sources ensemble pour les tests du programme entier, et, pour appeler une
+fonction, inclut le fichier où elle est visible et relie les autres, `main`
+renommé. Un nom de fichier est vérifié à l'enregistrement : pas de chemin, une
+extension `.c`/`.h` (ou `.cpp`/`.hpp`), au moins un fichier source.
+
 ### 4.5 Les jeux de tests
 
 Chaque exercice de code ou d'algorithme porte une liste de cas de test :
@@ -266,7 +278,15 @@ Chaque exercice de code ou d'algorithme porte une liste de cas de test :
 - **nom**, **entrée standard**, **sortie attendue**, **délai** (ms) : les
   **points**, eux, se posent à la dernière étape (§4.2) ;
 - **mode de comparaison** : `trim` (à l'espacement de fin près), `exact`
-  (au caractère près) ou `numeric` (tolérance 1e-6 sur les nombres).
+  (au caractère près) ou `numeric` (tolérance 1e-6 sur les nombres) ;
+- **arguments de la ligne de commande** (`argv`), pour un test du programme
+  entier : `40` lance `./programme 40`, que `main` lit dans `argv[1]`.
+
+Les déclarations attendues du barème acceptent, en plus des types de valeur,
+un **autre type** écrit comme en C (`Etudiant *`, `struct Note`) : paramètre,
+retour, champ de structure ou variable. Une fonction qui reçoit ou rend un tel
+type se vérifie par sa signature, mais ne s'appelle pas depuis un test : on la
+teste par le programme entier.
 
 Tous les tests comptent dans la note : le barème de l'exercice est réparti au
 prorata des points des tests.

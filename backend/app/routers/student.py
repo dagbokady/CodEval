@@ -42,6 +42,7 @@ from ..config import settings
 from ..grading import matching
 from ..grading.questions import questions_of
 from ..grading.languages import default_starter
+from ..grading.project import project_files, starter_document
 from ..services import (
     close_if_expired,
     notify,
@@ -363,8 +364,12 @@ def open_exam(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentEx
         # Rien de saisi pour l'instant : on pose le code de départ de l'enseignant,
         # ou à défaut le squelette du langage (main / return 0 en C).
         if not (drafts.get(exercise.id) or "").strip():
+            # Un projet s'ouvre sur ses fichiers, chacun avec son code de départ.
+            files = project_files(exercise)
             drafts[exercise.id] = (
-                exercise.starter_code
+                starter_document(files)
+                if files
+                else exercise.starter_code
                 or _joined_part_starters(exercise)
                 or default_starter(exercise.language, exercise.kind)
             )

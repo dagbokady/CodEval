@@ -99,10 +99,34 @@ const VALUE_TYPES = {
     example: 'A B C',
   },
   void: { key: 'void', label: 'Rien (affiche seulement)', c: 'void', input: 'none', returnsOnly: true },
+  // Un type C écrit en toutes lettres (`Etudiant *`, `struct Note`) : il se
+  // vérifie dans une déclaration, mais ne s'écrit pas comme valeur de test.
+  custom: {
+    key: 'custom',
+    label: 'Autre type (structure, pointeur…)',
+    c: '?',
+    input: 'custom',
+    declarationOnly: true,
+  },
 };
 
-export const PARAM_TYPES = Object.values(VALUE_TYPES).filter((t) => !t.returnsOnly);
-export const RETURN_TYPES = Object.values(VALUE_TYPES);
+export const PARAM_TYPES = Object.values(VALUE_TYPES).filter(
+  (t) => !t.returnsOnly && !t.declarationOnly,
+);
+export const RETURN_TYPES = Object.values(VALUE_TYPES).filter((t) => !t.declarationOnly);
+/** Types d'une déclaration attendue : ceux des valeurs, plus « autre type ». */
+export const DECLARED_PARAM_TYPES = [...PARAM_TYPES, VALUE_TYPES.custom];
+export const DECLARED_RETURN_TYPES = [...RETURN_TYPES, VALUE_TYPES.custom];
+
+/** Le type C d'un « autre type » est-il acceptable ? Même règle que le serveur. */
+const C_TYPE =
+  /^(?:(?:const|unsigned|signed|struct|enum|union|long|short)\s+)*[A-Za-z_]\w*(?:\s*\*)*$/;
+export function customTypeIssue(text) {
+  const cleaned = String(text ?? '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return 'type à écrire';
+  if (cleaned.length > 60 || !C_TYPE.test(cleaned)) return 'type C non reconnu';
+  return null;
+}
 
 /**
  * Les tableaux, rangés par le type de leurs éléments.
@@ -211,7 +235,15 @@ export function criteriaOf(exercise) {
 /** Les critères « fonction attendue » : les seuls qu'un test puisse appeler. */
 export function callableCriteria(exercise) {
   if (!DECLARATION_LANGUAGES.has(exercise?.language)) return [];
-  return criteriaOf(exercise).filter((c) => c.kind === 'function' && c.name?.trim());
+  // Une fonction qui reçoit ou rend une structure ne s'appelle pas depuis un
+  // test : on la vérifie par sa déclaration, on teste le programme entier.
+  return criteriaOf(exercise).filter(
+    (c) =>
+      c.kind === 'function' &&
+      c.name?.trim() &&
+      c.returns !== 'custom' &&
+      paramsOf(c).every((p) => p.type !== 'custom'),
+  );
 }
 
 export function paramsOf(criterion) {
@@ -224,9 +256,16 @@ export function fieldsOf(criterion) {
   return Array.isArray(fields) ? fields : [];
 }
 
-function paramText(type, name) {
+/** Le texte C d'un type : celui du catalogue, ou celui écrit pour un « autre type ». */
+export function cTypeOf(type, ctype) {
+  if (type === 'custom') return String(ctype ?? '').trim() || '?';
+  return valueType(type).c;
+}
+
+function paramText(type, name, ctype) {
   const kind = valueType(type);
-  return kind.input === 'list' ? `${kind.c.split(' ')[0]} ${name}[]` : `${kind.c} ${name}`;
+  if (kind.input === 'list') return `${kind.c.split(' ')[0]} ${name}[]`;
+  return `${cTypeOf(type, ctype)} ${name}`;
 }
 
 /** Le critère tel qu'on le montre à l'enseignant et sur le sujet. */
@@ -235,14 +274,14 @@ export function describeCriterion(criterion) {
   const name = criterion?.name?.trim() || '?';
   if (criterion?.kind === 'function') {
     const params = paramsOf(criterion)
-      .map((p, i) => paramText(p.type, p.name || `a${i + 1}`))
+      .map((p, i) => paramText(p.type, p.name || `a${i + 1}`, p.ctype))
       .join(', ');
-    return `${valueType(criterion.returns).c} ${name}(${params || 'void'})`;
+    return `${cTypeOf(criterion.returns, criterion.returns_ctype)} ${name}(${params || 'void'})`;
   }
   if (criterion?.kind === 'struct') {
     const fields = fieldsOf(criterion)
       .filter((f) => f.name?.trim())
-      .map((f) => `${valueType(f.type).c} ${f.name}`)
+      .map((f) => paramText(f.type, f.name, f.ctype))
       .join('; ');
     return fields ? `struct ${name} { ${fields}; }` : `struct ${name}`;
   }
@@ -250,7 +289,7 @@ export function describeCriterion(criterion) {
     criterion?.scope === 'local'
       ? ` (dans ${criterion.in_function?.trim() || 'une fonction'})`
       : ' (globale)';
-  return `${paramText(criterion?.vtype ?? 'int', name)}${scope}`;
+  return `${paramText(criterion?.vtype ?? 'int', name, criterion?.ctype)}${scope}`;
 }
 
 /**

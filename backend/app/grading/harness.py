@@ -16,6 +16,7 @@ vivent dans `bareme.py`, qui reprend les types définis ici.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -62,6 +63,33 @@ def get_type(key: str) -> ValueType:
         return TYPES[key]
     except KeyError:
         raise HarnessError(f"Type de valeur inconnu : {key}") from None
+
+
+# « Autre type » : un type C écrit en toutes lettres par l'enseignant (une
+# structure, un pointeur : `Etudiant *`, `struct Note`). Il entre tel quel dans
+# les sondes compilées : on n'y admet que des mots et des étoiles.
+CUSTOM = "custom"
+_C_TYPE = re.compile(
+    r"(?:(?:const|unsigned|signed|struct|enum|union|long|short)\s+)*"
+    r"[A-Za-z_]\w*(?:\s*\*)*"
+)
+
+
+def custom_c_type(text) -> str:
+    """Le type C d'un « autre type », normalisé, ou HarnessError s'il n'en est pas un."""
+    cleaned = " ".join(str(text or "").split())
+    if not cleaned or len(cleaned) > 60 or not _C_TYPE.fullmatch(cleaned):
+        raise HarnessError(f"« {text} » n'est pas un type C valide")
+    return cleaned
+
+
+def resolve_type(key, c_type=None) -> ValueType:
+    """Le type d'un paramètre, d'un retour, d'un champ ou d'une variable : un
+    type du catalogue, ou un « autre type » dont le texte C accompagne la clé."""
+    if key == CUSTOM:
+        text = custom_c_type(c_type)
+        return ValueType(CUSTOM, text, text, "")
+    return get_type(key)
 
 
 # ----- Rendu des valeurs -----
@@ -139,13 +167,20 @@ def declaration_of(sig: dict, variable: str) -> str:
     """Déclaration du pointeur de fonction attendu : la sonde de signature."""
     parts: list[str] = []
     for param in sig["params"]:
-        vtype = get_type(param["type"])
+        vtype = resolve_type(param["type"], param.get("ctype"))
         if vtype.is_array:
             parts.extend([f"{vtype.c_type} *", "int"])
         else:
             parts.append(vtype.c_type)
-    ret = get_type(sig["returns"])
+    ret = resolve_type(sig["returns"], sig.get("returns_ctype"))
     return f"{ret.c_type} (*{variable})({', '.join(parts) or 'void'})"
+
+
+def is_callable(sig: dict) -> bool:
+    """Un test peut-il appeler cette fonction ? Pas si elle reçoit ou rend un
+    « autre type » : une structure ne s'écrit pas comme valeur de test. Elle se
+    vérifie alors par sa déclaration, et se teste par le programme entier."""
+    return sig["returns"] != CUSTOM and all(p["type"] != CUSTOM for p in sig["params"])
 
 
 def _call(sig: dict, args: list) -> tuple[list[str], str]:
@@ -187,6 +222,11 @@ static {probe} = {name};
 
 def build_harness(sig: dict, cases: list[list], student_file: str) -> str:
     """Programme de test complet : un cas par indice reçu en argument."""
+    if not is_callable(sig):
+        raise HarnessError(
+            "une fonction qui reçoit ou rend une structure ne s'appelle pas depuis un test : "
+            "vérifiez-la par sa déclaration et testez le programme entier"
+        )
     ret = get_type(sig["returns"])
     body: list[str] = []
     for index, args in enumerate(cases):

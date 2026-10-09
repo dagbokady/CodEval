@@ -6,6 +6,7 @@ import { Alert, Button, Disclosure, Field, Loading, PageHeader, Tag } from '../.
 import { SheetHeader } from '../../components/SubjectSheet';
 import GradeMark from '../../components/GradeMark';
 import CodeBlock from '../../components/CodeBlock';
+import { starterText } from '../../project';
 import AnswerBlock from '../../components/CopyAnswer';
 import { useAuth } from '../../auth';
 import { exerciseLabel, formatDateTime, formatScore } from '../../format';
@@ -334,11 +335,11 @@ export default function SubmissionDetailPage() {
               {/* Le code de départ, l'enseignant l'a écrit lui-même : il le
                   reconnaît d'un mot et n'a pas à le relire sur chaque copie.
                   Replié, il laisse la production de l'apprenant en pleine vue. */}
-              {exercise.kind === 'code' && exercise.starter_code && (
+              {exercise.kind === 'code' && starterText(exercise).trim() && (
                 <Disclosure summary="Code de départ fourni" hint="rappel de l'énoncé">
                   <CodeBlock
                     className="copy-code copy-code--starter"
-                    code={exercise.starter_code}
+                    code={starterText(exercise)}
                     language={exercise.language}
                   />
                 </Disclosure>

@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import CodeBlock from './CodeBlock';
+import { isProject, projectFiles, starterText } from '../project';
 import { exerciseLabel, formatExamDuration, formatExamDate } from '../format';
 import {
   callableCriteria,
@@ -417,10 +418,15 @@ export function SheetExercise({
       {kind === 'truefalse' && (
         <TrueFalseStatements exercise={exercise} answer={parseAnswer(answer)} />
       )}
-      {kind === 'code' && exercise.starter_code && (
+      {kind === 'code' && isProject(exercise) && (
+        <p className="sujet-enonce">
+          Fichiers du projet : {projectFiles(exercise).map((f) => f.name).join(', ')}.
+        </p>
+      )}
+      {kind === 'code' && starterText(exercise).trim() && (
         <CodeBlock
           className="sujet-code"
-          code={exercise.starter_code}
+          code={starterText(exercise)}
           language={exercise.language}
         />
       )}

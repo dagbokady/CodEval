@@ -33,8 +33,9 @@ from .bareme import (
     probe_bodies,
     signature_of,
 )
-from .harness import CALLABLE_LANGUAGES, HarnessError, build_harness, stdin_for
+from .harness import CALLABLE_LANGUAGES, HarnessError, build_harness, declaration_of, stdin_for
 from .languages import get_language
+from .project import as_text, is_source, project_files, read_production
 from . import matching
 from .questions import answers_of, questions_of
 from .sandbox import Sandbox, Workspace, default_sandbox
@@ -273,25 +274,53 @@ def _prepare_code(code: str, exercise: Exercise) -> tuple[str, object]:
 HARNESS_FLAGS = ["-Werror=incompatible-pointer-types", "-Werror=implicit-function-declaration"]
 
 
-def _syntax_check(sandbox: Sandbox, source: str, lang) -> str:
-    """Le fichier de l'apprenant se compile-t-il, `main` ou pas ?"""
+def _syntax_check(sandbox: Sandbox, source: str, lang, contents: dict[str, str] | None = None) -> str:
+    """Le fichier de l'apprenant se compile-t-il, `main` ou pas ? Pour un projet,
+    chaque fichier source est vérifié, avec les en-têtes qu'il inclut."""
     if not lang.compile_cmd:
         return ""
+    std = [arg for arg in lang.compile_cmd if arg.startswith("-std=")]
+    logs: list[str] = []
     with Workspace() as ws:
-        ws.write(lang.filename, source)
-        std = [arg for arg in lang.compile_cmd if arg.startswith("-std=")]
-        cmd = [lang.compile_cmd[0], *std, "-fsyntax-only", lang.filename]
-        res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
-    if res.exit_code != 0:
-        return (res.stderr or res.stdout or "Échec de compilation")[:4000]
-    return ""
+        if contents is None:
+            ws.write(lang.filename, source)
+            units = [lang.filename]
+        else:
+            _write_project(ws, contents)
+            units = [name for name in contents if is_source(name, lang.key)]
+        for unit in units:
+            cmd = [lang.compile_cmd[0], *std, "-fsyntax-only", unit]
+            res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
+            if res.exit_code != 0:
+                logs.append(res.stderr or res.stdout or f"{unit} : échec de compilation")
+    return "\n".join(logs)[:4000]
 
 
-def _compile(sandbox: Sandbox, ws: Workspace, lang, source_name: str, flags: list[str] = []) -> str:
-    """Compile `source_name` en `program`. Rend le journal d'erreur, vide si tout va bien."""
+def _write_project(ws: Workspace, contents: dict[str, str]) -> None:
+    for name, body in contents.items():
+        ws.write(name, body)
+
+
+# Fichiers engendrés par la correction dans un projet : un nom de fichier de
+# l'apprenant commence toujours par une lettre, il ne peut pas les écraser.
+PROBE_FILE = "__codeval_probe"
+HARNESS_FILE = "__codeval_test"
+
+
+def _compile(
+    sandbox: Sandbox, ws: Workspace, lang, sources: str | list[str], flags: list[str] = []
+) -> str:
+    """Compile `sources` (un fichier, ou tous ceux d'un projet) en `program`.
+    Rend le journal d'erreur, vide si tout va bien."""
     if not lang.compile_cmd:
         return ""
-    cmd = [source_name if arg == lang.filename else arg for arg in lang.compile_cmd]
+    names = [sources] if isinstance(sources, str) else list(sources)
+    cmd: list[str] = []
+    for arg in lang.compile_cmd:
+        if arg == lang.filename:
+            cmd.extend(names)
+        else:
+            cmd.append(arg)
     cmd = cmd[:1] + list(flags) + cmd[1:]
     comp = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
     if comp.exit_code != 0:
@@ -300,14 +329,17 @@ def _compile(sandbox: Sandbox, ws: Workspace, lang, source_name: str, flags: lis
 
 
 def _run_case(sandbox: Sandbox, ws: Workspace, lang, test: TestCase, stdin: str, index: int | None):
-    cmd = list(lang.run_cmd) + ([str(index)] if index is not None else [])
+    # Un test d'appel reçoit son numéro de cas ; un test du programme entier, les
+    # arguments de sa ligne de commande (`./programme 40`).
+    extra = [str(index)] if index is not None else [str(a) for a in test.argv or []]
+    cmd = list(lang.run_cmd) + extra
     return sandbox.run(ws.path, cmd, stdin=stdin, timeout=test.timeout_ms / 1000)
 
 
-def _probe_compile(sandbox: Sandbox, ws: Workspace, lang) -> str:
+def _probe_compile(sandbox: Sandbox, ws: Workspace, lang, target: str | None = None) -> str:
     """Compile une sonde de barème sans édition de liens. Journal vide = satisfait."""
     std = [arg for arg in lang.compile_cmd if arg.startswith("-std=")]
-    cmd = [lang.compile_cmd[0], *HARNESS_FLAGS, *std, "-fsyntax-only", lang.filename]
+    cmd = [lang.compile_cmd[0], *HARNESS_FLAGS, *std, "-fsyntax-only", target or lang.filename]
     res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
     if res.exit_code == 0:
         return ""
@@ -321,6 +353,7 @@ def _check_criterion(
     lang,
     callable_language: bool,
     document: dict | None = None,
+    contents: dict[str, str] | None = None,
 ) -> tuple[bool, str]:
     """La copie satisfait-elle ce critère de déclaration ? Rend (satisfait, journal).
 
@@ -346,6 +379,8 @@ def _check_criterion(
         return False, "Critère incomplet : nom ou type manquant."
 
     extension = lang.filename.rsplit(".", 1)[1]
+    if contents is not None:
+        return _probe_project(bodies, contents, sandbox, lang, f"{PROBE_FILE}.{extension}")
     student_file = f"student.{extension}"
     log = ""
     for body in bodies:
@@ -355,6 +390,24 @@ def _check_criterion(
             log = _probe_compile(sandbox, ws, lang)
         if not log:
             return True, ""
+    return False, log
+
+
+def _probe_project(
+    bodies: list[str], contents: dict[str, str], sandbox: Sandbox, lang, probe_file: str
+) -> tuple[bool, str]:
+    """Une déclaration vit dans l'un des fichiers du projet : une structure dans
+    son en-tête, une fonction dans son `.c` ou son prototype dans le `.h`. On
+    sonde chaque fichier à son tour, avec ce qu'il inclut ; un seul suffit."""
+    log = ""
+    with Workspace() as ws:
+        _write_project(ws, contents)
+        for unit in contents:
+            for body in bodies:
+                ws.write(probe_file, build_probe(body, unit))
+                log = _probe_compile(sandbox, ws, lang, probe_file)
+                if not log:
+                    return True, ""
     return False, log
 
 
@@ -400,6 +453,13 @@ def _grade_code(
     except AlgoError as erreur:
         return ExerciseOutcome(ResultStatus.COMPILE_ERROR, 0.0, max_score, str(erreur), [], elapsed())
 
+    # Un projet : chaque fichier déclaré par l'enseignant, avec ce que l'apprenant
+    # y a écrit. Le texte d'un bloc sert aux contrôles qui lisent le source.
+    files = project_files(exercise)
+    contents = read_production(code, files, lang.key) if files else None
+    if contents is not None:
+        source = as_text(contents)
+
     criteria = criteria_of(exercise)
     # Les exigences d'un exercice algorithmique se lisent sur le document rendu,
     # pas sur sa traduction : on le garde sous la main pour la boucle des critères.
@@ -415,7 +475,7 @@ def _grade_code(
     # une faute. En revanche un `;` manquant casse toute l'unité de compilation :
     # aucun critère n'est alors jugeable, et le dire une fois vaut mieux que de
     # le répéter à chaque ligne du barème.
-    log = _syntax_check(sandbox, source, lang)
+    log = _syntax_check(sandbox, source, lang, contents)
     if log:
         return ExerciseOutcome(ResultStatus.COMPILE_ERROR, 0.0, max_score, log, [], elapsed())
 
@@ -428,7 +488,7 @@ def _grade_code(
     for criterion in criteria:
         share = (float(criterion.get("points") or 0) / weight_total) * max_score
         passed, note = _check_criterion(
-            criterion, source, sandbox, lang, callable_language, document
+            criterion, source, sandbox, lang, callable_language, document, contents
         )
         if passed:
             score += share
@@ -441,7 +501,7 @@ def _grade_code(
         criterion = functions.get(target_id) if target_id else None
         signature = signature_of(criterion) if criterion and callable_language else None
         outcome = _run_group(
-            source, lang, sandbox, cases, signature, weight_total, max_score
+            source, lang, sandbox, cases, signature, weight_total, max_score, contents
         )
         score += outcome["score"]
         details.extend(outcome["details"])
@@ -478,6 +538,7 @@ def _run_group(
     signature: dict | None,
     weight_total: float,
     max_score: float,
+    contents: dict[str, str] | None = None,
 ) -> dict:
     """Compile puis joue un groupe de tests : appels d'une même fonction, ou
     exécutions du programme entier."""
@@ -486,7 +547,11 @@ def _run_group(
     status = ResultStatus.OK
 
     with Workspace() as ws:
-        if signature is not None:
+        if contents is not None:
+            log = _build_project(sandbox, ws, lang, contents, cases, signature)
+            if isinstance(log, dict):
+                return log
+        elif signature is not None:
             student_file = f"student.{lang.filename.rsplit('.', 1)[1]}"
             ws.write(student_file, source)
             try:
@@ -504,7 +569,8 @@ def _run_group(
         else:
             ws.write(lang.filename, source)
 
-        log = _compile(sandbox, ws, lang, lang.filename, HARNESS_FLAGS if signature else [])
+        if contents is None:
+            log = _compile(sandbox, ws, lang, lang.filename, HARNESS_FLAGS if signature else [])
         if log:
             return {
                 "score": 0.0,
@@ -561,6 +627,62 @@ def _run_group(
     return {"score": score, "details": details, "log": "", "status": status}
 
 
+def _build_project(
+    sandbox: Sandbox, ws: Workspace, lang, contents: dict[str, str], cases, signature
+) -> str | dict:
+    """Compile un projet en `program`. Rend le journal (vide si tout va bien), ou
+    le résultat d'échec du groupe quand le programme de test ne peut être écrit.
+
+    Le programme entier se compile comme l'apprenant l'aurait fait : tous les
+    fichiers sources ensemble. Pour appeler une fonction, le programme de test
+    inclut le fichier source où elle est visible avec sa signature, et l'on
+    relie les autres fichiers compilés à part, leur `main` renommé.
+    """
+    _write_project(ws, contents)
+    sources = [name for name in contents if is_source(name, lang.key)]
+    if signature is None:
+        return _compile(sandbox, ws, lang, sources)
+
+    extension = lang.filename.rsplit(".", 1)[1]
+    probe = f"static {declaration_of(signature, '__codeval_probe')} = {signature['name']};"
+    probe_file = f"{PROBE_FILE}.{extension}"
+    unit, log = None, ""
+    for candidate in sources:
+        ws.write(probe_file, build_probe(probe, candidate))
+        log = _probe_compile(sandbox, ws, lang, probe_file)
+        if not log:
+            unit = candidate
+            break
+    if unit is None:
+        return {
+            "score": 0.0,
+            "details": [_failed_detail(t, log, signature) for t in cases],
+            "log": f"{signature['name']} : fonction introuvable avec cette signature\n{log}",
+            "status": ResultStatus.COMPILE_ERROR,
+        }
+    try:
+        program = build_harness(signature, [list(t.args or []) for t in cases], unit)
+    except HarnessError as erreur:
+        return {
+            "score": 0.0,
+            "details": [_failed_detail(t, str(erreur), signature) for t in cases],
+            "log": f"{signature['name']} : {erreur}",
+            "status": ResultStatus.COMPILE_ERROR,
+        }
+    harness_file = f"{HARNESS_FILE}.{extension}"
+    ws.write(harness_file, program)
+    flags = [arg for arg in lang.compile_cmd if arg.startswith(("-std=", "-O"))]
+    objects: list[str] = []
+    for index, other in enumerate(s for s in sources if s != unit):
+        obj = f"__codeval_{index}.o"
+        cmd = [lang.compile_cmd[0], *flags, "-Dmain=__codeval_student_main", "-c", other, "-o", obj]
+        res = sandbox.run(ws.path, cmd, timeout=settings.sandbox_compile_timeout)
+        if res.exit_code != 0:
+            return (res.stderr or res.stdout or f"{other} : échec de compilation")[:4000]
+        objects.append(obj)
+    return _compile(sandbox, ws, lang, [harness_file, *objects], HARNESS_FLAGS)
+
+
 def _failed_detail(test: TestCase, log: str, signature: dict | None) -> dict:
     return {
         "test_id": test.id,
@@ -588,8 +710,13 @@ def _readable_input(test: TestCase, signature: dict | None) -> str:
         )
         return f"{signature['name']}({rendered})"
     if test.input_types and values:
-        return " · ".join(str(v) for v in values)
-    return test.stdin[:200]
+        shown = " · ".join(str(v) for v in values)
+    else:
+        shown = test.stdin[:200]
+    if test.argv:
+        command = "./programme " + " ".join(str(a) for a in test.argv)
+        return f"{command}\n{shown}".strip()
+    return shown
 
 
 def grade_exercise(

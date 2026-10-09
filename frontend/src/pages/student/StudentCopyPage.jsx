@@ -5,6 +5,7 @@ import { Alert, Button, Loading, Tag } from '../../components/ui';
 import { SheetHeader, SheetInstructions } from '../../components/SubjectSheet';
 import GradeMark, { MarginNote } from '../../components/GradeMark';
 import CodeBlock from '../../components/CodeBlock';
+import { starterText } from '../../project';
 import AnswerBlock from '../../components/CopyAnswer';
 import SolutionBlock from '../../components/SolutionBlock';
 import { useAuth } from '../../auth';
@@ -162,12 +163,12 @@ export default function StudentCopyPage() {
             {/* Le squelette fourni par l'enseignant n'est pas le travail de
                 l'apprenant : replié, il ne prend pas la place de sa copie,
                 mais reste consultable pour comprendre l'énoncé. */}
-            {sheet.kind === 'code' && sheet.starter_code && (
+            {sheet.kind === 'code' && starterText(sheet).trim() && (
               <details className="copy-starter">
                 <summary className="copy-label">Code de départ fourni</summary>
                 <CodeBlock
                   className="copy-code copy-code--starter"
-                  code={sheet.starter_code}
+                  code={starterText(sheet)}
                   language={sheet.language}
                 />
               </details>

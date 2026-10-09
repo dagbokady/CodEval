@@ -9,6 +9,7 @@ import binascii
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from .grading.project import FILES_KEY, ProjectError, check_files
 from .models import EvaluationKind, EvaluationStatus, ResultStatus, Role, RunStatus, TestKind
 
 
@@ -442,6 +443,8 @@ class TestCaseIn(BaseModel):
     expected_type: str = Field(default="string", max_length=20)
     # Valeurs d'entrée, dans l'ordre des types déclarés.
     args: list = Field(default_factory=list, max_length=20)
+    # Arguments de la ligne de commande d'un test du programme entier.
+    argv: list[str] = Field(default_factory=list, max_length=20)
 
     @field_validator("comparison")
     @classmethod
@@ -456,6 +459,19 @@ class TestCaseIn(BaseModel):
         # Les tests écrits avant le barème typé n'ont pas de type de sortie :
         # on les relit comme du texte, ce qu'ils étaient.
         return v or "string"
+
+    @field_validator("argv", mode="before")
+    @classmethod
+    def _check_argv(cls, v):
+        # Un argument est toujours du texte : « 40 » saisi comme nombre aussi.
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            raise ValueError("Les arguments de ligne de commande forment une liste")
+        args = [str(arg) for arg in v]
+        if any(len(arg) > 200 for arg in args):
+            raise ValueError("Un argument de ligne de commande fait au plus 200 caractères")
+        return args
 
     @field_validator("args", "input_types", mode="before")
     @classmethod
@@ -483,6 +499,20 @@ class TestCaseOut(TestCaseIn):
 ExerciseKind = Literal["code", "algo", "qcm", "matching", "truefalse", "short"]
 
 
+def _checked_project(model):
+    """Les fichiers d'un exercice-projet (`settings.files`), vérifiés avant
+    d'être enregistrés : leurs noms entrent tels quels dans le répertoire de
+    compilation."""
+    files = (model.settings or {}).get(FILES_KEY)
+    if model.kind != "code" or not files:
+        return model
+    try:
+        model.settings = {**model.settings, FILES_KEY: check_files(files, model.language)}
+    except ProjectError as erreur:
+        raise ValueError(str(erreur)) from None
+    return model
+
+
 class ExerciseIn(BaseModel):
     id: int | None = None
     title: str = Field(min_length=1, max_length=200)
@@ -493,6 +523,10 @@ class ExerciseIn(BaseModel):
     kind: ExerciseKind = "code"
     settings: dict = Field(default_factory=dict)
     tests: list[TestCaseIn] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _project(self):
+        return _checked_project(self)
 
 
 class ExerciseOut(ORMModel):
@@ -535,6 +569,10 @@ class BankExerciseIn(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=10)
     is_shared: bool = False
     tests: list[TestCaseIn] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _project(self):
+        return _checked_project(self)
 
 
 class BankExerciseOut(ORMModel):

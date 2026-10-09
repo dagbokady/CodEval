@@ -19,11 +19,14 @@ import {
   ARRAY_TYPES,
   CRITERION_KINDS,
   DECLARATION_LANGUAGES,
+  DECLARED_PARAM_TYPES,
+  DECLARED_RETURN_TYPES,
   PARAM_TYPES,
   RETURN_TYPES,
   arrayOf,
   blankCriterion,
   criterionKind,
+  customTypeIssue,
   describeCriterion,
   elementOf,
   expectedTypeOf,
@@ -181,8 +184,18 @@ function ValueInput({ type, value, onChange, label, placeholder }) {
  * « Tableau » fait apparaître le type de ses éléments, à côté : c'est la
  * question qu'on se pose ensuite, et la seule qui reste.
  */
-function TypeSelect({ value, onChange, label, types = PARAM_TYPES, disabled = false }) {
+function TypeSelect({
+  value,
+  onChange,
+  label,
+  types = PARAM_TYPES,
+  disabled = false,
+  ctype,
+  onCtype,
+}) {
   const tableau = isArrayType(value);
+  const autre = value === 'custom';
+  const issue = autre ? customTypeIssue(ctype) : null;
   const simples = types.filter((type) => type.input !== 'list');
   const éléments = ARRAY_TYPES.filter((type) => types.some((t) => t.key === type.key));
   const tableauPossible = éléments.length > 0;
@@ -217,6 +230,23 @@ function TypeSelect({ value, onChange, label, types = PARAM_TYPES, disabled = fa
             </option>
           ))}
         </select>
+      )}
+      {/* « Autre type » : le type s'écrit comme en C, `Etudiant *` ou `struct Note`. */}
+      {autre && (
+        <input
+          aria-label={`${label} : type C`}
+          aria-invalid={Boolean(issue)}
+          title={issue ?? undefined}
+          value={ctype ?? ''}
+          placeholder="Etudiant *"
+          disabled={disabled}
+          style={{
+            width: 130,
+            fontFamily: 'var(--mono)',
+            borderColor: issue ? 'var(--danger)' : undefined,
+          }}
+          onChange={(e) => onCtype?.(e.target.value)}
+        />
       )}
     </span>
   );
@@ -386,8 +416,10 @@ function FunctionFields({ criterion, update }) {
           <TypeSelect
             value={criterion.returns}
             label="Type de retour"
-            types={RETURN_TYPES}
+            types={DECLARED_RETURN_TYPES}
             onChange={(returns) => update({ returns })}
+            ctype={criterion.returns_ctype}
+            onCtype={(returns_ctype) => update({ returns_ctype })}
           />
         </label>
         <Button
@@ -413,8 +445,13 @@ function FunctionFields({ criterion, update }) {
           <TypeSelect
             value={param.type}
             label={`Type du paramètre ${index + 1}`}
+            types={DECLARED_PARAM_TYPES}
             onChange={(type) =>
               setParams(params.map((p, i) => (i === index ? { ...p, type } : p)))
+            }
+            ctype={param.ctype}
+            onCtype={(ctype) =>
+              setParams(params.map((p, i) => (i === index ? { ...p, ctype } : p)))
             }
           />
           <Button
@@ -459,7 +496,12 @@ function StructFields({ criterion, update }) {
           <TypeSelect
             value={field.type}
             label={`Type du champ ${index + 1}`}
+            types={DECLARED_PARAM_TYPES}
             onChange={(type) => setFields(fields.map((f, i) => (i === index ? { ...f, type } : f)))}
+            ctype={field.ctype}
+            onCtype={(ctype) =>
+              setFields(fields.map((f, i) => (i === index ? { ...f, ctype } : f)))
+            }
           />
           <Button
             variant="secondary"
@@ -484,7 +526,10 @@ function VariableFields({ criterion, update }) {
         <TypeSelect
           value={criterion.vtype}
           label="Type de la variable"
+          types={DECLARED_PARAM_TYPES}
           onChange={(vtype) => update({ vtype })}
+          ctype={criterion.ctype}
+          onCtype={(ctype) => update({ ctype })}
         />
       </label>
       <label style={cellStyle}>

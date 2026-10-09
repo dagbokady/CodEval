@@ -50,6 +50,8 @@ import PointsEditor from '../../components/PointsEditor';
 import ToolboxEditor from '../../components/ToolboxEditor';
 import TestsEditor from '../../components/TestsEditor';
 import SolutionEditor from '../../components/SolutionEditor';
+import ProjectFilesEditor from '../../components/ProjectFilesEditor';
+import { isProject, projectFiles } from '../../project';
 import {
   autoDistribute,
   callableCriteria,
@@ -1283,19 +1285,24 @@ function ExercisesStep({
 
                 {(exercise.kind ?? 'code') === 'code' && (
                   <Disclosure
-                    summary="Code de départ"
-                    hint="Déjà rempli avec le squelette du langage. Ouvrez pour le modifier."
+                    summary={
+                      isProject(exercise)
+                        ? `Fichiers du projet · ${projectFiles(exercise).length}`
+                        : 'Code de départ'
+                    }
+                    hint={
+                      isProject(exercise)
+                        ? projectFiles(exercise).map((f) => f.name).join(', ')
+                        : 'Déjà rempli avec le squelette du langage. Ouvrez pour le modifier, ou découper le code en plusieurs fichiers.'
+                    }
+                    defaultOpen={isProject(exercise)}
                   >
-                    <Field label="Code présent dans l'éditeur à l'ouverture" id={`c-${index}`}>
-                      <textarea
-                        id={`c-${index}`}
-                        rows={10}
-                        style={{ fontFamily: 'var(--mono)', fontSize: 13 }}
-                        value={exercise.starter_code ?? ''}
-                        disabled={readOnly}
-                        onChange={(e) => update(index, { starter_code: e.target.value })}
-                      />
-                    </Field>
+                    <ProjectFilesEditor
+                      exercise={exercise}
+                      name={`c-${index}`}
+                      readOnly={readOnly}
+                      onChange={(patch) => update(index, patch)}
+                    />
                   </Disclosure>
                 )}
 
