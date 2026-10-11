@@ -175,6 +175,7 @@ cd frontend && npm run lint && npm run build
 | [frontend/README.md](frontend/README.md) | organisation des écrans, conventions, rôles et navigation |
 | [FONCTIONNALITES.md](FONCTIONNALITES.md) | inventaire détaillé des fonctionnalités |
 | [docs/guide/creer-devoirs-et-examens.md](docs/guide/creer-devoirs-et-examens.md) | guide illustré : créer un devoir d'algorithmique, un devoir et un examen de C avancé |
+| [docs/guide/Guide-enseignant-CodEval.pdf](docs/guide/Guide-enseignant-CodEval.pdf) | le même guide en PDF à distribuer aux enseignants : captures annotées et extraits des sujets |
 | [docs/recherche/bench/README.md](docs/recherche/bench/README.md) | banc de mesure du moteur de correction : granularité des tâches et passage à l'échelle |
 
 ## Limites connues
