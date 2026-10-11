@@ -10,10 +10,12 @@
 
 import CodeBlock from './CodeBlock';
 import MatchingBoard from './MatchingBoard';
+import TraceGrid from './TraceGrid';
 import { hasQuestions } from '../exerciseTypes';
 import { answersOf, questionsOf } from '../questions';
 import { algorithmText } from '../algoVocabulary';
 import { projectDocument, projectText } from '../project';
+import { readTrace, traceColumns, traceRows, traceVerdicts } from '../trace';
 
 function algoDocument(code) {
   const trimmed = (code ?? '').trim();
@@ -186,6 +188,38 @@ function TrueFalseAnswer({ sheet, published }) {
   );
 }
 
+/**
+ * Simulation : le tableau rempli par l'apprenant. Corrigé, chaque case notée se
+ * colore selon le verdict du serveur, avec la valeur attendue sous une erreur
+ * quand le corrigé peut être montré.
+ */
+function TraceAnswer({ sheet, published }) {
+  const columns = traceColumns(sheet.settings);
+  const rows = traceRows(sheet.settings);
+  const algorithm = String(sheet.settings?.algorithm ?? '');
+  if (columns.length === 0) {
+    return <p className="copy-empty">Aucun tableau de simulation dans cet exercice.</p>;
+  }
+  return (
+    <>
+      {algorithm.trim() && (
+        <details className="copy-starter">
+          <summary className="copy-label">Algorithme simulé</summary>
+          <CodeBlock className="copy-code copy-code--starter" code={algorithm} language="algo" />
+        </details>
+      )}
+      <TraceGrid
+        columns={columns}
+        rows={rows}
+        values={readTrace(sheet.answer, rows.length, columns.length)}
+        verdicts={traceVerdicts(sheet.tests)}
+        showExpected={published}
+        label="Tableau de simulation rendu"
+      />
+    </>
+  );
+}
+
 /** Un exercice à plusieurs questions se relit question par question. */
 function QuestionsAnswer({ sheet, published }) {
   const questions = questionsOf(sheet.kind, sheet.settings);
@@ -219,12 +253,13 @@ function QuestionsAnswer({ sheet, published }) {
 }
 
 /**
- * `sheet` : { kind, settings, answer, language, matches }. La même forme des
+ * `sheet` : { kind, settings, answer, language, matches, tests }. La même forme des
  * deux côtés : l'appelant compose l'objet, ce composant ne connaît que la copie.
  */
 export default function AnswerBlock({ sheet, published }) {
   if (hasQuestions(sheet.kind)) return <QuestionsAnswer sheet={sheet} published={published} />;
   if (sheet.kind === 'truefalse') return <TrueFalseAnswer sheet={sheet} published={published} />;
+  if (sheet.kind === 'trace') return <TraceAnswer sheet={sheet} published={published} />;
   if (!sheet.answer?.trim()) {
     return <p className="copy-empty">Aucune production enregistrée pour cette question.</p>;
   }

@@ -39,7 +39,7 @@ from ..schemas import (
     ScoreLineOut,
 )
 from ..config import settings
-from ..grading import matching
+from ..grading import matching, trace
 from ..grading.questions import questions_of
 from ..grading.languages import default_starter
 from ..grading.project import project_files, starter_document
@@ -145,7 +145,8 @@ def _public_settings(exercise: Exercise, reveal: bool) -> dict:
 
     Les exercices à plusieurs questions (QCM, correspondance, question-réponse)
     sont republiés question par question, chacune amputée de sa réponse ; le
-    Vrai/Faux perd la véracité de ses affirmations.
+    Vrai/Faux perd la véracité de ses affirmations, la simulation les cases
+    attendues de son tableau.
     """
     settings = dict(exercise.settings or {})
     settings.pop(matching.SALT_KEY, None)  # secret de présentation, jamais publié
@@ -153,8 +154,12 @@ def _public_settings(exercise: Exercise, reveal: bool) -> dict:
     # dans les réglages, qui sont envoyés tels quels pendant l'épreuve.
     for key in _SOLUTION_KEYS:
         settings.pop(key, None)
-    if reveal or exercise.kind not in ("qcm", "matching", "truefalse", "short"):
+    if reveal or exercise.kind not in ("qcm", "matching", "truefalse", "short", "trace"):
         return settings
+
+    if exercise.kind == "trace":
+        # Simulation : seules les colonnes fournies arrivent remplies.
+        return trace.public_settings(settings)
 
     if isinstance(settings.get("statements"), list):
         # Vrai/Faux : l'affirmation est publiée, sa véracité non.

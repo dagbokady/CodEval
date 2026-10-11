@@ -353,6 +353,7 @@ export default function SubmissionDetailPage() {
                   answer: exercise.code,
                   language: exercise.language || evalData?.language,
                   matches: exercise.matches ?? [],
+                  tests: exercise.tests ?? [],
                 }}
                 published
               />

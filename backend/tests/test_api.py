@@ -2240,3 +2240,81 @@ def test_un_projet_relit_une_copie_en_texte_dans_son_main():
         "outil.h": "int f(void);", "main.c": "int main(void){return 0;}"}
     assert read_production('{"files": {"main.c": "x", "pirate.c": "y"}}', files, "c") == {
         "outil.h": "int f(void);", "main.c": "x"}
+
+
+def test_simulation_d_algorithme_de_bout_en_bout(context):
+    """Le tableau de simulation : l'apprenant ne reçoit que les colonnes fournies,
+    chaque case attendue vaut une part du barème, une case vide n'est pas notée."""
+    import json as _json
+
+    t = auth(context["teacher"])
+    s = auth(context["student"])
+    eid = client.post("/api/evaluations", headers=t, json={
+        "title": "Simulation", "duration_minutes": 20, "classroom_id": context["classroom"],
+        "total_points": 5, "rules": {"allow_early_submit": True},
+    }).json()["id"]
+    res = client.put(f"/api/evaluations/{eid}/exercises", headers=t, json=[{
+        "title": "Calcul de moyenne", "kind": "trace", "points": 5,
+        "statement": "Simulez l'algorithme pour les saisies 10, 11 et 12.",
+        "settings": {
+            "algorithm": "ALGORITHME CalculDeMoyenne\nDEBUT\n  Somme ← 0\nFIN",
+            "columns": [{"title": "Instr.", "given": True}, {"title": "Somme"},
+                        {"title": "Écran", "given": False}],
+            # La dernière ligne a une case en trop : elle est retirée à l'enregistrement.
+            "rows": [["1", "0", ""], ["6", "10", ""], ["10", "", "Moyenne : 11"],
+                     ["FIN", "", "", "en trop"]],
+        },
+        "tests": [],
+    }])
+    assert res.status_code == 200, res.text
+    stored = res.json()["exercises"][0]
+    assert stored["settings"]["rows"][3] == ["FIN", "", ""]
+    exercise_id = stored["id"]
+
+    client.post(f"/api/evaluations/{eid}/publish", headers=t)
+    client.post(f"/api/evaluations/{eid}/start", headers=t)
+    served = client.get(f"/api/me/evaluations/{eid}", headers=s).json()["exercises"][0]
+    # Le corrigé reste au serveur : seule la colonne fournie arrive remplie.
+    assert served["settings"]["rows"] == [["1", "", ""], ["6", "", ""], ["10", "", ""],
+                                          ["FIN", "", ""]]
+    assert served["settings"]["algorithm"].startswith("ALGORITHME")
+
+    cells = [["1", "0", ""], ["6", "10,0", ""], ["10", "", "moyenne: 12"], ["FIN", "", ""]]
+    client.put(f"/api/me/evaluations/{eid}/exercises/{exercise_id}", headers=s,
+               json={"code": _json.dumps({"cells": cells}), "version": 0})
+    client.post(f"/api/me/evaluations/{eid}/submit", headers=s)
+    client.post(f"/api/evaluations/{eid}/close", headers=t)
+    run = client.post(f"/api/evaluations/{eid}/corrections", headers=t).json()
+    db = SessionLocal()
+    process_run(db, db.get(CorrectionRun, run["id"]))
+    db.close()
+
+    # Trois cases attendues, deux justes : 10,0 vaut 10 ; « moyenne: 12 » est faux.
+    results = client.get(f"/api/evaluations/{eid}/results", headers=t).json()
+    assert results["participants"][0]["final_score"] == round(5 * 2 / 3, 2)
+
+
+def test_une_case_de_simulation_se_compare_avec_souplesse():
+    from app.grading.trace import same_value
+
+    assert same_value("11", "11,00")
+    assert same_value("Note Numéro : 1", "note numero 1")
+    assert same_value("VRAI | V", "v")
+    assert same_value('"Bonjour"', "bonjour")
+    assert not same_value("11", "")
+    assert not same_value("11", "11 points")
+
+
+def test_les_derniers_nombres_affiches_ignorent_les_messages():
+    """Le mode « nombres affichés » ne lit que la fin chiffrée de la sortie :
+    les invites et les phrases de l'apprenant sont libres."""
+    from app.grading.engine import _matches
+
+    sortie = ("Entrez le nombre numéro 1 : Entrez le nombre numéro 2 : "
+              "Le plus grand de ces nombres est : 15\nC'était le nombre numéro 3\n")
+    assert _matches("15 3", sortie, "last_numbers")
+    assert not _matches("15 2", sortie, "last_numbers")
+    assert _matches("4,5", "Le prix à payer est de 4.50 FCFA", "last_numbers")
+    assert not _matches("18 19 20", "19 20", "last_numbers")
+    # Sans nombre attendu, la comparaison redevient souple.
+    assert _matches("Bonjour", "Bonjour  \n", "last_numbers")
