@@ -836,6 +836,26 @@ tr.row-confirm:hover { background: none; }
 .exam-editor .cm-focused .cm-selectionBackground,
 .exam-editor .cm-content ::selection { background: var(--primary-light) !important; }
 .exam-editor .cm-focused { outline: none; }
+/* Exercice-projet : un onglet par fichier, au-dessus de l'éditeur. */
+.project-editor { display: flex; flex-direction: column; height: 100%; }
+.project-tabs {
+  display: flex; gap: 2px; overflow-x: auto; flex-shrink: 0;
+  padding: 6px 8px 0; background: var(--bg-subtle);
+  border-bottom: 1px solid var(--exam-border, var(--border-soft));
+}
+.project-tab {
+  font-family: var(--mono); font-size: 12.5px; white-space: nowrap;
+  padding: 6px 12px; cursor: pointer; color: var(--text-muted);
+  background: transparent; border: 1px solid transparent; border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.project-tab:hover { color: var(--text-body); }
+.project-tab.active {
+  color: var(--exam-text, var(--text-body)); background: var(--exam-card, var(--bg-app));
+  border-color: var(--exam-border, var(--border-soft)); margin-bottom: -1px;
+}
+.project-file { flex: 1; min-height: 0; }
+.project-file > div { height: 100%; }
 .exam-status { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--exam-muted); }
 
 .exam-subject-panel {
@@ -2500,6 +2520,20 @@ tr.row-confirm:hover { background: none; }
 }
 
 .test-comparaison { display: grid; gap: 4px; }
+/* La ligne de commande d'un test : l'invite, puis les arguments à la suite. */
+.test-argv {
+  display: flex; align-items: center; gap: 0; flex: 1; min-width: 220px;
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  background: var(--bg-subtle);
+}
+.test-argv-invite {
+  padding: 0 8px; font-size: 12.5px; color: var(--text-muted); white-space: nowrap;
+  background: transparent;
+}
+.test-argv input {
+  flex: 1; min-width: 0; border: none; border-radius: 0; font-family: var(--mono);
+  background: var(--bg-app);
+}
 .comparaison-tout { display: grid; gap: 4px; margin-left: auto; justify-items: end; }
 .test-comparaison .sub { font-size: 11px; }
 
@@ -3632,3 +3666,17 @@ tr.row-confirm:hover { background: none; }
 @media (max-width: 560px) {
   .settings-form .settings-actions > .btn { flex: 1 1 100%; }
 }
+
+/* Éditeur enseignant d'un exercice-projet : un fichier par carte. */
+.project-mode { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 10px; font-size: 13px; }
+.project-mode label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.project-files { display: grid; gap: 10px; }
+.project-file-card {
+  display: grid; gap: 6px; padding: 10px; background: var(--bg-subtle);
+  border: 1px solid var(--border-soft); border-radius: var(--radius-lg);
+}
+.project-file-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.project-file-head input { width: 200px; font-family: var(--mono); font-weight: 600; }
+.project-file-head input[aria-invalid="true"] { border-color: var(--danger); }
+.project-file-issue { font-size: 12px; color: var(--danger); }
+.project-file-actions { margin-left: auto; display: inline-flex; gap: 4px; }

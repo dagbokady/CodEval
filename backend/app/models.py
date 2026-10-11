@@ -358,6 +358,9 @@ class TestCase(Base):
     expected_type: Mapped[str] = mapped_column(String(20), default="string")
     # Valeurs d'entrée typées, dans l'ordre des types déclarés.
     args: Mapped[list] = mapped_column(JSONList, default=list)
+    # Arguments de la ligne de commande, pour un test du programme entier :
+    # `./programme 40` porte ["40"].
+    argv: Mapped[list] = mapped_column(JSONList, default=list)
 
     exercise: Mapped[Exercise] = relationship(back_populates="tests")
 
@@ -407,6 +410,7 @@ class BankTestCase(Base):
     input_types: Mapped[list] = mapped_column(JSONList, default=list)
     expected_type: Mapped[str] = mapped_column(String(20), default="string")
     args: Mapped[list] = mapped_column(JSONList, default=list)
+    argv: Mapped[list] = mapped_column(JSONList, default=list)
 
     exercise: Mapped[BankExercise] = relationship(back_populates="tests")
 

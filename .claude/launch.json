@@ -3,13 +3,10 @@
   "configurations": [
     {
       "name": "api",
-      "runtimeExecutable": "backend/.venv/bin/uvicorn",
+      "runtimeExecutable": "sh",
       "runtimeArgs": [
-        "app.main:app",
-        "--port",
-        "8000",
-        "--app-dir",
-        "backend"
+        "-c",
+        "cd backend && exec .venv/bin/uvicorn app.main:app --port 8000"
       ],
       "port": 8000
     },

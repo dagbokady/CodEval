@@ -29,7 +29,8 @@ _OUTILS = {"c": "gcc", "cpp": "g++", "java": "javac", "python": "python3"}
 def _corriger(exercice: dict, production: str):
     modele = SimpleNamespace(kind=exercice["kind"], language=exercice["language"],
                              points=exercice["points"], settings=exercice["settings"])
-    tests = [SimpleNamespace(id=i, kind=SimpleNamespace(value=t["kind"]),
+    # Un test enregistré a toujours ses arguments de ligne de commande (vides par défaut).
+    tests = [SimpleNamespace(id=i, kind=SimpleNamespace(value=t["kind"]), argv=t.get("argv", []),
                              **{k: t[k] for k in _TEST_FIELDS})
              for i, t in enumerate(exercice["tests"])]
     return grade_exercise(production, modele, tests)

@@ -31,7 +31,7 @@ from __future__ import annotations
 import re
 
 from .algo_bareme import ALGO_CRITERION_KINDS, describe_algo, is_algo_criterion
-from .harness import ValueType, declaration_of, get_type
+from .harness import CUSTOM, HarnessError, ValueType, declaration_of, resolve_type
 
 # Familles de critères de déclaration, dans l'ordre du sélecteur enseignant.
 CRITERION_KINDS = ("variable", "function", "struct")
@@ -65,11 +65,22 @@ def signature_of(criterion: dict) -> dict | None:
     return {
         "name": name,
         "params": [
-            {"name": p.get("name") or f"a{i}", "type": p.get("type", "int")}
+            {"name": p.get("name") or f"a{i}", "type": p.get("type", "int"),
+             "ctype": p.get("ctype")}
             for i, p in enumerate((criterion or {}).get("params") or [])
         ],
         "returns": (criterion or {}).get("returns", "int"),
+        "returns_ctype": (criterion or {}).get("returns_ctype"),
     }
+
+
+def _shown_type(key, c_type=None) -> ValueType:
+    """Le type à afficher : un « autre type » mal écrit se montre « ? » au lieu
+    de faire échouer toute la description du barème."""
+    try:
+        return resolve_type(key, c_type)
+    except HarnessError:
+        return ValueType(str(key), "?", "?", "")
 
 
 def describe(criterion: dict) -> str:
@@ -83,24 +94,24 @@ def describe(criterion: dict) -> str:
         if signature is None:
             return f"fonction {name}"
         params = ", ".join(
-            _param_text(p["type"], p["name"]) for p in signature["params"]
+            _param_text(p["type"], p["name"], p.get("ctype")) for p in signature["params"]
         )
-        return f"{get_type(signature['returns']).c_type} {name}({params or 'void'})"
+        returns = _shown_type(signature["returns"], signature.get("returns_ctype")).c_type
+        return f"{returns} {name}({params or 'void'})"
     if kind == "variable":
-        vtype = get_type(criterion.get("vtype", "int"))
         where = _scope_text(criterion)
-        return f"{_param_text(vtype.key, name)}{where}"
+        return f"{_param_text(criterion.get('vtype', 'int'), name, criterion.get('ctype'))}{where}"
     if kind == "struct":
         fields = ", ".join(
-            f"{get_type(f.get('type', 'int')).c_type} {f.get('name') or '?'}"
+            _param_text(f.get("type", "int"), f.get("name") or "?", f.get("ctype"))
             for f in criterion.get("fields") or []
         )
         return f"struct {name} {{ {fields} }}" if fields else f"struct {name}"
     return name
 
 
-def _param_text(type_key: str, name: str) -> str:
-    vtype = get_type(type_key)
+def _param_text(type_key: str, name: str, c_type=None) -> str:
+    vtype = _shown_type(type_key, c_type)
     if vtype.is_array:
         return f"{vtype.c_type} {name}[]"
     return f"{vtype.c_type} {name}"
@@ -134,7 +145,7 @@ def _pointer_to(vtype: ValueType, expression: str) -> str:
 def _struct_probe(criterion: dict, type_name: str) -> str:
     lines = [f"static {type_name} __codeval_s;"]
     for index, field in enumerate(criterion.get("fields") or []):
-        vtype = get_type(field.get("type", "int"))
+        vtype = resolve_type(field.get("type", "int"), field.get("ctype"))
         member = str(field.get("name") or "").strip()
         if not member.isidentifier():
             continue
@@ -154,6 +165,14 @@ def probe_bodies(criterion: dict) -> list[str]:
     Une structure peut avoir été nommée `struct Point` ou déclarée par `typedef` :
     on essaie les deux écritures avant de conclure qu'elle manque.
     """
+    try:
+        return _probe_bodies(criterion)
+    except HarnessError:
+        # Un type inconnu ou mal écrit : le critère est incomplet, pas la copie fautive.
+        return []
+
+
+def _probe_bodies(criterion: dict) -> list[str]:
     kind = criterion.get("kind")
     name = str(criterion.get("name") or "").strip()
     if not name.isidentifier():
@@ -166,7 +185,7 @@ def probe_bodies(criterion: dict) -> list[str]:
         return [f"static {declaration_of(signature, '__codeval_probe')} = {name};"]
 
     if kind == "variable":
-        vtype = get_type(criterion.get("vtype", "int"))
+        vtype = resolve_type(criterion.get("vtype", "int"), criterion.get("ctype"))
         return [f"static {_pointer_to(vtype, name)}"]
 
     if kind == "struct":
@@ -225,6 +244,11 @@ def _declaration_pattern(vtype: ValueType, name: str) -> str:
     de variable, et n'a donc pas à satisfaire le critère.
     """
     escaped = re.escape(name)
+    if vtype.key == CUSTOM:
+        # « Etudiant *tab » : les mots du type, puis ses étoiles, espaces libres.
+        words = re.findall(r"\w+|\*", vtype.c_type)
+        typed = r"\s*".join(rf"\b{w}\b" if w != "*" else r"\*" for w in words)
+        return rf"{typed}[^;{{}}()]*?\b{escaped}\b\s*(?:=|;|,|\[)"
     if vtype.is_array:
         return rf"\b{vtype.c_type}\b[^;{{}}()]*?\b{escaped}\s*\["
     if vtype.key == "string":
@@ -237,7 +261,10 @@ def declares_variable(source: str, criterion: dict) -> bool:
     name = str(criterion.get("name") or "").strip()
     if not name.isidentifier():
         return False
-    vtype = get_type(criterion.get("vtype", "int"))
+    try:
+        vtype = resolve_type(criterion.get("vtype", "int"), criterion.get("ctype"))
+    except HarnessError:
+        return False
     clean = strip_noise(source)
     fn = str(criterion.get("in_function") or "").strip()
     if fn:

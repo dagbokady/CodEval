@@ -77,6 +77,7 @@ def _snapshot_exercise(exercise: Exercise | BankExercise) -> dict:
                 "kind": test.kind.value,
                 "input_types": list(test.input_types or []),
                 "args": list(test.args or []),
+                "argv": list(test.argv or []),
             }
             for test in exercise.tests
         ],
@@ -88,6 +89,7 @@ def _test_values(data: dict) -> dict:
     values["kind"] = TestKind(data.get("kind", TestKind.OFFICIAL.value))
     values["input_types"] = list(data.get("input_types") or [])
     values["args"] = list(data.get("args") or [])
+    values["argv"] = [str(a) for a in data.get("argv") or []]
     return values
 
 

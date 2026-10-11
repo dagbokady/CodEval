@@ -328,6 +328,7 @@ def _clone(
                     input_types=list(test.input_types or []),
                     expected_type=test.expected_type,
                     args=list(test.args or []),
+                    argv=list(test.argv or []),
                 )
             )
     return copy

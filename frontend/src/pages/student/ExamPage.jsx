@@ -7,6 +7,8 @@ import { python } from '@codemirror/lang-python';
 import { java } from '@codemirror/lang-java';
 import { api, sendOnLeave } from '../../api/client';
 import AlgoEditor from '../../components/AlgoEditor';
+import ProjectEditor from '../../components/ProjectEditor';
+import { isProject, projectFiles } from '../../project';
 import CodeBlock from '../../components/CodeBlock';
 import MatchingBoard from '../../components/MatchingBoard';
 import { Alert, Button, Loading } from '../../components/ui';
@@ -976,6 +978,17 @@ function Exam({ evaluationId, data }) {
                       onChange={onChange}
                       allowed={exercise.settings?.allowed_elements}
                       readOnly={Boolean(submittedAt) || locked}
+                    />
+                  ) : isProject(exercise) ? (
+                    <ProjectEditor
+                      key={exercise.id}
+                      files={projectFiles(exercise)}
+                      language={exercise.language}
+                      value={codeOf(exercise.id)}
+                      onChange={onChange}
+                      readOnly={Boolean(submittedAt) || locked}
+                      theme={theme}
+                      extensions={extensions}
                     />
                   ) : (
                     <CodeMirror

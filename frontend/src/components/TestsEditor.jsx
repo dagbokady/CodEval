@@ -53,7 +53,42 @@ function testSummary(test, criterion) {
       : `${call} doit renvoyer ${attendu}`;
   }
   const given = valeurs.length ? `, avec ${valeurs.join(' puis ')} en entrée,` : '';
-  return `le programme${given} doit afficher ${attendu}`;
+  const lancé = argvOf(test).length ? ` lancé par ${commandLine(test)}` : '';
+  return `le programme${lancé}${given} doit afficher ${attendu}`;
+}
+
+/** Les arguments de la ligne de commande d'un test du programme entier. */
+function argvOf(test) {
+  return Array.isArray(test?.argv) ? test.argv.map(String) : [];
+}
+
+function commandLine(test) {
+  return ['./programme', ...argvOf(test)].join(' ');
+}
+
+/**
+ * Les arguments, saisis sur une ligne comme dans un terminal. Le texte reste
+ * tel qu'on le tape : le découper à chaque frappe avalerait l'espace qui
+ * sépare deux arguments avant qu'on ait écrit le second.
+ */
+function ArgvInput({ test, onChange }) {
+  const [text, setText] = useState(() => argvOf(test).join(' '));
+  return (
+    <label className="test-argv">
+      <code className="test-argv-invite">./programme</code>
+      <input
+        aria-label="Arguments de la ligne de commande"
+        value={text}
+        placeholder="(aucun argument)"
+        spellCheck={false}
+        onChange={(e) => {
+          setText(e.target.value);
+          const words = e.target.value.trim();
+          onChange({ argv: words ? words.split(/\s+/) : [] });
+        }}
+      />
+    </label>
+  );
 }
 
 /**
@@ -106,7 +141,9 @@ function TestsRecap({ tests, callable }) {
                   <code>
                     {criterion
                       ? `${criterion.name}(${valeursEntrée})`
-                      : valeursEntrée || '(rien)'}
+                      : [argvOf(test).length ? commandLine(test) : '', valeursEntrée]
+                          .filter(Boolean)
+                          .join(' · ') || '(rien)'}
                   </code>
                 </td>
                 <td className="tests-recap-type">
@@ -289,6 +326,16 @@ function TestCard({
       >
         <TestInputs test={test} criterion={criterion} onChange={onChange} />
       </Etape>
+
+      {!criterion && (
+        <Etape
+          numero="2 bis"
+          titre="Les arguments de la ligne de commande"
+          aide="Facultatif. Séparés par des espaces : « 40 » lance ./programme 40, que main lit dans argv."
+        >
+          <ArgvInput test={test} onChange={onChange} />
+        </Etape>
+      )}
 
       <Etape
         numero="3"

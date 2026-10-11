@@ -187,6 +187,7 @@ export default function UsersPage() {
                           {u.id === me.id && <span className="sub" style={{ display: 'inline' }}> (vous)</span>}
                         </span>
                         <span className="sub">{u.email}</span>
+                        {u.space && <span className="sub">{u.space}</span>}
                       </td>
                       <td>{roleLabel(u.role, u.gender)}</td>
                       <td className="mono">{u.matricule ?? <span className="cell-muted">-</span>}</td>
@@ -412,12 +413,14 @@ function UserDialog({ user, isSelf, onClose }) {
             label="Rôle"
             id="u-role"
             hint={
-              !creating && form.role !== user.role
-                ? 'Changer de rôle retire les inscriptions et attributions actuelles.'
-                : undefined
+              user.space
+                ? "Compte d'un espace personnel : son rôle ne se change pas."
+                : !creating && form.role !== user.role
+                  ? 'Changer de rôle retire les inscriptions et attributions actuelles.'
+                  : undefined
             }
           >
-            <select id="u-role" value={form.role} onChange={set('role')} disabled={isSelf}>
+            <select id="u-role" value={form.role} onChange={set('role')} disabled={isSelf || Boolean(user.space)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>{ROLE_LABELS[r]}</option>
               ))}
