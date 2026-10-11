@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 
@@ -36,7 +37,7 @@ from .bareme import (
 from .harness import CALLABLE_LANGUAGES, HarnessError, build_harness, declaration_of, stdin_for
 from .languages import get_language
 from .project import as_text, is_source, project_files, read_production
-from . import matching
+from . import matching, trace
 from .questions import answers_of, questions_of
 from .sandbox import Sandbox, Workspace, default_sandbox
 
@@ -51,9 +52,28 @@ class ExerciseOutcome:
     duration_ms: int
 
 
+# Un nombre dans une sortie rédigée : « 4,5 » au cours, « 4.5 » en C.
+_NUMBER = re.compile(r"[+-]?\d+(?:[.,]\d+)?")
+
+
+def _numbers(text: str) -> list[float]:
+    return [float(n.replace(",", ".")) for n in _NUMBER.findall(text)]
+
+
 def _matches(expected: str, actual: str, comparison: str) -> bool:
     if comparison == "exact":
         return expected == actual
+    if comparison == "last_numbers":
+        # Les invites et les messages sont libres (« Entrez un nombre : »,
+        # « Le plus grand est : ») : seuls comptent les derniers nombres
+        # affichés, qui doivent être ceux qu'attend le test, dans l'ordre.
+        # Sans nombre attendu, le test se compare comme un test « souple ».
+        exp, act = _numbers(expected), _numbers(actual)
+        if not exp:
+            return _matches(expected, actual, "trim")
+        return len(act) >= len(exp) and all(
+            abs(a - b) < 1e-6 for a, b in zip(exp, act[-len(exp):])
+        )
     if comparison == "numeric":
         try:
             exp = [float(x) for x in expected.split()]
@@ -158,6 +178,15 @@ def _grade_truefalse(answer: str, exercise: Exercise) -> ExerciseOutcome:
         )
 
     score = (correct / len(statements)) * max_score
+    return ExerciseOutcome(ResultStatus.OK, round(score, 2), max_score, "", details, 0)
+
+
+def _grade_trace(answer: str, exercise: Exercise) -> ExerciseOutcome:
+    """Simulation d'algorithme : chaque case attendue vaut une part égale du barème."""
+    max_score = exercise.points
+    if not answer.strip():
+        return ExerciseOutcome(ResultStatus.NO_SUBMISSION, 0.0, max_score, "", [], 0)
+    score, details = trace.grade(answer, exercise.settings or {}, max_score)
     return ExerciseOutcome(ResultStatus.OK, round(score, 2), max_score, "", details, 0)
 
 
@@ -727,6 +756,8 @@ def grade_exercise(
         return _grade_questions(code, exercise)
     if kind == "truefalse":
         return _grade_truefalse(code, exercise)
+    if kind == "trace":
+        return _grade_trace(code, exercise)
     return _grade_code(code, exercise, list(tests), sandbox)
 
 

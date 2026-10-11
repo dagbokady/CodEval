@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import CodeBlock from './CodeBlock';
+import TraceGrid from './TraceGrid';
 import { isProject, projectFiles, starterText } from '../project';
 import { exerciseLabel, formatExamDuration, formatExamDate } from '../format';
 import {
@@ -24,6 +25,7 @@ import {
 } from '../bareme';
 import { exerciseType, hasQuestions } from '../exerciseTypes';
 import { answersOf, questionsOf } from '../questions';
+import { traceColumns, traceRows } from '../trace';
 
 function sessionYear(date) {
   const value = date ? new Date(date) : new Date();
@@ -267,6 +269,26 @@ function TrueFalseStatements({ exercise, answer }) {
   );
 }
 
+/**
+ * Simulation : l'algorithme à dérouler, puis le tableau vierge (seules les
+ * colonnes fournies sont écrites) quand la feuille réserve la place de répondre.
+ */
+function SheetTrace({ exercise, showAnswerZone }) {
+  const algorithm = String(exercise.settings?.algorithm ?? '');
+  const columns = traceColumns(exercise.settings);
+  const rows = traceRows(exercise.settings);
+  return (
+    <>
+      {algorithm.trim() && (
+        <CodeBlock className="sujet-code sujet-algorithme" code={algorithm} language="algo" />
+      )}
+      {showAnswerZone && columns.length > 0 && (
+        <TraceGrid columns={columns} rows={rows} values={[]} />
+      )}
+    </>
+  );
+}
+
 /** Question-réponse : des lignes vierges, comme sur une épreuve imprimée. */
 function ShortAnswerLines({ question }) {
   const rows = Math.min(12, Math.max(1, Number(question.rows) || 4));
@@ -417,6 +439,9 @@ export function SheetExercise({
       )}
       {kind === 'truefalse' && (
         <TrueFalseStatements exercise={exercise} answer={parseAnswer(answer)} />
+      )}
+      {kind === 'trace' && (
+        <SheetTrace exercise={exercise} showAnswerZone={showAnswerZone} />
       )}
       {kind === 'code' && isProject(exercise) && (
         <p className="sujet-enonce">

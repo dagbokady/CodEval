@@ -12,6 +12,7 @@ import { Button, Field } from './ui';
 import { TypePreview } from './TypePreviews';
 import { typeFamilies } from '../exerciseTypes';
 import { blankQuestion, questionsOf } from '../questions';
+import { MAX_COLUMNS, MAX_ROWS, traceColumns, traceRows, traceWidths } from '../trace';
 
 /**
  * Choix du type : première étape de toute création de question. Chaque type se
@@ -250,6 +251,165 @@ export function TrueFalseEditor({ settings, readOnly, onChange }) {
 }
 
 /**
+ * Simulation d'algorithme : l'algorithme à dérouler, puis le tableau attendu.
+ *
+ * L'enseignant remplit le tableau comme il le corrigerait sur papier ; une
+ * colonne « fournie » (le numéro d'instruction) est recopiée sur la feuille de
+ * l'apprenant, les autres lui arrivent vides.
+ */
+export function TraceEditor({ settings, readOnly, onChange, name = 'trace' }) {
+  const columns = traceColumns(settings);
+  const rows = traceRows(settings);
+  // Les champs d'en-tête ont leur cadre : on leur laisse un peu plus d'air.
+  const widths = traceWidths(columns, [rows], { cap: 64, extra: 4 });
+
+  const write = (patch) => onChange({ columns, rows, ...patch });
+  const setColumn = (index, patch) =>
+    write({ columns: columns.map((col, i) => (i === index ? { ...col, ...patch } : col)) });
+  const setCell = (r, c, value) =>
+    write({ rows: rows.map((row, i) => (i === r ? row.map((v, j) => (j === c ? value : v)) : row)) });
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <Field label="Algorithme à simuler" id={`${name}-algo`}>
+        <textarea
+          id={`${name}-algo`}
+          className="trace-algorithm-input"
+          rows={12}
+          value={settings.algorithm ?? ''}
+          disabled={readOnly}
+          spellCheck={false}
+          placeholder={'ALGORITHME Nom\nVARIABLES\n  x : ENTIER\nDEBUT\n1  LIRE(x)\n2  ECRIRE(x)\nFIN'}
+          onChange={(e) => onChange({ algorithm: e.target.value })}
+        />
+      </Field>
+
+      <div>
+        <strong style={{ fontSize: 13 }}>Tableau de simulation attendu</strong>
+        <p className="sub" style={{ marginTop: 4 }}>
+          Une colonne par variable (et une pour l'écran), une ligne par instruction exécutée.
+          Une colonne <em>fournie</em> est recopiée sur la feuille de l'apprenant : le numéro
+          d'instruction, par exemple. Une case laissée vide n'est pas notée ; plusieurs réponses
+          admises se séparent par « | ». Chaque case remplie vaut une part égale du barème.
+        </p>
+      </div>
+
+      <div className="trace-scroll">
+        <table className="trace-grid trace-grid--edit">
+          <thead>
+            <tr>
+              <th aria-label="Rang" />
+              {columns.map((column, c) => (
+                <th
+                  key={c}
+                  scope="col"
+                  className={column.given ? 'trace-given' : undefined}
+                  style={{ minWidth: widths[c] }}
+                >
+                  <input
+                    className="trace-col-title"
+                    aria-label={`Titre de la colonne ${c + 1}`}
+                    value={column.title}
+                    placeholder={`Colonne ${c + 1}`}
+                    disabled={readOnly}
+                    onChange={(e) => setColumn(c, { title: e.target.value })}
+                  />
+                  <span className="trace-col-tools">
+                    <label className="trace-given-toggle">
+                      <input
+                        type="checkbox"
+                        checked={column.given}
+                        disabled={readOnly}
+                        onChange={(e) => setColumn(c, { given: e.target.checked })}
+                      />
+                      <span>fournie</span>
+                    </label>
+                    {columns.length > 1 && !readOnly && (
+                      <button
+                        type="button"
+                        className="trace-remove"
+                        title="Retirer la colonne"
+                        onClick={() =>
+                          write({
+                            columns: columns.filter((_, i) => i !== c),
+                            rows: rows.map((row) => row.filter((_, i) => i !== c)),
+                          })
+                        }
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                </th>
+              ))}
+              <th aria-label="Retirer" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, r) => (
+              <tr key={r}>
+                <td className="trace-rang">{r + 1}</td>
+                {row.map((cell, c) => (
+                  <td key={c} className={columns[c]?.given ? 'trace-given' : undefined}>
+                    <input
+                      aria-label={`Ligne ${r + 1}, ${columns[c]?.title || `colonne ${c + 1}`}`}
+                      value={cell}
+                      disabled={readOnly}
+                      spellCheck={false}
+                      onChange={(e) => setCell(r, c, e.target.value)}
+                    />
+                  </td>
+                ))}
+                <td>
+                  {rows.length > 1 && !readOnly && (
+                    <button
+                      type="button"
+                      className="trace-remove"
+                      title="Retirer la ligne"
+                      onClick={() => write({ rows: rows.filter((_, i) => i !== r) })}
+                    >
+                      ×
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {!readOnly && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Button
+            variant="secondary"
+            size="small"
+            type="button"
+            disabled={rows.length >= MAX_ROWS}
+            onClick={() => write({ rows: [...rows, columns.map(() => '')] })}
+          >
+            + Ajouter une ligne
+          </Button>
+          <Button
+            variant="secondary"
+            size="small"
+            type="button"
+            disabled={columns.length >= MAX_COLUMNS}
+            onClick={() =>
+              write({
+                columns: [...columns, { title: '', given: false }],
+                rows: rows.map((row) => [...row, '']),
+              })
+            }
+          >
+            + Ajouter une colonne
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Une question rédigée (définition ou autre). L'enseignant liste ce qu'il
  * accepte ; sans rien lister, la question part en correction manuelle plutôt
  * que d'être comptée fausse.
@@ -411,8 +571,10 @@ export function QuestionListEditor({ kind, settings, readOnly, onChange, name = 
 
   const allCollapsed = questions.length > 0 && questions.every((_, i) => isCollapsed(i));
 
+  // minmax(0, 1fr) : le résumé d'une question repliée tient sur une ligne
+  // (nowrap) ; sans cette borne, il élargirait la carte au-delà de sa colonne.
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'minmax(0, 1fr)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 14 }}>
           {questions.length > 1 ? `${questions.length} questions` : 'Question'}
@@ -435,7 +597,11 @@ export function QuestionListEditor({ kind, settings, readOnly, onChange, name = 
       </div>
 
       {questions.map((question, index) => (
-        <div key={index} className="card" style={{ display: 'grid', gap: 10 }}>
+        <div
+          key={index}
+          className="card"
+          style={{ display: 'grid', gap: 10, gridTemplateColumns: 'minmax(0, 1fr)' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               type="button"
@@ -479,13 +645,16 @@ export function QuestionListEditor({ kind, settings, readOnly, onChange, name = 
               >
                 {isCollapsed(index) ? '▸' : '▾'}
               </span>
-              <strong style={{ fontSize: 13, color: 'var(--primary)' }}>
+              <strong
+                style={{ fontSize: 13, color: 'var(--primary)', whiteSpace: 'nowrap', flex: 'none' }}
+              >
                 Question {index + 1}
               </strong>
               {isCollapsed(index) && (
                 <span
                   className="sub"
                   style={{
+                    minWidth: 0,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',

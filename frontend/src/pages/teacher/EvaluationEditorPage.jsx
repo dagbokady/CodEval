@@ -61,6 +61,7 @@ import {
 } from '../../bareme';
 import {
   QuestionListEditor,
+  TraceEditor,
   TrueFalseEditor,
   TypePicker,
 } from '../../components/QuestionEditors';
@@ -1255,6 +1256,15 @@ function ExercisesStep({
 
                 {exercise.kind === 'truefalse' && (
                   <TrueFalseEditor
+                    settings={exercise.settings ?? {}}
+                    readOnly={readOnly}
+                    onChange={(s) => update(index, { settings: { ...exercise.settings, ...s } })}
+                  />
+                )}
+
+                {exercise.kind === 'trace' && (
+                  <TraceEditor
+                    name={`tr-${index}`}
                     settings={exercise.settings ?? {}}
                     readOnly={readOnly}
                     onChange={(s) => update(index, { settings: { ...exercise.settings, ...s } })}

@@ -9,7 +9,9 @@
 
 import { useState } from 'react';
 import CodeBlock from './CodeBlock';
+import TraceGrid from './TraceGrid';
 import { questionsOf } from '../questions';
+import { traceColumns, traceRows } from '../trace';
 
 function acceptedText(value) {
   if (typeof value === 'string') return value;
@@ -29,6 +31,19 @@ function ClosedKey({ sheet }) {
           </li>
         ))}
       </ul>
+    );
+  }
+
+  if (sheet.kind === 'trace') {
+    // Le tableau attendu en entier : toutes les colonnes, telles que remplies
+    // par l'enseignant.
+    const columns = traceColumns(sheet.settings);
+    return (
+      <TraceGrid
+        columns={columns.map((column) => ({ ...column, given: true }))}
+        rows={traceRows(sheet.settings)}
+        label="Tableau de simulation attendu"
+      />
     );
   }
 

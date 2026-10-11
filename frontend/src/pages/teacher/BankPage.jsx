@@ -16,6 +16,7 @@ import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
 import { SheetExercise } from '../../components/SubjectSheet';
 import {
   QuestionListEditor,
+  TraceEditor,
   TrueFalseEditor,
   TypePicker,
 } from '../../components/QuestionEditors';
@@ -348,6 +349,14 @@ export default function BankPage() {
 
               {form.kind === 'truefalse' && (
                 <TrueFalseEditor
+                  settings={form.settings}
+                  onChange={(patch) => setForm({ ...form, settings: { ...form.settings, ...patch } })}
+                />
+              )}
+
+              {form.kind === 'trace' && (
+                <TraceEditor
+                  name="b-trace"
                   settings={form.settings}
                   onChange={(patch) => setForm({ ...form, settings: { ...form.settings, ...patch } })}
                 />

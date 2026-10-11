@@ -223,6 +223,7 @@ l'apprenant et du mode de correction.
 | `matching` | mise en correspondance de paires gauche / droite | proportion de paires correctement associées |
 | `truefalse` | suite d'affirmations à déclarer vraies ou fausses | proportion d'affirmations correctement tranchées |
 | `short` | question-réponse : définitions et réponses rédigées | comparaison aux formulations acceptées (casse, accents et ponctuation ignorés), ou note sur les mots-clés présents ; **sans corrigé saisi, la copie est signalée à l'enseignant pour une correction manuelle** plutôt que comptée fausse |
+| `trace` | simulation d'algorithme : l'enseignant donne l'algorithme et le tableau de simulation attendu, l'apprenant remplit le tableau en déroulant l'algorithme | chaque case attendue vaut une part égale du barème ; une case laissée vide par l'enseignant n'est pas notée. Les nombres se comparent par leur valeur (`11` = `11,0`), le texte sans casse, accents ni ponctuation ; plusieurs réponses admises se séparent par `\|` |
 
 Le catalogue des types vit dans `frontend/src/exerciseTypes.js` : éditeur
 d'évaluation, banque, feuille de sujet et copie corrigée le lisent tous, pour
@@ -278,7 +279,10 @@ Chaque exercice de code ou d'algorithme porte une liste de cas de test :
 - **nom**, **entrée standard**, **sortie attendue**, **délai** (ms) : les
   **points**, eux, se posent à la dernière étape (§4.2) ;
 - **mode de comparaison** : `trim` (à l'espacement de fin près), `exact`
-  (au caractère près) ou `numeric` (tolérance 1e-6 sur les nombres) ;
+  (au caractère près), `numeric` (tolérance 1e-6 sur les nombres) ou
+  `last_numbers` (« Nombres affichés » : seuls les derniers nombres de la sortie
+  comptent, les invites et les messages de l'apprenant sont libres : « Le plus
+  grand est : 15 » passe pour `15`) ;
 - **arguments de la ligne de commande** (`argv`), pour un test du programme
   entier : `40` lance `./programme 40`, que `main` lit dans `argv[1]`.
 

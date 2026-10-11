@@ -177,7 +177,7 @@ export const CRITERION_KINDS = [
   },
 ];
 
-/** Les trois façons de comparer une sortie, dites en clair. */
+/** Les façons de comparer une sortie, dites en clair. */
 export const COMPARISONS = [
   {
     key: 'trim',
@@ -196,6 +196,12 @@ export const COMPARISONS = [
     label: 'Numérique',
     hint: 'compare les nombres, à 10⁻⁶ près',
     exemple: '« 2.8 » et « 2.800001 » passent tous les deux',
+  },
+  {
+    key: 'last_numbers',
+    label: 'Nombres affichés',
+    hint: 'seuls les derniers nombres comptent, messages et invites ignorés',
+    exemple: '« Le plus grand est : 15 » passe pour « 15 »',
   },
 ];
 

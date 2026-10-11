@@ -10,6 +10,7 @@ import ProjectEditor from '../../components/ProjectEditor';
 import { isProject, projectFiles } from '../../project';
 import CodeBlock from '../../components/CodeBlock';
 import MatchingBoard from '../../components/MatchingBoard';
+import TraceGrid from '../../components/TraceGrid';
 import { Alert, Button, Loading } from '../../components/ui';
 import {
   SheetExercise,
@@ -21,6 +22,7 @@ import { useAuth } from '../../auth';
 import { formatDateTime, formatDuration, formatRelative } from '../../format';
 import { evaluationUsesLanguage, exerciseType, hasQuestions } from '../../exerciseTypes';
 import { answersOf, packAnswers, questionsOf } from '../../questions';
+import { packTrace, readTrace, traceColumns, traceRows } from '../../trace';
 import { algorithmText, parseAlgorithm } from '../../algoVocabulary';
 import { useServerCountdown } from '../../useNow';
 import { useTheme } from '../../theme';
@@ -970,6 +972,13 @@ function Exam({ evaluationId, data }) {
                       onChange={onChange}
                       readOnly={Boolean(submittedAt) || locked}
                     />
+                  ) : exercise.kind === 'trace' ? (
+                    <TraceStudent
+                      exercise={exercise}
+                      value={codeOf(exercise.id)}
+                      onChange={onChange}
+                      readOnly={Boolean(submittedAt) || locked}
+                    />
                   ) : exercise.kind === 'algo' ? (
                     <AlgoEditor
                       key={exercise.id}
@@ -1384,6 +1393,42 @@ function TrueFalseStudent({ exercise, value, onChange, readOnly }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Simulation d'algorithme : le tableau à remplir en déroulant l'algorithme de la
+ * feuille de gauche. Les colonnes fournies par l'enseignant sont déjà écrites.
+ */
+function TraceStudent({ exercise, value, onChange, readOnly }) {
+  const columns = traceColumns(exercise.settings);
+  const rows = traceRows(exercise.settings);
+  const cells = readTrace(value, rows.length, columns.length);
+
+  const setCell = (r, c, text) => {
+    if (readOnly) return;
+    onChange(packTrace(cells.map((row, i) => (i === r ? row.map((v, j) => (j === c ? text : v)) : row))));
+  };
+
+  return (
+    <div style={{ padding: 20, display: 'grid', gap: 12, alignContent: 'start', overflow: 'auto' }}>
+      <p style={{ fontSize: 14, fontWeight: 600 }}>Tableau de simulation</p>
+      <p className="sub">
+        Déroulez l'algorithme de la feuille de gauche et notez, ligne par ligne, la valeur prise
+        par chaque variable et ce qui s'affiche à l'écran. Entrée passe à la ligne suivante.
+      </p>
+      {rows.length === 0 ? (
+        <p className="sub">Aucun tableau à remplir dans cet exercice.</p>
+      ) : (
+        <TraceGrid
+          columns={columns}
+          rows={rows}
+          values={cells}
+          editable={!readOnly}
+          onCell={setCell}
+        />
+      )}
     </div>
   );
 }

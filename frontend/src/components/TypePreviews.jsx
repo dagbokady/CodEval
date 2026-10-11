@@ -212,6 +212,44 @@ function ApercuAlgo() {
   );
 }
 
+/**
+ * Simulation : un tableau à colonnes, la première fournie (numéros
+ * d'instruction), quelques cases déjà remplies dont une en cours de saisie.
+ */
+function ApercuSimulation() {
+  const colonnes = [14, 42, 80, 118, 146];
+  const lignes = [16, 34, 50, 66, 82];
+  const remplies = [
+    [1, 1], [2, 2], [3, 1], [3, 3],
+  ];
+  return (
+    <Cadre>
+      <rect x="14" y="16" width="132" height="66" rx="3" fill="none" stroke={LIGNE} strokeWidth="1.5" />
+      <rect x="14" y="16" width="132" height="18" rx="3" fill={ACCENT} opacity="0.18" />
+      <rect x="14" y="34" width="28" height="48" fill={ENCRE} opacity="0.12" />
+      {colonnes.slice(1, -1).map((x) => (
+        <line key={x} x1={x} y1="16" x2={x} y2="82" stroke={LIGNE} strokeWidth="1.2" />
+      ))}
+      {lignes.slice(1, -1).map((y) => (
+        <line key={y} x1="14" y1={y} x2="146" y2={y} stroke={LIGNE} strokeWidth="1.2" />
+      ))}
+      {lignes.slice(1, -1).map((y) => (
+        <rect key={`n${y}`} x="22" y={y + 6} width="12" height="4" rx="2" fill={ENCRE} opacity="0.45" />
+      ))}
+      {remplies.map(([ligne, col]) => (
+        <Barre
+          key={`${ligne}-${col}`}
+          x={colonnes[col] + 7}
+          y={lignes[ligne] + 5.5}
+          width={20}
+          actif={ligne === 3 && col === 3}
+          height={5}
+        />
+      ))}
+    </Cadre>
+  );
+}
+
 const APERCUS = {
   qcm: ApercuQcm,
   matching: ApercuCorrespondance,
@@ -219,6 +257,7 @@ const APERCUS = {
   short: ApercuQuestionReponse,
   code: ApercuCode,
   algo: ApercuAlgo,
+  trace: ApercuSimulation,
 };
 
 /** Miniature d'un type. Rien n'est dessiné pour un type inconnu. */

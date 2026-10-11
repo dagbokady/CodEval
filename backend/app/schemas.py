@@ -10,6 +10,8 @@ import binascii
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .grading.project import FILES_KEY, ProjectError, check_files
+from .grading.trace import TraceError
+from .grading.trace import check_settings as check_trace
 from .models import EvaluationKind, EvaluationStatus, ResultStatus, Role, RunStatus, TestKind
 
 
@@ -449,8 +451,8 @@ class TestCaseIn(BaseModel):
     @field_validator("comparison")
     @classmethod
     def _check_comparison(cls, v: str) -> str:
-        if v not in {"trim", "exact", "numeric"}:
-            raise ValueError("comparison doit être trim, exact ou numeric")
+        if v not in {"trim", "exact", "numeric", "last_numbers"}:
+            raise ValueError("comparison doit être trim, exact, numeric ou last_numbers")
         return v
 
     @field_validator("expected_type", mode="before")
@@ -496,7 +498,7 @@ class TestCaseOut(TestCaseIn):
 
 # Types de question proposés à l'enseignant. « code » et « algo » sont les
 # exercices pratiques ; les autres sont des questions à correction automatique.
-ExerciseKind = Literal["code", "algo", "qcm", "matching", "truefalse", "short"]
+ExerciseKind = Literal["code", "algo", "qcm", "matching", "truefalse", "short", "trace"]
 
 
 def _checked_project(model):
@@ -509,6 +511,18 @@ def _checked_project(model):
     try:
         model.settings = {**model.settings, FILES_KEY: check_files(files, model.language)}
     except ProjectError as erreur:
+        raise ValueError(str(erreur)) from None
+    return model
+
+
+def _checked_trace(model):
+    """Le tableau d'une simulation d'algorithme, remis aux dimensions de ses
+    colonnes avant d'être enregistré."""
+    if model.kind != "trace":
+        return model
+    try:
+        model.settings = check_trace(model.settings or {})
+    except TraceError as erreur:
         raise ValueError(str(erreur)) from None
     return model
 
@@ -526,7 +540,7 @@ class ExerciseIn(BaseModel):
 
     @model_validator(mode="after")
     def _project(self):
-        return _checked_project(self)
+        return _checked_trace(_checked_project(self))
 
 
 class ExerciseOut(ORMModel):
@@ -572,7 +586,7 @@ class BankExerciseIn(BaseModel):
 
     @model_validator(mode="after")
     def _project(self):
-        return _checked_project(self)
+        return _checked_trace(_checked_project(self))
 
 
 class BankExerciseOut(ORMModel):

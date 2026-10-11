@@ -10,6 +10,7 @@ import AnswerBlock from '../../components/CopyAnswer';
 import SolutionBlock from '../../components/SolutionBlock';
 import { useAuth } from '../../auth';
 import { exerciseLabel, formatDateTime, formatScore } from '../../format';
+import { needsTests } from '../../exerciseTypes';
 
 const RESULT_LABELS = {
   ok: 'Exécutée',
@@ -187,9 +188,9 @@ export default function StudentCopyPage() {
               <pre className="copy-compile-log">{sheet.compile_log}</pre>
             )}
 
-            {/* Un QCM ou une correspondance n'a pas de jeu de tests : le détail
-                de correction est déjà lisible dans les réponses ci-dessus. */}
-            {data.published && sheet.tests.length > 0 && !['qcm', 'matching', 'truefalse', 'short'].includes(sheet.kind) && (
+            {/* Un QCM, une correspondance ou une simulation n'a pas de jeu de
+                tests : le détail de correction se lit dans les réponses ci-dessus. */}
+            {data.published && sheet.tests.length > 0 && needsTests(sheet.kind) && (
               <div className="copy-tests">
                 {groupByCategory(sheet.tests).map(([label, tests]) => (
                   <div key={label}>

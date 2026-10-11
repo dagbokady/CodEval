@@ -3332,6 +3332,7 @@ tr.row-confirm:hover { background: none; }
 [data-kind='short'] { --kind: var(--kind-short); }
 [data-kind='code'] { --kind: var(--kind-code); }
 [data-kind='algo'] { --kind: var(--kind-algo); }
+[data-kind='trace'] { --kind: var(--kind-trace); }
 
 .cm-card-body { display: flex; flex-direction: column; gap: 8px; flex: 1; padding: 12px 14px 14px; }
 .cm-byline {
@@ -3680,3 +3681,62 @@ tr.row-confirm:hover { background: none; }
 .project-file-head input[aria-invalid="true"] { border-color: var(--danger); }
 .project-file-issue { font-size: 12px; color: var(--danger); }
 .project-file-actions { margin-left: auto; display: inline-flex; gap: 4px; }
+
+/* ─── Simulation d'algorithme : le tableau de simulation ───
+   Un seul tableau pour le sujet, l'épreuve, la copie et le corrigé. Il défile
+   en largeur plutôt que de déborder : une simulation compte souvent six ou
+   sept colonnes. */
+.trace-scroll { overflow-x: auto; max-width: 100%; }
+.trace-grid {
+  border-collapse: collapse; font-size: 13px; min-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.trace-grid th, .trace-grid td {
+  border: 1px solid var(--border-strong); padding: 4px 8px; text-align: center;
+  vertical-align: middle;
+}
+.trace-grid th {
+  background: var(--bg-subtle); color: var(--text-title); font-weight: 600; font-size: 12.5px;
+}
+.trace-grid td.trace-given, .trace-grid th.trace-given { background: var(--bg-subtle); }
+.trace-grid td.trace-given { font-family: var(--mono); color: var(--text-muted); }
+.trace-grid td input {
+  width: 100%; min-width: 0; border: 0; background: transparent; padding: 4px 2px;
+  font: inherit; font-family: var(--mono); text-align: center; color: var(--text-body);
+}
+.trace-grid td input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-radius: 2px; }
+.trace-value { font-family: var(--mono); white-space: pre-wrap; }
+.trace-grid td.trace-ok { background: var(--success-bg); box-shadow: inset 0 0 0 1px var(--success); }
+.trace-grid td.trace-ko { background: var(--danger-bg); box-shadow: inset 0 0 0 1px var(--danger); }
+.trace-expected { display: block; font-size: 11px; color: var(--danger); margin-top: 2px; }
+
+/* L'éditeur de l'enseignant : chaque case est un champ, chaque en-tête aussi. */
+.trace-grid--edit th { padding: 6px; vertical-align: top; }
+.trace-grid--edit th input.trace-col-title {
+  width: 100%; min-width: 0; font: inherit; font-weight: 600; text-align: center;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 4px 6px;
+  background: var(--bg-card);
+}
+.trace-grid--edit td { padding: 0; }
+.trace-col-tools {
+  display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;
+  font-weight: 400;
+}
+.trace-given-toggle {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted);
+  cursor: pointer; white-space: nowrap;
+}
+.trace-given-toggle input { width: auto; min-width: 0; margin: 0; accent-color: var(--primary); }
+.trace-rang { color: var(--text-faint); font-size: 11.5px; min-width: 28px !important; padding: 0 6px !important; }
+.trace-remove {
+  border: 0; background: none; color: var(--text-faint); cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 2px 6px; border-radius: var(--radius-sm);
+}
+.trace-remove:hover { color: var(--danger); background: var(--danger-bg); }
+.trace-algorithm-input { font-family: var(--mono); font-size: 13px; line-height: 1.5; }
+
+/* Sur la feuille du sujet, le tableau suit la taille du texte de la feuille. */
+.sujet .trace-scroll { margin: 0 0 0.8em 1.2em; }
+.sujet .trace-grid { font-size: 0.85em; }
+.sujet .trace-grid th, .sujet .trace-grid td { min-width: 3.5em; height: 1.9em; }
+.sujet-algorithme { white-space: pre; }

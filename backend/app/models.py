@@ -344,7 +344,7 @@ class TestCase(Base):
     kind: Mapped[TestKind] = mapped_column(Enum(TestKind), default=TestKind.OFFICIAL)
     stdin: Mapped[str] = mapped_column(Text, default="")
     expected_stdout: Mapped[str] = mapped_column(Text, default="")
-    comparison: Mapped[str] = mapped_column(String(20), default="trim")  # trim | exact | numeric
+    comparison: Mapped[str] = mapped_column(String(20), default="trim")  # trim | exact | numeric | last_numbers
     points: Mapped[float] = mapped_column(Float, default=1.0)
     timeout_ms: Mapped[int] = mapped_column(Integer, default=2000)
     # Critère « fonction attendue » du barème que ce test appelle

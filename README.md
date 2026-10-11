@@ -87,10 +87,11 @@ l'autorisation sur chaque requête.
 | Étudiant | composer dans un environnement contrôlé, avec sauvegarde automatique, puis consulter sa copie et ses résultats une fois publiés |
 | Administration | tableau de bord, utilisateurs, classes, langages ouverts, vue d'ensemble des matières et des évaluations |
 
-Six types de question cohabitent dans une même épreuve : QCM, correspondance,
-vrai/faux, réponse courte, exercice de code et exercice d'algorithmique en blocs. Les
-quatre premiers sont corrigés par comparaison, sans exécution ; les deux derniers
-passent par le compilateur et la sandbox. L'administration ouvre ou ferme le C, le C++,
+Sept types de question cohabitent dans une même épreuve : QCM, correspondance,
+vrai/faux, réponse courte, simulation d'algorithme (tableau de simulation), exercice de
+code et exercice d'algorithmique en blocs. Les cinq premiers sont corrigés par
+comparaison, sans exécution ; les deux derniers passent par le compilateur et la
+sandbox. L'administration ouvre ou ferme le C, le C++,
 Python et l'algorithmique pour toute la plateforme (C et algorithmique par défaut) ;
 l'enseignant choisit le langage de chaque matière parmi ceux qui sont ouverts, et ce
 langage s'impose aux épreuves de la matière.
@@ -173,6 +174,7 @@ cd frontend && npm run lint && npm run build
 | [backend/README.md](backend/README.md) | configuration, modèle de données, sandbox, mise en production |
 | [frontend/README.md](frontend/README.md) | organisation des écrans, conventions, rôles et navigation |
 | [FONCTIONNALITES.md](FONCTIONNALITES.md) | inventaire détaillé des fonctionnalités |
+| [docs/guide/creer-devoirs-et-examens.md](docs/guide/creer-devoirs-et-examens.md) | guide illustré : créer un devoir d'algorithmique, un devoir et un examen de C avancé |
 | [docs/recherche/bench/README.md](docs/recherche/bench/README.md) | banc de mesure du moteur de correction : granularité des tâches et passage à l'échelle |
 
 ## Limites connues

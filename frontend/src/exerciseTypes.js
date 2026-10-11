@@ -10,6 +10,7 @@
 
 import { blankQuestion } from './questions';
 import { DEFAULT_ELEMENTS } from './algoVocabulary';
+import { defaultTrace } from './trace';
 
 const EXERCISE_TYPES = [
   {
@@ -114,6 +115,22 @@ const EXERCISE_TYPES = [
     // l'étape « outils » part d'un état écrit, et l'exercice garde trace de ce
     // qui était permis le jour où il a été créé.
     defaults: () => ({ allowed_elements: [...DEFAULT_ELEMENTS], ecriture_cours: true }),
+  },
+  {
+    key: 'trace',
+    badge: 'Simulation',
+    label: "Simulation d'algorithme",
+    tagline: 'Tableau de simulation à remplir',
+    description:
+      "Vous donnez un algorithme et ses données ; l'apprenant le déroule à la main et remplit le tableau de simulation, instruction par instruction.",
+    family: 'Exercices pratiques',
+    grading: 'auto',
+    sheetTitle: "SIMULATION D'ALGORITHMES",
+    needsTests: false,
+    usesLanguage: false,
+    gradingNote:
+      'La correction est automatique : chaque case attendue du tableau rapporte une part égale du barème.',
+    defaults: () => defaultTrace(),
   },
 ];
 
