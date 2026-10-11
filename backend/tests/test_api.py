@@ -17,6 +17,8 @@ os.environ.setdefault(
     ),
 )
 os.environ.setdefault("CODEVAL_SECRET_KEY", "test-secret-key-with-enough-entropy")
+# Le .env local peut couper la vérification des e-mails : les tests la veulent.
+os.environ["CODEVAL_EMAIL_VERIFICATION"] = "true"
 
 from app.db import Base, SessionLocal, engine, init_db  # noqa: E402
 from app.grading.engine import process_run  # noqa: E402
@@ -372,17 +374,23 @@ def test_algorithme_en_blocs_est_traduit_et_corrige():
     from app.grading.engine import grade_exercise
     from app.models import Exercise, TestCase, TestKind
 
-    algorithme = [
-        {"type": "lire", "cible": "n"},
-        {"type": "variable", "nom": "s", "valeur": "0"},
-        {"type": "pour", "variable": "i", "debut": "1", "fin": "n",
-         "corps": [{"type": "affectation", "cible": "s", "expression": "s + i"}]},
-        {"type": "ecrire", "expression": "s"},
-    ]
+    algorithme = {
+        "variables": [
+            {"nom": "n", "type": "entier"},
+            {"nom": "s", "type": "entier", "valeur": "0"},
+            {"nom": "i", "type": "entier"},
+        ],
+        "corps": [
+            {"type": "lire", "cible": "n"},
+            {"type": "pour", "variable": "i", "debut": "1", "fin": "n",
+             "corps": [{"type": "affectation", "cible": "s", "expression": "s + i"}]},
+            {"type": "ecrire", "expression": "s"},
+        ],
+    }
     exercise = Exercise(
         id=902, evaluation_id=1, position=1, title="Somme", statement="", language="c",
         points=6, starter_code="", kind="algo",
-        settings={"allowed_elements": ["lire", "ecrire", "variable", "affectation", "pour"]},
+        settings={"allowed_elements": ["declaration", "lire", "ecrire", "affectation", "pour"]},
     )
     tests = [
         TestCase(id=1, exercise_id=902, position=1, name="n = 5", kind=TestKind.OFFICIAL,
@@ -394,7 +402,8 @@ def test_algorithme_en_blocs_est_traduit_et_corrige():
     assert outcome.score == 6.0 and outcome.status.value == "ok"
 
     # Un élément hors palette est refusé avant toute exécution.
-    hors_palette = _json.dumps(algorithme + [{"type": "tantque", "condition": "n > 0", "corps": []}])
+    hors_palette = _json.dumps({**algorithme, "corps": algorithme["corps"] + [
+        {"type": "tantque", "condition": "n > 0", "corps": []}]})
     refus = grade_exercise(hors_palette, exercise, tests)
     assert refus.status.value == "compile_error"
     assert "TANTQUE" in refus.compile_log
@@ -2137,3 +2146,97 @@ def test_chacun_supprime_son_compte_et_l_admin_ceux_des_autres(context):
     uid, second = compte("admin2@test.ci", "admin")
     assert client.post("/api/auth/me/delete", headers=second,
                        json={"current_password": "motdepasse1"}).status_code == 200
+
+
+def test_projet_c_en_plusieurs_fichiers_avec_arguments(context):
+    """Un exercice-projet : l'apprenant reçoit un onglet par fichier, la correction
+    compile le projet entier, le lance avec ses arguments, et vérifie des
+    signatures qui reçoivent une structure."""
+    import json as _json
+
+    t = auth(context["teacher"])
+    s = auth(context["student"])
+    subject = client.post("/api/subjects", headers=t,
+                          json={"name": "C avancé", "language": "c"}).json()
+    eid = client.post("/api/evaluations", headers=t, json={
+        "title": "Projet modulaire", "language": "c", "duration_minutes": 30,
+        "classroom_id": context["classroom"], "subject_id": subject["id"], "total_points": 10,
+        "rules": {"allow_early_submit": True},
+    }).json()["id"]
+
+    def exercise(files):
+        return [{
+            "title": "Moyenne de la classe", "statement": "", "language": "c", "points": 10,
+            "settings": {
+                "files": files,
+                "criteria": [
+                    {"id": "s1", "kind": "struct", "name": "Etudiant", "points": 1,
+                     "fields": [{"name": "note", "type": "float"}]},
+                    {"id": "f1", "kind": "function", "name": "MoyenneNotes", "points": 1,
+                     "returns": "float",
+                     "params": [{"name": "t", "type": "custom", "ctype": "Etudiant *"},
+                                {"name": "n", "type": "int"}]},
+                ],
+            },
+            "tests": [{"name": "./programme 2", "argv": [2], "stdin": "12\n15\n",
+                       "expected_stdout": "13.50", "points": 3}],
+        }]
+
+    # Un nom de fichier n'est jamais un chemin.
+    res = client.put(f"/api/evaluations/{eid}/exercises", headers=t,
+                     json=exercise([{"name": "../main.c"}]))
+    assert res.status_code == 422
+
+    header = ('#ifndef ETUDIANT_H\n#define ETUDIANT_H\ntypedef struct Etudiant { float note; } '
+              'Etudiant;\nfloat MoyenneNotes(Etudiant *t, int n);\n#endif\n')
+    res = client.put(f"/api/evaluations/{eid}/exercises", headers=t, json=exercise([
+        {"name": "Etudiant.h", "starter": header},
+        {"name": "Fonctions.c", "starter": '#include "Etudiant.h"\n'},
+        {"name": "main.c", "starter": "int main(int argc, char *argv[])\n{\n    return 0;\n}\n"},
+    ]))
+    assert res.status_code == 200, res.text
+    exercise_id = res.json()["exercises"][0]["id"]
+    assert res.json()["exercises"][0]["tests"][0]["argv"] == ["2"]
+
+    assert client.post(f"/api/evaluations/{eid}/publish", headers=t).status_code == 200
+    assert client.post(f"/api/evaluations/{eid}/start", headers=t).status_code == 200
+    exam = client.get(f"/api/me/evaluations/{eid}", headers=s).json()
+    draft = _json.loads(exam["drafts"][str(exercise_id)])
+    assert list(draft["files"]) == ["Etudiant.h", "Fonctions.c", "main.c"]
+    assert draft["files"]["Etudiant.h"] == header
+
+    files = {
+        "Etudiant.h": header,
+        "Fonctions.c": ('#include "Etudiant.h"\nfloat MoyenneNotes(Etudiant *t, int n) {\n'
+                        '    float s = 0;\n    for (int i = 0; i < n; i++) s += t[i].note;\n'
+                        '    return s / n;\n}\n'),
+        "main.c": ('#include <stdio.h>\n#include <stdlib.h>\n#include "Etudiant.h"\n'
+                   'int main(int argc, char *argv[]) {\n    int n = atoi(argv[1]);\n'
+                   '    Etudiant *tab = malloc(n * sizeof(Etudiant));\n'
+                   '    for (int i = 0; i < n; i++) scanf("%f", &tab[i].note);\n'
+                   '    printf("%.2f\\n", MoyenneNotes(tab, n));\n    free(tab);\n'
+                   '    return 0;\n}\n'),
+    }
+    save = client.put(f"/api/me/evaluations/{eid}/exercises/{exercise_id}", headers=s,
+                      json={"code": _json.dumps({"files": files}), "version": 0})
+    assert save.status_code == 200, save.text
+    assert client.post(f"/api/me/evaluations/{eid}/submit", headers=s).status_code == 200
+    assert client.post(f"/api/evaluations/{eid}/close", headers=t).status_code == 200
+    run = client.post(f"/api/evaluations/{eid}/corrections", headers=t)
+    db = SessionLocal()
+    process_run(db, db.get(CorrectionRun, run.json()["id"]))
+    db.close()
+    results = client.get(f"/api/evaluations/{eid}/results", headers=t).json()
+    assert results["participants"][0]["final_score"] == 10.0
+
+
+def test_un_projet_relit_une_copie_en_texte_dans_son_main():
+    """Une copie écrite avant que l'exercice ne devienne un projet n'est pas perdue :
+    elle va dans main.c, les autres fichiers gardent leur code de départ."""
+    from app.grading.project import read_production
+
+    files = [{"name": "outil.h", "starter": "int f(void);"}, {"name": "main.c", "starter": ""}]
+    assert read_production("int main(void){return 0;}", files, "c") == {
+        "outil.h": "int f(void);", "main.c": "int main(void){return 0;}"}
+    assert read_production('{"files": {"main.c": "x", "pirate.c": "y"}}', files, "c") == {
+        "outil.h": "int f(void);", "main.c": "x"}

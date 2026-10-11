@@ -49,7 +49,12 @@ export default function RegisterPage() {
     setError(null);
     setPending(true);
     try {
-      setResendIn(await requestEmailCode(form.email));
+      const sent = await requestEmailCode(form.email);
+      if (!sent.required) {
+        await confirm(null);
+        return;
+      }
+      setResendIn(sent.resendIn);
     } catch (err) {
       setError(err.message);
     } finally {

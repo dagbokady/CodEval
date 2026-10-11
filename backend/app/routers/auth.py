@@ -13,7 +13,7 @@ from ..accounts import delete_account, ensure_not_last_admin
 from ..audit import log
 from ..config import settings
 from ..deps import CurrentUser, DbSession
-from ..email_verification import check_code, send_code
+from ..email_verification import check_code, check_signup_code, send_code
 from ..mail import button, mail_configured, send_email
 from ..models import Organization, PasswordResetToken, Role, User, utcnow
 from ..rate_limit import limiter
@@ -70,9 +70,13 @@ def request_email_code(payload: EmailCodeRequest, request: Request, db: DbSessio
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Un compte existe déjà avec cet e-mail : connectez-vous."
         )
+    if not settings.email_verification:
+        # Développement : pas de code, le formulaire crée le compte aussitôt.
+        return {"ok": True, "required": False}
     send_code(db, payload.email, client_ip(request))
     return {
         "ok": True,
+        "required": True,
         "expires_in": settings.email_code_minutes * 60,
         "resend_in": settings.email_code_resend_seconds,
     }
@@ -84,7 +88,7 @@ def register_teacher(payload: RegisterTeacher, db: DbSession) -> TokenOut:
     sur l'offre gratuite."""
     if email_taken(db, payload.email):
         raise HTTPException(status.HTTP_409_CONFLICT, "Cet e-mail est déjà utilisé")
-    check_code(db, payload.email, payload.email_code)
+    check_signup_code(db, payload.email, payload.email_code)
     org = create_personal_space(db, payload.full_name.strip())
     user = User(
         organization_id=org.id,

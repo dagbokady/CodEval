@@ -13,6 +13,7 @@ import MatchingBoard from './MatchingBoard';
 import { hasQuestions } from '../exerciseTypes';
 import { answersOf, questionsOf } from '../questions';
 import { algorithmText } from '../algoVocabulary';
+import { projectDocument, projectText } from '../project';
 
 function algoDocument(code) {
   const trimmed = (code ?? '').trim();
@@ -31,6 +32,9 @@ function algoDocument(code) {
 
 /** L'algorithme en blocs est stocké en JSON : on le relit en pseudo-code. */
 function readableAnswer(code) {
+  // Un projet se relit fichier par fichier, chacun sous son nom.
+  const project = projectDocument(code);
+  if (project) return projectText(project);
   const doc = algoDocument(code);
   if (!doc) return code;
   try {
