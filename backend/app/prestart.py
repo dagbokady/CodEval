@@ -2,7 +2,7 @@
 
 Pour les hébergeurs sans terminal (Render) : applique les migrations puis crée
 le compte d'administration si CODEVAL_ADMIN_EMAIL et CODEVAL_ADMIN_PASSWORD
-sont renseignées, puis publie les exercices des TD d'algorithmique dans la
+sont renseignées, puis publie les sujets ESATIC (devoirs et examen) dans la
 communauté (app.seed_community). Rejouable à chaque démarrage.
 """
 

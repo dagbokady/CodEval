@@ -2318,3 +2318,28 @@ def test_les_derniers_nombres_affiches_ignorent_les_messages():
     assert not _matches("18 19 20", "19 20", "last_numbers")
     # Sans nombre attendu, la comparaison redevient souple.
     assert _matches("Bonjour", "Bonjour  \n", "last_numbers")
+
+
+def test_seed_community_publishes_esatic_subjects(context):
+    from app.seed_community import main as seed_community, subjects
+
+    t = auth(context["teacher"])
+    seed_community()
+    seed_community()  # rejouable : rien n'est publié deux fois
+    titles = [s["title"] for s in subjects()]
+    listing = client.get("/api/community?item_type=subject&limit=50", headers=t).json()
+    found = {item["title"]: item for item in listing["items"] if item["title"] in titles}
+    assert sorted(found) == sorted(titles)
+    assert all(item["total_points"] == 20 for item in found.values())
+
+    for item in found.values():
+        res = client.post(f"/api/community/{item['id']}/use", headers=t, json={})
+        assert res.status_code == 201, res.text
+        evaluation = client.get(f"/api/evaluations/{res.json()['evaluation_id']}",
+                                headers=t).json()
+        assert sum(e["points"] for e in evaluation["exercises"]) == 20
+        assert evaluation["duration_minutes"] == 120
+
+    examen = found["Examen 2e session — C avancé (mars 2025)"]
+    detail = client.get(f"/api/community/{examen['id']}", headers=t).json()
+    assert [e["kind"] for e in detail["content"]["exercises"]] == ["code", "short", "qcm"]
