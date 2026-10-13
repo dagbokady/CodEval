@@ -961,6 +961,7 @@ function Exam({ evaluationId, data }) {
                   {hasQuestions(exercise.kind) ? (
                     <QuestionsStudent
                       exercise={exercise}
+                      shuffleSeed={data.shuffle_seed}
                       value={codeOf(exercise.id)}
                       onChange={onChange}
                       readOnly={Boolean(submittedAt) || locked}
@@ -1456,8 +1457,9 @@ function ShortAnswerQuestion({ value, onChange, readOnly }) {
 
 function MatchingQuestion({ question, value, onChange, readOnly }) {
   const pairs = question.pairs ?? [];
-  // Le serveur envoie les éléments de droite déjà mélangés, désignés par un jeton
-  // opaque : la bonne association ne transite jamais par le navigateur.
+  // Le serveur envoie les deux colonnes déjà mélangées, autrement pour chaque
+  // apprenant. À droite, un jeton opaque : la bonne association ne transite
+  // jamais par le navigateur. À gauche, la clé sous laquelle la copie relie.
   const options =
     question.right_options ?? pairs.map((pair, index) => ({ token: String(index), text: pair.right }));
   const matches = value?.matches ?? {};
@@ -1472,7 +1474,7 @@ function MatchingQuestion({ question, value, onChange, readOnly }) {
         Reliez chaque élément du bloc de gauche à celui qui lui correspond dans le bloc de droite.
       </p>
       <MatchingBoard
-        left={pairs.map((pair, index) => ({ key: String(index), text: pair.left }))}
+        left={pairs.map((pair, index) => ({ key: pair.key ?? String(index), text: pair.left }))}
         right={options.map((option, index) => ({
           key: option.token ?? String(index),
           text: option.text,
@@ -1491,7 +1493,7 @@ function MatchingQuestion({ question, value, onChange, readOnly }) {
  * L'exercice porte plusieurs questions, chacune avec son énoncé et sa réponse ;
  * la production rendue les rassemble dans un seul objet, dans l'ordre du sujet.
  */
-function QuestionsStudent({ exercise, value, onChange, readOnly }) {
+function QuestionsStudent({ exercise, shuffleSeed = 0, value, onChange, readOnly }) {
   const kind = exercise.kind;
   const questions = questionsOf(kind, exercise.settings);
   const answers = answersOf(kind, value, questions.length);
@@ -1513,7 +1515,9 @@ function QuestionsStudent({ exercise, value, onChange, readOnly }) {
             <QcmQuestion
               question={question}
               rank={rank}
-              seed={exercise.id * 31 + rank}
+              // L'exercice, la question et l'apprenant : deux voisins ne voient
+              // pas les propositions dans le même ordre.
+              seed={exercise.id * 31 + rank + shuffleSeed * 7919}
               value={answers[rank]}
               readOnly={readOnly}
               onChange={(given) => answer(rank, given)}

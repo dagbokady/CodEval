@@ -121,32 +121,41 @@ def _hide_short(question: dict) -> dict:
     return {k: v for k, v in question.items() if k != "accepted"}
 
 
-def _hide_matching(question: dict, exercise: Exercise, rank: int) -> dict:
+def _hide_matching(question: dict, exercise: Exercise, rank: int, participant: int = 0) -> dict:
     """Correspondance : le rang d'une paire *est* sa réponse.
 
-    On n'envoie que les éléments de gauche et une liste mélangée des éléments de
-    droite désignés par un jeton opaque, que seul le serveur sait rattacher à un
-    rang. Chaque grille reçoit son propre mélange.
+    On n'envoie que les éléments de gauche et une liste des éléments de droite
+    désignés par un jeton opaque, que seul le serveur sait rattacher à un rang.
+    Les deux colonnes sont mélangées, chacune de son côté et autrement pour
+    chaque apprenant : deux voisins ne voient pas la même grille. Un élément de
+    gauche garde son rang d'origine dans `key`, la clé sous laquelle la copie le
+    relie : ce rang ne dit rien de la réponse, portée par le jeton de droite.
     """
     pairs = [p for p in question.get("pairs", []) if isinstance(p, dict)]
     salt = matching.salt_of(exercise)
+    base = (exercise.id or 1) * 31 + rank
+    left = matching.shuffled_order(len(pairs), matching.participant_seed(base, participant, "left"))
+    right = matching.shuffled_order(
+        len(pairs), matching.participant_seed(base, participant, "right")
+    )
     return {
         **question,
-        "pairs": [{"left": p.get("left", "")} for p in pairs],
+        "pairs": [{"left": pairs[i].get("left", ""), "key": str(i)} for i in left],
         "right_options": [
             {"token": matching.token_for(salt, i, rank), "text": pairs[i].get("right", "")}
-            for i in matching.shuffled_order(len(pairs), (exercise.id or 1) * 31 + rank)
+            for i in right
         ],
     }
 
 
-def _public_settings(exercise: Exercise, reveal: bool) -> dict:
+def _public_settings(exercise: Exercise, reveal: bool, participant: int = 0) -> dict:
     """Le corrigé ne quitte le serveur qu'une fois les résultats publiés.
 
     Les exercices à plusieurs questions (QCM, correspondance, question-réponse)
     sont republiés question par question, chacune amputée de sa réponse ; le
     Vrai/Faux perd la véracité de ses affirmations, la simulation les cases
-    attendues de son tableau.
+    attendues de son tableau. `participant` décide du mélange des
+    correspondances, propre à chaque apprenant.
     """
     settings = dict(exercise.settings or {})
     settings.pop(matching.SALT_KEY, None)  # secret de présentation, jamais publié
@@ -177,7 +186,7 @@ def _public_settings(exercise: Exercise, reveal: bool) -> dict:
             settings["questions"] = [_hide_short(q) for q in questions]
         else:
             settings["questions"] = [
-                _hide_matching(q, exercise, rank) for rank, q in enumerate(questions)
+                _hide_matching(q, exercise, rank, participant) for rank, q in enumerate(questions)
             ]
         # Les réglages à plat des exercices d'autrefois ont été repliés dans la
         # liste : les laisser publierait le corrigé qu'on vient d'en ôter.
@@ -230,12 +239,12 @@ def _expected_tests(exercise: Exercise) -> list[dict]:
     return expected
 
 
-def _public_exercise(exercise: Exercise) -> ExercisePublicOut:
+def _public_exercise(exercise: Exercise, participant: int) -> ExercisePublicOut:
     """Vue apprenant pendant l'épreuve : ni jeux de tests, ni corrigé."""
     return ExercisePublicOut(
         **{
             **ExercisePublicOut.model_validate(exercise).model_dump(),
-            "settings": _public_settings(exercise, reveal=False),
+            "settings": _public_settings(exercise, reveal=False, participant=participant),
         }
     )
 
@@ -394,7 +403,8 @@ def open_exam(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentEx
         rules=evaluation.rules or {},
         seconds_left=seconds_left(evaluation),
         server_time=utcnow(),
-        exercises=[_public_exercise(e) for e in exercises],
+        exercises=[_public_exercise(e, participation.id) for e in exercises],
+        shuffle_seed=participation.id,
         drafts=drafts,
         saved_exercise_ids=[eid for eid, code in saved.items() if code.strip()],
         incidents=participation.incidents or 0,
@@ -826,7 +836,9 @@ def my_copy(evaluation_id: int, user: StudentUser, db: DbSession) -> StudentCopy
                 language=exercise.language,
                 kind=exercise.kind,
                 points=exercise.points,
-                settings=_public_settings(exercise, reveal=published),
+                settings=_public_settings(
+                    exercise, reveal=published, participant=participation.id
+                ),
                 starter_code=exercise.starter_code,
                 answer=answers.get(exercise.id, ""),
                 matches=matching.readable_matches(exercise, answers.get(exercise.id, ""), published),
