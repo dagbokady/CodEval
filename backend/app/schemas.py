@@ -833,6 +833,9 @@ class StudentExamOut(BaseModel):
     seconds_left: int
     server_time: datetime
     exercises: list[ExercisePublicOut]
+    # Graine du mélange des propositions de QCM, propre à l'apprenant : deux
+    # voisins ne voient pas les choix dans le même ordre.
+    shuffle_seed: int = 0
     drafts: dict[int, str]
     saved_exercise_ids: list[int]
     incidents: int

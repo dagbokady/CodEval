@@ -820,8 +820,12 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
     options = grid["right_options"]
     assert sorted(o["text"] for o in options) == ["constant", "linéaire", "quadratique"]
     assert all(set(o) == {"token", "text"} for o in options)
+    # La colonne de gauche arrive mélangée elle aussi : chaque élément porte la
+    # clé sous laquelle la copie le relie.
+    assert sorted(p["key"] for p in grid["pairs"]) == ["0", "1", "2"]
 
     by_text = {o["text"]: o["token"] for o in options}
+    key_of = {p["left"]: p["key"] for p in grid["pairs"]}
     client.put(
         f"/api/me/evaluations/{eid}/exercises/{exercise['id']}",
         headers=s,
@@ -829,9 +833,9 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
             "code": _json.dumps(
                 {
                     "matches": {
-                        "0": by_text["constant"],
-                        "1": by_text["linéaire"],
-                        "2": by_text["constant"],
+                        key_of["O(1)"]: by_text["constant"],
+                        key_of["O(n)"]: by_text["linéaire"],
+                        key_of["O(n²)"]: by_text["constant"],
                     }
                 }
             ),
@@ -854,6 +858,46 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
     rows = client.get(f"/api/me/results/{eid}", headers=s).json()["exercises"][0]["matches"]
     assert [r["chosen"] for r in rows] == ["constant", "linéaire", "constant"]
     assert [r["correct"] for r in rows] == [True, True, False]
+
+
+def test_chaque_apprenant_recoit_sa_propre_grille_melangee():
+    """Les deux colonnes d'une correspondance sont mélangées, autrement pour chacun."""
+    from app.grading.matching import resolve
+    from app.models import Exercise
+    from app.routers.student import _hide_matching
+
+    pairs = [{"left": f"g{i}", "right": f"d{i}"} for i in range(8)]
+    exercise = Exercise(
+        id=906, evaluation_id=1, position=1, title="Relier", statement="",
+        language="c", points=4, starter_code="", kind="matching",
+        settings={"_matching_salt": "sel", "questions": [{"text": "", "pairs": pairs}]},
+    )
+    question = exercise.settings["questions"][0]
+    first = _hide_matching(question, exercise, 0, participant=11)
+    second = _hide_matching(question, exercise, 0, participant=12)
+
+    def lefts(grid):
+        return [p["left"] for p in grid["pairs"]]
+
+    def rights(grid):
+        return [o["text"] for o in grid["right_options"]]
+
+    # Deux voisins ne voient pas la même grille, ni à gauche ni à droite…
+    assert lefts(first) != lefts(second)
+    assert rights(first) != rights(second)
+    # … et les deux colonnes ne suivent pas le même tirage.
+    assert [p["key"] for p in first["pairs"]] != [
+        o["text"][1:] for o in first["right_options"]
+    ]
+    # Le même apprenant retrouve sa grille à chaque rechargement.
+    assert _hide_matching(question, exercise, 0, participant=11) == first
+    # La clé de gauche est le rang d'origine, le jeton de droite y renvoie.
+    for grid in (first, second):
+        assert sorted(lefts(grid)) == sorted(p["left"] for p in pairs)
+        for pair in grid["pairs"]:
+            assert pair["left"] == f"g{pair['key']}"
+        for option in grid["right_options"]:
+            assert resolve(option["token"], "sel", len(pairs)) == int(option["text"][1:])
 
 
 def test_le_sel_d_une_correspondance_survit_a_une_modification(context):
