@@ -2144,6 +2144,138 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert client.delete(f"/api/community/{exercise_item['id']}", headers=t).status_code == 204
 
 
+def test_banque_partage_depuis_ma_banque(context):
+    """Ma banque réunit exercices et sujets ; le partage s'y règle en trois
+    portées et suit l'original tant qu'il dure."""
+    t = auth(context["teacher"])
+    exercise = client.post(
+        "/api/bank/exercises",
+        headers=t,
+        json={"title": "Minimum partagé", "language": "c", "points": 4,
+              "tests": [{"name": "T", "stdin": "3 9\n", "expected_stdout": "3", "points": 4}]},
+    ).json()
+    assert exercise["share"] == "none"
+    source = client.post(
+        "/api/evaluations", headers=t,
+        json={"title": "Sujet de banque", "language": "python", "total_points": 20},
+    ).json()
+    client.put(f"/api/evaluations/{source['id']}/exercises", headers=t,
+               json=[{"title": "Somme", "language": "python", "points": 20}])
+    template = client.post(f"/api/evaluations/{source['id']}/save-as-template", headers=t).json()
+
+    library = client.get("/api/bank/library", headers=t).json()["items"]
+    keys = [(item["source"], item["id"]) for item in library]
+    assert ("exercise", exercise["id"]) in keys and ("subject", template["id"]) in keys
+    only_subjects = client.get("/api/bank/library?kind=subject", headers=t).json()["items"]
+    assert {item["source"] for item in only_subjects} == {"subject"}
+    assert client.get("/api/bank/library?q=minimum", headers=t).json()["items"][0]["id"] == (
+        exercise["id"])
+
+    # Un collègue du même établissement, et un enseignant d'ailleurs.
+    client.post("/api/users", headers=auth(context["admin"]),
+                json={"email": "collegue@test.ci", "full_name": "Collègue", "role": "teacher",
+                      "password": "motdepasse1"})
+    colleague = auth(client.post("/api/auth/login", json={
+        "email": "collegue@test.ci", "password": "motdepasse1"}).json()["access_token"])
+    outsider_admin = create_admin("École Lointaine", "Admin Trois", "admin3@loin.ci")
+    client.post("/api/users", headers=auth(outsider_admin),
+                json={"email": "prof3@loin.ci", "full_name": "Prof Trois", "role": "teacher",
+                      "password": "motdepasse1"})
+    outsider = auth(client.post("/api/auth/login", json={
+        "email": "prof3@loin.ci", "password": "motdepasse1"}).json()["access_token"])
+
+    def titles(headers):
+        return [i["title"] for i in client.get("/api/community?page_size=100",
+                                               headers=headers).json()["items"]]
+
+    # Établissement : les collègues seuls.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "bank_exercise", "source_id": exercise["id"],
+        "visibility": "organization"})
+    assert res.status_code == 200, res.text
+    item_id = res.json()["item_id"]
+    assert "Minimum partagé" in titles(colleague)
+    assert "Minimum partagé" not in titles(outsider)
+    assert client.get(f"/api/community/{item_id}", headers=outsider).status_code == 404
+    assert client.get(f"/api/bank/exercises/{exercise['id']}", headers=t).json()["share"] == (
+        "organization")
+
+    # Tous les enseignants : la même publication s'ouvre à la plateforme.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "bank_exercise", "source_id": exercise["id"], "visibility": "all"})
+    assert res.json()["item_id"] == item_id
+    assert "Minimum partagé" in titles(outsider)
+    shared = client.get(f"/api/community/{item_id}", headers=outsider).json()
+    assert shared["shared_from_bank"] and not shared["is_mine"]
+
+    # Retoucher l'original actualise ce qui est partagé.
+    client.put(f"/api/bank/exercises/{exercise['id']}", headers=t, json={
+        "title": "Minimum partagé", "language": "c", "points": 4,
+        "tests": [{"name": "T", "stdin": "3 9\n", "expected_stdout": "3", "points": 2},
+                  {"name": "U", "stdin": "8 1\n", "expected_stdout": "1", "points": 2}]})
+    tests = client.get(f"/api/community/{item_id}", headers=outsider).json()[
+        "content"]["exercise"]["tests"]
+    assert [test["expected_stdout"] for test in tests] == ["3", "1"]
+
+    # Une reprise depuis l'éditeur se compte.
+    assert client.post(f"/api/community/{item_id}/used", headers=outsider).json()["uses"] == 1
+
+    # On ne partage que sa propre banque.
+    assert client.put("/api/community/share", headers=colleague, json={
+        "source_type": "bank_exercise", "source_id": exercise["id"],
+        "visibility": "all"}).status_code == 404
+
+    # Un sujet se partage de même, et suit sa feuille.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "template", "source_id": template["id"], "visibility": "organization"})
+    subject_item = res.json()["item_id"]
+    mine = client.get("/api/evaluations/templates?scope=mine", headers=t).json()["items"]
+    assert next(i for i in mine if i["id"] == template["id"])["share"] == "organization"
+    assert client.get("/api/evaluations/templates?scope=mine",
+                      headers=colleague).json()["total"] == 0
+    client.put(f"/api/evaluations/{template['id']}/exercises", headers=t,
+               json=[{"title": "Somme", "language": "python", "points": 10},
+                     {"title": "Produit", "language": "python", "points": 10}])
+    detail = client.get(f"/api/community/{subject_item}", headers=colleague).json()
+    assert detail["exercises_count"] == 2
+
+    # Ne plus partager, ou supprimer l'original, retire la publication.
+    client.put("/api/community/share", headers=t, json={
+        "source_type": "template", "source_id": template["id"], "visibility": "none"})
+    assert client.get(f"/api/community/{subject_item}", headers=colleague).status_code == 404
+    assert client.delete(f"/api/bank/exercises/{exercise['id']}", headers=t).status_code == 204
+    assert client.get(f"/api/community/{item_id}", headers=outsider).status_code == 404
+
+    # Les brouillons se listent à part, pour y ajouter un exercice.
+    drafts = client.get("/api/evaluations?group=draft", headers=t).json()["items"]
+    assert drafts and all(d["status"] == "draft" for d in drafts)
+
+
+def test_seed_communaute_publie_les_sujets_de_reference(context):
+    """Les trois sujets de référence et leurs exercices, publiés une seule fois."""
+    from app.db import soft_delete
+    from app.models import CommunityItem
+    from app.seed_community import main as seed, publications
+
+    expected = publications()
+    assert [p["item_type"] for p in expected].count("subject") == 3
+    assert len({p["title"] for p in expected}) == len(expected) == 12
+
+    seed()
+    seed()  # rejouable : rien n'est publié deux fois
+    with SessionLocal() as db:
+        items = [i for i in db.query(CommunityItem).all()
+                 if i.title in {p["title"] for p in expected}]
+        assert len(items) == 12
+        assert {i.visibility for i in items} == {"all"}
+        exam = next(i for i in items if i.title.startswith("Examen 2e session"))
+        assert [e["kind"] for e in exam.content["exercises"]] == ["code", "short", "qcm"]
+        # Retirées : les autres tests comptent les publications.
+        for item in items:
+            soft_delete(item)
+        db.commit()
+
+
 def test_chacun_supprime_son_compte_et_l_admin_ceux_des_autres(context):
     """La suppression efface l'identité, ferme l'accès et libère l'adresse ;
     le dernier administrateur ne peut pas partir."""

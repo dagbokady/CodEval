@@ -1,0 +1,115 @@
+/* ========== La banque : la liste à gauche, l'aperçu à droite ========== */
+.banque { display: grid; gap: 14px; }
+
+.banque-filtres .banque-recherche { flex: 1 1 320px; width: auto; max-width: 560px; height: 36px; }
+.banque-filtres .banque-type { height: 36px; }
+.banque-compte { font-size: 13px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.banque-double { display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+
+/* Les deux colonnes défilent chacune : la liste reste en place quand on lit un long sujet. */
+.banque-liste,
+.banque-apercu {
+  height: calc(100vh - 250px); min-height: 460px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-card);
+}
+.banque-liste {
+  flex: 1 1 340px; max-width: 460px; min-width: 0; overflow-y: auto;
+  transition: opacity 0.15s;
+}
+.banque-liste.est-perime { opacity: 0.55; }
+
+.banque-ligne {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px;
+  padding: 8px 14px; border: none; border-top: 1px solid var(--border-soft);
+  background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.banque-liste > [role='listitem']:first-child .banque-ligne { border-top: none; }
+.banque-ligne:hover { background: var(--bg-row-hover); }
+.banque-ligne[aria-current='true'] { background: var(--primary-light); }
+.banque-ligne[aria-current='true'] .banque-ligne-titre { font-weight: 600; }
+.banque-ligne:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.banque-point {
+  flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--kind, var(--text-faint));
+}
+.banque-point--sujet { border-radius: 2px; background: var(--text-muted); }
+
+.banque-ligne-texte { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.banque-ligne-titre,
+.banque-ligne-meta { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.banque-ligne-titre { font-size: 14px; font-weight: 500; color: var(--text-title); }
+.banque-ligne-meta { font-size: 12.5px; color: var(--text-muted); }
+.banque-ligne-note {
+  flex: none; display: inline-flex; align-items: center; gap: 3px;
+  font-size: 12.5px; font-weight: 500; color: var(--text-body); font-variant-numeric: tabular-nums;
+}
+.banque-ligne-etat { flex: none; display: inline-flex; color: var(--text-muted); }
+.banque-ligne-etat svg { width: 15px; height: 15px; }
+.banque-ligne-etat--ok { color: var(--success); }
+.banque-plus { display: flex; justify-content: center; padding: 10px; }
+
+/* L'aperçu : l'en-tête et ses actions restent ; la feuille défile dessous. */
+.banque-apercu { flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.banque-apercu-tete {
+  display: grid; gap: 6px; padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.banque-apercu-etiquettes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 22px; }
+.banque-tag-sujet {
+  display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600;
+  padding: 1px 7px; border-radius: 4px; color: var(--text-body); background: var(--bg-subtle);
+}
+.banque-dans { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--success); }
+.banque-dans svg { width: 14px; height: 14px; }
+.banque-apercu-titre { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; color: var(--text-title); }
+.banque-apercu-meta { margin: 0; font-size: 13px; color: var(--text-muted); }
+.banque-apercu-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.banque-apercu-actions .btn { height: 34px; }
+.banque-partage { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.banque-partage-titre { font-size: 13px; color: var(--text-muted); }
+
+.banque-apercu-corps {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: grid; gap: 12px; align-content: start;
+  padding: 16px 20px 22px; background: var(--bg-paper-tray);
+}
+.banque-apercu-corps .feuille-papier.banque-feuille { max-width: none; margin: 0; padding: 28px 32px 32px; }
+.banque-noter { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; color: var(--text-muted); }
+.banque-noter .alert { flex-basis: 100%; margin: 0; }
+
+/* « Ajouter à une évaluation » : ses brouillons, ou une évaluation nouvelle. */
+.banque-ajout {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 50;
+  width: min(320px, calc(100vw - 32px)); padding: 4px;
+  display: grid; text-align: left;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow-elevated, 0 12px 32px rgba(24, 24, 27, 0.14));
+}
+.banque-ajout-titre {
+  padding: 6px 10px 4px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.banque-ajout-vide { padding: 4px 10px 8px; font-size: 12.5px; color: var(--text-muted); }
+.banque-ajout-choix,
+.banque-ajout-nouvelle {
+  display: grid; gap: 1px; width: 100%; min-height: 44px; padding: 5px 10px;
+  border: none; border-radius: 6px; background: transparent;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.banque-ajout-choix strong { font-size: 13.5px; font-weight: 500; color: var(--text-title); }
+.banque-ajout-choix span { font-size: 12px; color: var(--text-muted); }
+.banque-ajout-nouvelle { align-items: center; font-size: 13.5px; font-weight: 500; color: var(--primary); }
+.banque-ajout-choix:hover,
+.banque-ajout-nouvelle:hover,
+.banque-ajout-choix:focus-visible,
+.banque-ajout-nouvelle:focus-visible { background: var(--bg-hover); outline: none; }
+.banque-ajout-sep { height: 1px; margin: 4px 6px; background: var(--border-soft); }
+
+/* Sur un écran étroit, l'aperçu passe sous la liste et la page défile d'un bloc. */
+@media (max-width: 900px) {
+  .banque-liste { max-width: none; height: 340px; min-height: 0; }
+  .banque-apercu { height: auto; min-height: 0; overflow: visible; }
+  .banque-apercu-corps { overflow: visible; }
+  .banque-apercu-corps .feuille-papier.banque-feuille { padding: 20px 16px 24px; }
+}

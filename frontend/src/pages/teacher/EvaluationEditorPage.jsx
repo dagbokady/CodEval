@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api/client';
 import {
@@ -56,6 +56,43 @@ function spreadPoints(exercises, total) {
 function isEvenSpread(exercises, total) {
   const even = spreadPoints(exercises, total);
   return exercises.every((ex, i) => Math.abs(Number(ex.points) - Number(even[i].points)) < 0.011);
+}
+
+/**
+ * Import : copie complète de l'exercice, type et paramètres compris. Sans le
+ * `kind` ni les `settings`, un QCM ou une correspondance repartait en « code ».
+ *
+ * La banque ne fixe pas de points : l'exercice importé prend sa part du total
+ * comme un exercice nouveau (parts égales tant que personne n'a pesé un
+ * exercice plus qu'un autre, zéro sinon).
+ */
+function withImported(list, item, total) {
+  const kind = item.kind ?? 'code';
+  const imported = {
+    id: null,
+    _key: newKey('e'),
+    title: item.title,
+    statement: item.statement,
+    language: item.language,
+    points: 0,
+    kind,
+    settings: item.settings ?? {},
+    starter_code:
+      kind === 'code' && !item.starter_code?.trim()
+        ? defaultStarter(item.language, 'code')
+        : (item.starter_code ?? ''),
+    tests: (item.tests ?? []).map(stripIds),
+  };
+  return isEvenSpread(list, total) ? spreadPoints([...list, imported], total) : [...list, imported];
+}
+
+/** Une reprise se compte là d'où vient l'exercice : la banque ou la communauté. */
+function countUse(origin) {
+  const url =
+    origin.type === 'community'
+      ? `/api/community/${origin.id}/used`
+      : `/api/bank/exercises/${origin.id}/used`;
+  api(url, { method: 'POST' }).catch(() => {});
 }
 
 /**
@@ -197,15 +234,34 @@ function Editor({ evaluationId, evaluation }) {
   const [searchParams] = useSearchParams();
   // À la création, l'enregistrement change l'URL et remonte l'éditeur : le
   // message voyage dans l'état de navigation pour ne pas être perdu.
-  const { state: arrival } = useLocation();
+  const location = useLocation();
+  const arrival = location.state;
   const { organization, user } = useAuth();
 
-  const [error, setError] = useState(null);
-  const [notice, setNotice] = useState(arrival?.notice ?? null);
+  // Arrivée depuis la page Banque (« Ajouter à une évaluation ») : l'exercice
+  // choisi est déjà sur la feuille, ses points pris sur le total ; il reste à
+  // enregistrer. Une épreuve déjà ouverte aux étudiants ne le reçoit pas.
+  const [arrivalImport] = useState(() => {
+    const open = !evaluation?.status || ['draft', 'scheduled'].includes(evaluation.status);
+    return open ? (arrival?.importer ?? null) : null;
+  });
+
+  const [error, setError] = useState(() =>
+    arrival?.importer && !arrivalImport
+      ? 'Cette évaluation n’accepte plus de nouvel exercice : choisissez un brouillon.'
+      : null,
+  );
+  const [notice, setNotice] = useState(() =>
+    arrivalImport
+      ? `« ${arrivalImport.exercise.title} » ajouté depuis la banque : enregistrez pour le garder.`
+      : (arrival?.notice ?? null),
+  );
   const [view, setView] = useState('teacher');
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() =>
+    arrivalImport ? (evaluation?.exercises?.length ?? 0) : null,
+  );
   const [ui, setUi] = useState({});
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(Boolean(arrivalImport));
   const [bankOpen, setBankOpen] = useState(false);
 
   const classrooms = useClassrooms();
@@ -214,9 +270,22 @@ function Editor({ evaluationId, evaluation }) {
   const disciplines = useDisciplines();
 
   const [form, setForm] = useState(() => formFrom(evaluation, searchParams.get('classe')));
-  const [exercises, setExercises] = useState(() =>
-    (evaluation?.exercises ?? []).map((e) => ({ ...e, tests: e.tests ?? [] })),
-  );
+  const [exercises, setExercises] = useState(() => {
+    const list = (evaluation?.exercises ?? []).map((e) => ({ ...e, tests: e.tests ?? [] }));
+    return arrivalImport
+      ? withImported(list, arrivalImport.exercise, Number(form.total_points) || 0)
+      : list;
+  });
+
+  // L'état de navigation est vidé aussitôt : recharger la page ne réimporte pas.
+  const arrivalHandled = useRef(false);
+  useEffect(() => {
+    if (!arrival?.importer || arrivalHandled.current) return;
+    arrivalHandled.current = true;
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    if (arrivalImport) countUse(arrivalImport.origin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const status = evaluation?.status;
   /* Avant l'ouverture, tout se modifie. Après la clôture, seul le corrigé
@@ -421,37 +490,12 @@ function Editor({ evaluationId, evaluation }) {
     setSelected(exercises.length);
   }
 
-  /**
-   * Import : copie complète de l'exercice, type et paramètres compris. Sans le
-   * `kind` ni les `settings`, un QCM ou une correspondance repartait en « code ».
-   *
-   * La banque ne fixe pas de points : l'exercice importé prend sa part du total
-   * comme un exercice nouveau (parts égales tant que personne n'a pesé un
-   * exercice plus qu'un autre, zéro sinon).
-   */
+  /** Le sélecteur de la banque, dans l'éditeur : l'exercice choisi rejoint la feuille. */
   function importFromBank(item) {
-    const kind = item.kind ?? 'code';
-    changeExercises((list) => {
-      const imported = {
-        id: null,
-        _key: newKey('e'),
-        title: item.title,
-        statement: item.statement,
-        language: item.language,
-        points: 0,
-        kind,
-        settings: item.settings ?? {},
-        starter_code:
-          kind === 'code' && !item.starter_code?.trim()
-            ? defaultStarter(item.language, 'code')
-            : (item.starter_code ?? ''),
-        tests: (item.tests ?? []).map(stripIds),
-      };
-      return isEvenSpread(list, total) ? spreadPoints([...list, imported], total) : [...list, imported];
-    });
+    changeExercises((list) => withImported(list, item, total));
     setSelected(exercises.length);
     setBankOpen(false);
-    api(`/api/bank/exercises/${item.id}/used`, { method: 'POST' }).catch(() => {});
+    countUse({ type: 'bank', id: item.id });
     setNotice(`« ${item.title} » importé depuis la banque.`);
   }
 
