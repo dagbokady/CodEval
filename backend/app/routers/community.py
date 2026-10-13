@@ -276,7 +276,8 @@ def list_items(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
-    filters = [_visible(user)]
+    # La communauté ne partage que des sujets complets.
+    filters = [_visible(user), CommunityItem.item_type == "subject"]
     if item_type:
         filters.append(CommunityItem.item_type == item_type)
     if language:
@@ -341,22 +342,17 @@ def list_items(
 
 @router.get("/sources")
 def publishable_sources(user: MemberUser, db: DbSession) -> dict:
-    """Ce que l'utilisateur peut publier : ce qu'il a rangé dans la banque
-    d'exercices et dans la banque d'évaluations (les modèles), tout
-    l'établissement pour l'administration. Une épreuve en cours d'usage ne se
-    publie pas directement : on la met d'abord en banque."""
-    bank_filters = [BankExercise.organization_id == user.organization_id]
+    """Ce que l'utilisateur peut publier : les sujets rangés dans la banque
+    d'évaluations (les modèles), tout l'établissement pour l'administration. Une
+    épreuve en cours d'usage ne se publie pas directement : on la met d'abord en
+    banque."""
     eval_filters = [
         Evaluation.organization_id == user.organization_id,
         Evaluation.is_template.is_(True),
     ]
     if user.role is Role.TEACHER:
-        bank_filters.append(BankExercise.author_id == user.id)
         eval_filters.append(Evaluation.teacher_id == user.id)
 
-    exercises = db.scalars(
-        select(BankExercise).where(*bank_filters).order_by(BankExercise.updated_at.desc())
-    )
     evaluations = list(
         db.scalars(select(Evaluation).where(*eval_filters).order_by(Evaluation.created_at.desc()))
     )
@@ -370,10 +366,6 @@ def publishable_sources(user: MemberUser, db: DbSession) -> dict:
             ).all()
         )
     return {
-        "exercises": [
-            {"id": e.id, "title": e.title, "kind": e.kind, "language": e.language}
-            for e in exercises
-        ],
         "evaluations": [
             {
                 "id": e.id,
@@ -459,7 +451,13 @@ def publish(payload: CommunityPublishIn, user: MemberUser, db: DbSession) -> Com
 def share(payload: CommunityShareIn, user: TeacherUser, db: DbSession) -> CommunityShareOut:
     """Ouvrir un exercice ou un sujet de sa banque à ses collègues de
     l'établissement (« organization ») ou à tous les enseignants (« all »), ou
-    cesser de le partager (« none »)."""
+    cesser de le partager (« none »). Un exercice seul ne s'y partage pas : la
+    communauté ne montre que des sujets complets."""
+    if payload.source_type == BANK_EXERCISE and payload.visibility != "none":
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "La communauté ne partage que des sujets complets",
+        )
     if payload.source_type == BANK_EXERCISE:
         source = db.scalar(
             select(BankExercise)

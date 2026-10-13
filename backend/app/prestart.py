@@ -2,8 +2,8 @@
 
 Pour les hébergeurs sans terminal (Render) : applique les migrations puis crée
 le compte d'administration si CODEVAL_ADMIN_EMAIL et CODEVAL_ADMIN_PASSWORD
-sont renseignées, puis publie dans la communauté les sujets de référence et
-leurs exercices (app.seed_community). Rejouable à chaque démarrage.
+sont renseignées, puis publie dans la communauté les trois sujets ESATIC
+(app.seed_community). Rejouable à chaque démarrage.
 """
 
 from __future__ import annotations

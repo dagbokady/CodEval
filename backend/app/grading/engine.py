@@ -243,7 +243,8 @@ def _grade_one_short(question: dict, given, share: float) -> tuple[float, dict]:
 def _grade_questions(answer: str, exercise: Exercise) -> ExerciseOutcome:
     """QCM, correspondance et question-réponse : plusieurs questions par exercice.
 
-    Le barème de l'exercice se partage également entre ses questions ; chacune est
+    Le barème de l'exercice se partage également entre ses questions, sauf si
+    chacune porte ses points (« main.c (04 pts) », « commandes (03 pts) ») ; chacune est
     corrigée par la règle de son type, et le détail garde son rang et son intitulé
     pour que la copie corrigée se lise question par question.
     """
@@ -257,10 +258,15 @@ def _grade_questions(answer: str, exercise: Exercise) -> ExerciseOutcome:
         return ExerciseOutcome(ResultStatus.OK, 0.0, max_score, "", [], 0)
 
     given = answers_of(kind, answer, len(questions))
-    share = max_score / len(questions)
+    weights = [question.get("points") for question in questions]
+    if all(isinstance(w, (int, float)) and not isinstance(w, bool) and w > 0 for w in weights):
+        shares = [max_score * w / sum(weights) for w in weights]
+    else:
+        shares = [max_score / len(questions)] * len(questions)
     score = 0.0
     details = []
     for rank, question in enumerate(questions):
+        share = shares[rank]
         if kind == "qcm":
             part, detail = _grade_one_qcm(question, given[rank], share)
         elif kind == "matching":

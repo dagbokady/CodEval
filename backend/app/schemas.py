@@ -614,9 +614,9 @@ class BankExerciseOut(ORMModel):
 
 # ----- Communauté -----
 class CommunityPublishIn(BaseModel):
-    """Publier dans la communauté un exercice de la banque ou une épreuve."""
+    """Publier dans la communauté un sujet complet de la banque d'évaluations."""
 
-    source_type: Literal["bank_exercise", "evaluation"]
+    source_type: Literal["evaluation"] = "evaluation"
     source_id: int
     title: str | None = Field(default=None, min_length=2, max_length=200)
     description: str = Field(default="", max_length=2000)

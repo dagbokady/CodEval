@@ -76,10 +76,7 @@ export default function PublishDialog({ open, onClose, onPublished }) {
               setSourceType(value);
               setSourceId('');
             }}
-            options={[
-              { value: 'evaluation', label: 'Un sujet' },
-              { value: 'exercise', label: 'Un exercice' },
-            ]}
+            options={[{ value: 'evaluation', label: 'Un sujet complet' }]}
           />
         </Field>
 

@@ -720,7 +720,8 @@ function Preview({
           )}
         </div>
 
-        {!fromCommunity && (
+        {/* La communauté ne partage que des sujets complets. */}
+        {row.source === 'template' && (
           <div className="banque-partage">
             <span className="banque-partage-titre" id="banque-partage">
               Partagé avec
