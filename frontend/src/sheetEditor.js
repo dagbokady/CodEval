@@ -122,8 +122,11 @@ export function withQuestions(settings, questions) {
  * Ce qui manque à un exercice pour être corrigé juste. Vide : il est prêt.
  * Chaque message nomme l'endroit à reprendre, pour que l'enseignant y aille
  * sans chercher.
+ *
+ * `points: false` : un exercice de la banque n'a pas de points, ils se
+ * décident dans l'évaluation qui l'importe.
  */
-export function exerciseIssues(exercise) {
+export function exerciseIssues(exercise, { points = true } = {}) {
   const issues = [];
   const kind = exercise.kind ?? 'code';
   if (!String(exercise.title ?? '').trim()) issues.push('Intitulé manquant');
@@ -187,6 +190,6 @@ export function exerciseIssues(exercise) {
     else if (!expected) issues.push('Aucune case attendue dans le tableau');
   }
 
-  if (!(Number(exercise.points) > 0)) issues.push('Aucun point');
+  if (points && !(Number(exercise.points) > 0)) issues.push('Aucun point');
   return issues;
 }

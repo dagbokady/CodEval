@@ -3,24 +3,21 @@
  *
  * Sans exercice sélectionné, il règle l'épreuve (ouverture, type, modalités de
  * passage) et dresse la liste des exercices avec ce qui leur manque. Un
- * exercice sélectionné, il montre ses réglages : comparaison des sorties,
- * fichiers de départ, outils autorisés, barème détaillé, corrigé à montrer
- * aux étudiants, et les gestes pour le déplacer, le copier ou le retirer.
+ * exercice sélectionné, il montre ce qui lui manque, son barème détaillé, le
+ * corrigé à montrer aux étudiants, et les gestes pour le déplacer, le copier ou
+ * le retirer. La comparaison des sorties, le code de départ et les outils
+ * autorisés se règlent sur la feuille, là où ils servent.
  */
 
 import { useState } from 'react';
 
 import PointsEditor from './PointsEditor';
-import ProjectFilesEditor from './ProjectFilesEditor';
 import SolutionEditor from './SolutionEditor';
-import ToolboxEditor from './ToolboxEditor';
 import { Button, Field, Segmented } from './ui';
-import { DEFAULT_ELEMENTS } from '../algoVocabulary';
-import { COMPARISONS } from '../bareme';
 import { EVALUATION_KINDS, RULE_SWITCHES } from '../evaluationDefaults';
 import { exerciseType, needsTests } from '../exerciseTypes';
 import { questionsOf } from '../questions';
-import { comparisonOf, exerciseIssues, parseQcmText, withQuestions } from '../sheetEditor';
+import { exerciseIssues, parseQcmText, withQuestions } from '../sheetEditor';
 import { traceColumns } from '../trace';
 
 function fmt(value) {
@@ -261,12 +258,9 @@ function ExercisePanel({
   onRemove,
   onToBank,
   toBankPending,
-  ui,
-  onUi,
 }) {
   const kind = exercise.kind ?? 'code';
   const key = exercise._key ?? exercise.id ?? `e-${index}`;
-  const exerciseUi = ui[key] ?? {};
   const issues = exerciseIssues(exercise);
   const change = (patch) => onExercise(index, patch);
 
@@ -295,86 +289,13 @@ function ExercisePanel({
         <p className="panneau-aide">{exerciseType(kind).gradingNote}</p>
       </section>
 
-      {needsTests(kind) && (
-        <ComparisonSection
-          exercise={exercise}
-          change={change}
-          canEdit={canEditCorrection}
-          args={exerciseUi.args ?? (exercise.tests ?? []).some((t) => (t.argv ?? []).length > 0)}
-          onArgs={(args) => onUi(key, { args })}
-        />
-      )}
-
-      {kind === 'code' && (
-        <section className="panneau-section">
-          <span className="panneau-sous-titre">Fichiers de départ</span>
-          <ProjectFilesEditor
-            exercise={exercise}
-            name={`fichiers-${key}`}
-            readOnly={!canEditSubject}
-            onChange={(patch) => change(patch)}
-          />
-        </section>
-      )}
-
-      {kind === 'algo' && (
-        <section className="panneau-section">
-          <span className="panneau-sous-titre">Outils autorisés</span>
-          <ToolboxEditor
-            value={exercise.settings?.allowed_elements ?? DEFAULT_ELEMENTS}
-            readOnly={!canEditSubject}
-            onChange={(allowed) =>
-              change((ex) => ({ settings: { ...ex.settings, allowed_elements: allowed } }))
-            }
-            ecritureCours={Boolean(exercise.settings?.ecriture_cours)}
-            onEcritureCours={(ecriture_cours) =>
-              change((ex) => ({ settings: { ...ex.settings, ecriture_cours } }))
-            }
-          />
-        </section>
-      )}
-
-      {needsTests(kind) && (
-        <section className="panneau-section">
-          <span className="panneau-sous-titre">Barème de l’exercice</span>
-          <PointsEditor
-            exercise={exercise}
-            readOnly={!canEditCorrection}
-            showTotal={false}
-            onChange={(next) => change(() => next)}
-          />
-        </section>
-      )}
-
-      {kind === 'trace' && <TraceColumnsSection exercise={exercise} change={change} canEdit={canEditSubject} />}
-      {kind === 'qcm' && <QcmPasteSection change={change} canEdit={canEditSubject} />}
-      {kind === 'short' && (
-        <ShortSection
-          exercise={exercise}
-          change={change}
-          canEditSubject={canEditSubject}
-          canEditCorrection={canEditCorrection}
-        />
-      )}
-      {(kind === 'truefalse' || kind === 'matching') && (
-        <section className="panneau-section">
-          <p className="panneau-aide">
-            {kind === 'truefalse'
-              ? 'Tout se règle sur la feuille : entourez V ou F en face de chaque affirmation.'
-              : 'Tout se règle sur la feuille : écrivez en rouge la bonne correspondance de chaque élément. Chaque étudiant voit les deux colonnes mélangées, dans un ordre qui lui est propre.'}
-          </p>
-        </section>
-      )}
-
-      <section className="panneau-section">
-        <SolutionEditor
-          kind={kind}
-          name={`corrige-${key}`}
-          settings={exercise.settings ?? {}}
-          readOnly={!canEditCorrection}
-          onChange={(settings) => change({ settings })}
-        />
-      </section>
+      <ExerciseSettings
+        exercise={exercise}
+        change={change}
+        name={String(key)}
+        canEditSubject={canEditSubject}
+        canEditCorrection={canEditCorrection}
+      />
 
       {canEditSubject && (
         <section className="panneau-section">
@@ -414,41 +335,63 @@ function ExercisePanel({
 }
 
 /**
- * Une seule comparaison pour tout l'exercice : c'est presque toujours la même
- * d'un test à l'autre. Des tests réglés différemment (éditeur détaillé) sont
- * signalés plutôt que réécrits en douce.
+ * Les réglages d'un exercice qui n'ont pas de place sur la feuille, selon son
+ * type. Partagés par l'éditeur d'évaluation et la banque d'exercices ; la
+ * banque n'a pas de points (`showPoints`), ils se décident dans l'évaluation.
  */
-function ComparisonSection({ exercise, change, canEdit, args, onArgs }) {
-  const current = comparisonOf(exercise);
-  const hasTests = (exercise.tests ?? []).length > 0;
-  const chosen = COMPARISONS.find((c) => c.key === current);
-
+export function ExerciseSettings({
+  exercise,
+  change,
+  name,
+  canEditSubject,
+  canEditCorrection,
+  showPoints = true,
+}) {
+  const kind = exercise.kind ?? 'code';
   return (
-    <section className="panneau-section">
-      <Field label="Comparer la sortie" id="comparaison" hint={chosen ? `${chosen.hint} : ${chosen.exemple}` : 'Les tests ne comparent pas tous de la même façon.'}>
-        <select
-          id="comparaison"
-          value={current}
-          disabled={!canEdit || !hasTests}
-          onChange={(e) =>
-            change((ex) => ({ tests: (ex.tests ?? []).map((t) => ({ ...t, comparison: e.target.value })) }))
-          }
-        >
-          {current === 'mixed' && <option value="mixed">Selon le test</option>}
-          {COMPARISONS.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {(exercise.kind ?? 'code') === 'code' && (
-        <label className="panneau-coche">
-          <input type="checkbox" checked={Boolean(args)} disabled={!canEdit} onChange={(e) => onArgs(e.target.checked)} />
-          Le programme reçoit des arguments (argv)
-        </label>
+    <>
+      {showPoints && needsTests(kind) && (
+        <section className="panneau-section">
+          <span className="panneau-sous-titre">Barème de l’exercice</span>
+          <PointsEditor
+            exercise={exercise}
+            readOnly={!canEditCorrection}
+            showTotal={false}
+            onChange={(next) => change(() => next)}
+          />
+        </section>
       )}
-    </section>
+
+      {kind === 'trace' && <TraceColumnsSection exercise={exercise} change={change} canEdit={canEditSubject} />}
+      {kind === 'qcm' && <QcmPasteSection change={change} canEdit={canEditSubject} />}
+      {kind === 'short' && (
+        <ShortSection
+          exercise={exercise}
+          change={change}
+          canEditSubject={canEditSubject}
+          canEditCorrection={canEditCorrection}
+        />
+      )}
+      {(kind === 'truefalse' || kind === 'matching') && (
+        <section className="panneau-section">
+          <p className="panneau-aide">
+            {kind === 'truefalse'
+              ? 'Tout se règle sur la feuille : entourez V ou F en face de chaque affirmation.'
+              : 'Tout se règle sur la feuille : écrivez en rouge la bonne correspondance de chaque élément. Chaque étudiant voit les deux colonnes mélangées, dans un ordre qui lui est propre.'}
+          </p>
+        </section>
+      )}
+
+      <section className="panneau-section">
+        <SolutionEditor
+          kind={kind}
+          name={`corrige-${name}`}
+          settings={exercise.settings ?? {}}
+          readOnly={!canEditCorrection}
+          onChange={(settings) => change({ settings })}
+        />
+      </section>
+    </>
   );
 }
 
