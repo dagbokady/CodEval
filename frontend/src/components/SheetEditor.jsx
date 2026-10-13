@@ -7,9 +7,12 @@
  * de la feuille. Le corrigé, qu'il ne verra pas (bonnes réponses, jeux de tests,
  * cases attendues), s'écrit à l'encre rouge du correcteur, au même endroit.
  *
- * Les réglages qui n'ont pas de place sur une feuille (comparaison des sorties,
- * fichiers de départ, outils autorisés…) vivent dans le panneau voisin
- * (`SheetPanel`), qui suit l'exercice sélectionné.
+ * Ce qui se règle rarement (code de départ, outils autorisés, éditeurs
+ * détaillés) s'ouvre sur place, derrière un lien. Le panneau voisin
+ * (`SheetPanel`) ne garde que ce qui n'a pas de place sur une feuille.
+ *
+ * `ExerciseOnSheet` sert aussi à la banque d'exercices : un exercice s'y écrit
+ * exactement comme dans une évaluation, sans numéro ni points.
  */
 
 import { useState } from 'react';
@@ -17,10 +20,13 @@ import { useState } from 'react';
 import BaremeEditor from './BaremeEditor';
 import CodeBlock from './CodeBlock';
 import GradeMark from './GradeMark';
+import ProjectFilesEditor from './ProjectFilesEditor';
 import TestsEditor from './TestsEditor';
+import ToolboxEditor from './ToolboxEditor';
 import { Button } from './ui';
-import { DEFAULT_ELEMENTS } from '../algoVocabulary';
+import { DEFAULT_ELEMENTS, toolGroups } from '../algoVocabulary';
 import {
+  COMPARISONS,
   CRITERION_PROMPTS,
   DECLARATION_LANGUAGES,
   callableCriteria,
@@ -41,7 +47,15 @@ import {
 import { formatExamDate, formatExamDuration } from '../format';
 import { isProject, projectFiles, starterText } from '../project';
 import { blankQuestion, questionsOf } from '../questions';
-import { EMPTY_TEST, newKey, newProgramTest, rowsFor, stdinOf, withQuestions } from '../sheetEditor';
+import {
+  EMPTY_TEST,
+  comparisonOf,
+  newKey,
+  newProgramTest,
+  rowsFor,
+  stdinOf,
+  withQuestions,
+} from '../sheetEditor';
 import { MAX_COLUMNS, MAX_ROWS, traceColumns, traceRows } from '../trace';
 
 const DURATIONS = [15, 20, 30, 45, 60, 90, 120, 150, 180, 240];
@@ -373,10 +387,14 @@ function EditableHeader({
   );
 }
 
-function ExerciseOnSheet({
+/**
+ * Un exercice sur la feuille. Sans `index`, il est seul (banque d'exercices) :
+ * ni numéro ni points, ceux-ci se décident dans l'évaluation qui l'importe.
+ */
+export function ExerciseOnSheet({
   exercise,
-  index,
-  selected,
+  index = null,
+  selected = false,
   onSelect,
   onChange,
   canEditSubject,
@@ -385,47 +403,55 @@ function ExerciseOnSheet({
   onUi,
 }) {
   const kind = exercise.kind ?? 'code';
-  const number = index + 1;
+  const numbered = index !== null;
+  const name = numbered ? `Exercice ${index + 1}` : 'Exercice';
+  const ofName = numbered ? `de l’exercice ${index + 1}` : 'de l’exercice';
 
   return (
     <section
       className={`feuille-ex ${selected ? 'est-choisi' : ''}`.trim()}
-      aria-label={`Exercice ${number}`}
+      aria-label={name}
       data-exercise
       onFocus={onSelect}
     >
       <div className="feuille-ex-tete sujet-question-tete">
-        <button type="button" className="feuille-ex-num" onClick={onSelect}>
-          Exercice {number}
-        </button>
+        {onSelect ? (
+          <button type="button" className="feuille-ex-num" onClick={onSelect}>
+            {name}
+          </button>
+        ) : (
+          <span className="feuille-ex-num">{name}</span>
+        )}
         <span aria-hidden="true">:</span>
         <input
           className="ink feuille-ex-titre"
-          aria-label={`Intitulé de l’exercice ${number}`}
+          aria-label={`Intitulé ${ofName}`}
           value={exercise.title}
           disabled={!canEditSubject}
           placeholder="Intitulé de l’exercice"
           onChange={(e) => onChange({ title: e.target.value })}
         />
-        <label className="feuille-ex-pts">
-          <input
-            className="ink"
-            type="number"
-            min="0"
-            step="0.5"
-            aria-label={`Points de l’exercice ${number}`}
-            value={exercise.points}
-            disabled={!canEditCorrection}
-            onChange={(e) => onChange({ points: e.target.value })}
-          />{' '}
-          pts
-        </label>
+        {numbered && (
+          <label className="feuille-ex-pts">
+            <input
+              className="ink"
+              type="number"
+              min="0"
+              step="0.5"
+              aria-label={`Points ${ofName}`}
+              value={exercise.points}
+              disabled={!canEditCorrection}
+              onChange={(e) => onChange({ points: e.target.value })}
+            />{' '}
+            pts
+          </label>
+        )}
       </div>
 
       {!hasQuestions(kind) && (
         <AutoText
           className="ink sujet-enonce"
-          aria-label={`Énoncé de l’exercice ${number}`}
+          aria-label={`Énoncé ${ofName}`}
           value={exercise.statement}
           width={80}
           disabled={!canEditSubject}
@@ -443,12 +469,11 @@ function ExerciseOnSheet({
       {(kind === 'code' || kind === 'algo') && (
         <Criteria exercise={exercise} onChange={onChange} canEdit={canEditCorrection} ui={ui} onUi={onUi} />
       )}
-      {kind === 'code' && <CodeEnvironment exercise={exercise} />}
+      {kind === 'code' && (
+        <CodeEnvironment exercise={exercise} onChange={onChange} canEdit={canEditSubject} ui={ui} onUi={onUi} />
+      )}
       {kind === 'algo' && (
-        <p className="feuille-ligne-info feuille-ligne-info--discrete">
-          Outils autorisés : {(exercise.settings?.allowed_elements ?? DEFAULT_ELEMENTS).length}{' '}
-          éléments du cours, réglés dans le panneau.
-        </p>
+        <AllowedTools exercise={exercise} onChange={onChange} canEdit={canEditSubject} ui={ui} onUi={onUi} />
       )}
       {(kind === 'code' || kind === 'algo') && (
         <TestsCorrige
@@ -538,32 +563,34 @@ function Criteria({ exercise, onChange, canEdit, ui, onUi }) {
         <PasteDeclarations
           onAdd={(found) => setCriteria([...criteriaOf(exercise), ...found])}
           onClose={() => onUi({ paste: false })}
+          onDetail={() => onUi({ paste: false, detailCriteria: true })}
         />
       )}
 
-      {canEdit && !ui.paste && (
+      {/* Un seul geste : coller du C quand on sait le lire, l'éditeur détaillé
+          sinon (algorithme, autres langages). */}
+      {canEdit && !ui.paste && !ui.detailCriteria && (
         <div className="feuille-gestes" style={{ margin: '0 0 0.6em 2.2em' }}>
-          {pasteable && (
-            <button type="button" className="feuille-ajout" onClick={() => onUi({ paste: true })}>
-              + Déclarations exigées (coller du C)
-            </button>
-          )}
           <button
             type="button"
             className="feuille-ajout"
-            onClick={() => onUi({ detailCriteria: !ui.detailCriteria })}
+            onClick={() => onUi(pasteable ? { paste: true } : { detailCriteria: true })}
           >
-            {ui.detailCriteria
-              ? 'Fermer l’éditeur détaillé'
-              : kind === 'algo'
-                ? '+ Ce que l’algorithme doit contenir'
-                : 'Éditeur détaillé'}
+            {kind === 'algo'
+              ? '+ Ce que l’algorithme doit contenir'
+              : '+ Exiger une fonction, une structure ou une variable'}
           </button>
         </div>
       )}
 
       {canEdit && ui.detailCriteria && (
         <div className="feuille-corrige feuille-corrige--detail">
+          <div className="feuille-corrige-tete">
+            <span className="feuille-sous-titre">Ce que la copie doit contenir</span>
+            <button type="button" className="feuille-ajout" onClick={() => onUi({ detailCriteria: false })}>
+              Fermer
+            </button>
+          </div>
           <BaremeEditor exercise={exercise} criteria={criteria} onCriteriaChange={setCriteria} />
         </div>
       )}
@@ -571,7 +598,7 @@ function Criteria({ exercise, onChange, canEdit, ui, onUi }) {
   );
 }
 
-function PasteDeclarations({ onAdd, onClose }) {
+function PasteDeclarations({ onAdd, onClose, onDetail }) {
   const [text, setText] = useState('');
   const [unread, setUnread] = useState([]);
 
@@ -589,8 +616,11 @@ function PasteDeclarations({ onAdd, onClose }) {
 
   return (
     <div className="feuille-coller">
+      <label className="feuille-coller-aide" htmlFor="coller-declarations">
+        Collez les déclarations exigées, en C : la copie devra les contenir.
+      </label>
       <textarea
-        aria-label="Déclarations C à exiger"
+        id="coller-declarations"
         autoFocus
         spellCheck={false}
         value={text}
@@ -608,6 +638,9 @@ function PasteDeclarations({ onAdd, onClose }) {
         <Button size="small" disabled={!text.trim()} onClick={add}>
           Ajouter
         </Button>
+        <button type="button" className="feuille-ajout" onClick={onDetail}>
+          Éditeur détaillé
+        </button>
         <button type="button" className="feuille-ajout" onClick={onClose}>
           Fermer
         </button>
@@ -616,18 +649,90 @@ function PasteDeclarations({ onAdd, onClose }) {
   );
 }
 
-/** Le code de départ, tel que l'étudiant le trouvera : il se règle dans le panneau. */
-function CodeEnvironment({ exercise }) {
+/**
+ * Le code de départ, tel que l'étudiant le trouvera. Déjà rempli avec le
+ * squelette du langage : « Modifier » ouvre sur place l'éditeur de fichiers
+ * (un seul fichier, ou un projet découpé en .h et .c).
+ */
+function CodeEnvironment({ exercise, onChange, canEdit, ui, onUi }) {
+  const [name] = useState(() => newKey('depart'));
   const starter = starterText(exercise);
+  const project = isProject(exercise);
+
+  if (canEdit && ui.starter) {
+    return (
+      <div className="feuille-corrige feuille-corrige--detail">
+        <div className="feuille-corrige-tete">
+          <span className="feuille-sous-titre">Code de départ</span>
+          <button type="button" className="feuille-ajout" onClick={() => onUi({ starter: false })}>
+            Fermer
+          </button>
+        </div>
+        <ProjectFilesEditor exercise={exercise} name={name} onChange={onChange} />
+      </div>
+    );
+  }
+
   return (
     <>
-      {isProject(exercise) && (
+      {project && (
         <p className="feuille-ligne-info">
           Fichiers du projet : {projectFiles(exercise).map((f) => f.name).join(', ')}.
         </p>
       )}
       {starter.trim() && (
         <CodeBlock className="sujet-code" code={starter} language={exercise.language} />
+      )}
+      {canEdit && (
+        <div className="feuille-gestes" style={{ margin: '0 0 0.6em 1.2em' }}>
+          <button type="button" className="feuille-ajout" onClick={() => onUi({ starter: true })}>
+            {project
+              ? 'Modifier les fichiers du projet'
+              : starter.trim()
+                ? 'Modifier le code de départ'
+                : '+ Code de départ'}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Les outils qu'un algorithme a le droit de poser, nommés sur une ligne.
+ * « Modifier » ouvre la palette sur place.
+ */
+function AllowedTools({ exercise, onChange, canEdit, ui, onUi }) {
+  const allowed = exercise.settings?.allowed_elements ?? DEFAULT_ELEMENTS;
+  const effective = allowed.length ? allowed : DEFAULT_ELEMENTS;
+  const labels = toolGroups()
+    .flatMap((group) => group.elements)
+    .filter((element) => effective.includes(element.key))
+    .map((element) => element.label);
+
+  return (
+    <>
+      <div className="feuille-ligne-info feuille-outils">
+        <span>
+          Outils autorisés : <span className="feuille-outils-liste">{labels.join(', ')}</span>
+        </span>
+        {canEdit && (
+          <button type="button" className="feuille-ajout" onClick={() => onUi({ tools: !ui.tools })}>
+            {ui.tools ? 'Fermer' : 'Modifier'}
+          </button>
+        )}
+      </div>
+      {canEdit && ui.tools && (
+        <div className="feuille-corrige feuille-corrige--detail">
+          <ToolboxEditor
+            value={allowed}
+            onChange={(next) => onChange((ex) => ({ settings: { ...ex.settings, allowed_elements: next } }))}
+            ecritureCours={Boolean(exercise.settings?.ecriture_cours)}
+            onEcritureCours={(ecriture_cours) =>
+              onChange((ex) => ({ settings: { ...ex.settings, ecriture_cours } }))
+            }
+          />
+        </div>
       )}
     </>
   );
@@ -650,6 +755,10 @@ function callLine(test, callable) {
  * test du programme entier tient sur une ligne (ce qu'on tape, ce qui doit
  * s'afficher) ; un test qui appelle une fonction, ou dont on veut régler les
  * types, passe par l'éditeur détaillé.
+ *
+ * Sous les tests, ce qui dit comment les lire : la comparaison des sorties
+ * (une seule pour tout l'exercice, c'est presque toujours la même d'un test à
+ * l'autre) et, pour un programme, s'il reçoit des arguments.
  */
 function TestsCorrige({ exercise, onChange, canEdit, ui, onUi }) {
   const tests = exercise.tests ?? [];
@@ -657,14 +766,19 @@ function TestsCorrige({ exercise, onChange, canEdit, ui, onUi }) {
   const indexed = tests.map((test, index) => ({ test, index }));
   const program = indexed.filter(({ test }) => !test.target_id);
   const calls = indexed.filter(({ test }) => test.target_id);
-  const showArgs =
-    (exercise.kind ?? 'code') === 'code' &&
-    (ui.args ?? tests.some((t) => (t.argv ?? []).length > 0));
+  const isCode = (exercise.kind ?? 'code') === 'code';
+  const showArgs = isCode && (ui.args ?? tests.some((t) => (t.argv ?? []).length > 0));
+  const comparison = comparisonOf(exercise);
+  const chosen = COMPARISONS.find((c) => c.key === comparison);
 
   const setTest = (index, patch) =>
     onChange((ex) => ({ tests: ex.tests.map((t, j) => (j === index ? { ...t, ...patch } : t)) }));
   const removeTest = (index) => onChange((ex) => ({ tests: ex.tests.filter((_, j) => j !== index) }));
   const addTest = () => onChange((ex) => ({ tests: [...(ex.tests ?? []), newProgramTest(ex)] }));
+  // Des tests réglés différemment (éditeur détaillé) sont signalés plutôt que
+  // réécrits en douce : « Selon le test » ne s'écrit pas, il se constate.
+  const setComparison = (value) =>
+    onChange((ex) => ({ tests: (ex.tests ?? []).map((t) => ({ ...t, comparison: value })) }));
 
   if (ui.detailTests && canEdit) {
     return (
@@ -780,7 +894,45 @@ function TestsCorrige({ exercise, onChange, canEdit, ui, onUi }) {
           <button type="button" className="feuille-ajout" onClick={addTest}>
             + Ajouter un test
           </button>
+          {tests.length > 0 && (
+            <label className="feuille-option">
+              Comparer
+              <select
+                className="feuille-select"
+                value={comparison}
+                onChange={(e) => setComparison(e.target.value)}
+              >
+                {comparison === 'mixed' && (
+                  <option value="mixed" disabled>
+                    Selon le test
+                  </option>
+                )}
+                {COMPARISONS.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {isCode && (
+            <label className="feuille-option">
+              <input
+                type="checkbox"
+                checked={Boolean(showArgs)}
+                onChange={(e) => onUi({ args: e.target.checked })}
+              />
+              Le programme reçoit des arguments
+            </label>
+          )}
         </div>
+      )}
+      {canEdit && tests.length > 0 && (
+        <span className="feuille-aide-corrige">
+          {chosen
+            ? `${chosen.label} : ${chosen.hint} (${chosen.exemple}).`
+            : 'Les tests ne comparent pas tous de la même façon : choisissez-en une pour les aligner.'}
+        </span>
       )}
     </div>
   );

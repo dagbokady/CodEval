@@ -1,43 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAction, useBankExercises, useLanguages, useSubjects } from '../../api/hooks';
 import { useAuth } from '../../auth';
-import { DEFAULT_ELEMENTS } from '../../algoVocabulary';
 import { defaultStarter, isUntouchedStarter } from '../../starterCode';
-import { KIND_LABELS, exerciseType, hasQuestions, needsTests } from '../../exerciseTypes';
-import BaremeEditor from '../../components/BaremeEditor';
-import PointsEditor from '../../components/PointsEditor';
-import ToolboxEditor from '../../components/ToolboxEditor';
-import TestsEditor from '../../components/TestsEditor';
-import SolutionEditor from '../../components/SolutionEditor';
-import ProjectFilesEditor from '../../components/ProjectFilesEditor';
-import { isProject } from '../../project';
-import { autoDistribute, criteriaOf, isSimpleScoring } from '../../bareme';
+import { KIND_LABELS, exerciseType, needsTests, typeFamilies, usesLanguage } from '../../exerciseTypes';
+import { autoDistribute, isSimpleScoring } from '../../bareme';
+import { exerciseIssues } from '../../sheetEditor';
+import { ExerciseOnSheet } from '../../components/SheetEditor';
+import { ExerciseSettings } from '../../components/SheetPanel';
 import { SheetExercise } from '../../components/SubjectSheet';
-import {
-  QuestionListEditor,
-  TraceEditor,
-  TrueFalseEditor,
-  TypePicker,
-} from '../../components/QuestionEditors';
 import {
   Alert,
   Button,
   Chips,
-  Disclosure,
   EmptyState,
-  Field,
   Loading,
   PageHeader,
   Pagination,
+  Segmented,
   Tag,
 } from '../../components/ui';
+import '../../styles/feuille.css';
+
+/**
+ * La banque d'exercices : des exercices prêts à reprendre dans une évaluation.
+ *
+ * Un exercice s'y écrit comme dans l'éditeur d'évaluation, sur la feuille et
+ * d'un seul écran : l'énoncé à l'encre de la feuille, le corrigé à l'encre
+ * rouge au même endroit, ce qui n'a pas de place sur un sujet dans le panneau
+ * voisin. Il n'y a pas de points : ils se décident dans l'évaluation qui
+ * importe l'exercice, où ils se répartissent avec ceux des autres.
+ */
 
 const SCOPES = [
   { value: 'mine', label: 'Mes exercices' },
   { value: 'shared', label: 'Partagés' },
 ];
 
+/**
+ * Un exercice neuf. Ses points restent ceux que le serveur donne par défaut :
+ * ils ne s'affichent nulle part ici, mais le barème simplifié des tests s'en
+ * sert pour se répartir.
+ */
 const EMPTY = {
   title: '',
   statement: '',
@@ -53,58 +57,6 @@ const EMPTY = {
 };
 
 /**
- * Le titre de chaque étape de l'assistant, dans l'ordre où on les traverse.
- *
- * Un exercice pratique se construit toujours dans le même ordre : ce qu'est
- * l'exercice et l'environnement donné à l'apprenant, puis la correction (ce que
- * la copie doit contenir, les tests, la comparaison), et enfin ce que tout cela
- * vaut. L'ordre ne change pas, mais il tient sur trois écrans au lieu de six :
- * chaque écran regroupe ce qui s'écrit d'un même geste. Seul le bloc
- * d'environnement diffère : un exercice de code se donne avec son squelette de
- * départ, un exercice algorithmique se règle par les outils qu'on y autorise.
- *
- * Les points viennent toujours en dernier, déjà répartis à parts égales : on ne
- * les touche que pour peser une ligne plus qu'une autre.
- */
-const PRACTICAL_STEPS = {
-  1: 'énoncé et environnement',
-  2: 'correction',
-  3: 'points',
-};
-
-const QUESTION_STEPS = {
-  1: 'énoncé et questions',
-  2: 'points',
-};
-
-function stepsOf(kind) {
-  return needsTests(kind) ? PRACTICAL_STEPS : QUESTION_STEPS;
-}
-
-function stepLabel(kind, step) {
-  return stepsOf(kind)[step];
-}
-
-/** La dernière étape (celle des points) dépend du type d'exercice. */
-function lastStep(kind) {
-  return Object.keys(stepsOf(kind)).length;
-}
-
-const EMPTY_TEST = {
-  name: 'Test',
-  kind: 'official',
-  target_id: null,
-  input_types: [],
-  expected_type: 'string',
-  args: [],
-  stdin: '',
-  expected_stdout: '',
-  comparison: 'trim',
-  points: 1,
-  timeout_ms: 2000,
-};
-
-/**
  * Le squelette du langage suit le langage choisi, tant que l'enseignant ne l'a pas
  * réécrit : sinon on écraserait son propre code de départ.
  */
@@ -117,45 +69,47 @@ function withLanguage(form, language) {
 
 /**
  * Changer de type refait l'exercice à neuf : ses paramètres n'ont de sens que
- * pour le type qui les a créés, et le code de départ qu'en mode « code ».
+ * pour le type qui les a créés. Un squelette resté intact suit le type (celui
+ * du langage pour du code, rien pour un algorithme) ; un code de départ réécrit
+ * par l'enseignant reste, tant que le type est pratique.
  */
 function withKind(form, kind) {
-  const starter =
-    kind === 'code' && isUntouchedStarter(form.starter_code)
-      ? defaultStarter(form.language, 'code')
-      : kind === 'algo'
-        ? form.starter_code
-        : '';
+  const starter = isUntouchedStarter(form.starter_code)
+    ? defaultStarter(form.language, kind)
+    : needsTests(kind)
+      ? form.starter_code
+      : '';
   return { ...form, kind, settings: exerciseType(kind).defaults(), starter_code: starter };
 }
 
-/**
- * Aperçu du sujet, à droite de l'éditeur : la feuille telle que l'apprenant la
- * recevra, mise à jour à chaque frappe. Elle ne montre que ce qui est déjà
- * saisi : c'est le seul moyen de voir la mise en page d'un exercice avant de
- * l'enregistrer.
- */
-function ExercisePreview({ form }) {
-  const exercise = {
-    ...form,
-    points: Number(form.points) || 0,
-    settings: form.settings ?? {},
-    starter_code: form.starter_code ?? '',
-    tests: form.tests ?? [],
+/** Ce que le serveur reçoit : ni clés d'affichage, ni nombres saisis en texte. */
+function payloadOf(form) {
+  const withTests = needsTests(form.kind);
+  // Le barème simplifié se recalcule à l'enregistrement, comme dans l'éditeur
+  // d'évaluation : un test ajouté pèse sa part.
+  const noté = isSimpleScoring(form) ? autoDistribute({ ...form, tests: form.tests ?? [] }) : form;
+  return {
+    title: form.title.trim(),
+    statement: form.statement,
+    language: form.language,
+    points: Number(form.points) || EMPTY.points,
+    starter_code: withTests ? form.starter_code : '',
+    kind: form.kind,
+    settings: noté.settings,
+    subject_id: form.subject_id === '' ? null : Number(form.subject_id),
+    tags: form.tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+    is_shared: form.is_shared,
+    tests: withTests
+      ? (noté.tests ?? []).map((test) => {
+          const copy = { ...test };
+          delete copy._key;
+          return { ...copy, points: Number(test.points), timeout_ms: Number(test.timeout_ms) };
+        })
+      : [],
   };
-  return (
-    <aside className="editeur-apercu" aria-label="Aperçu du sujet">
-      <div className="editeur-apercu-titre">Aperçu du sujet</div>
-      <div className="editeur-apercu-feuille">
-        <div className="sujet">
-          {/* Sans rang : un exercice de la banque n'a pas encore de place dans un sujet. */}
-          {/* showTests : l'enseignant doit voir ses jeux de tests prendre place
-              sur la feuille pendant qu'il les écrit. */}
-          <SheetExercise exercise={exercise} showAnswerZone={false} showTests />
-        </div>
-      </div>
-    </aside>
-  );
 }
 
 export default function BankPage() {
@@ -164,100 +118,63 @@ export default function BankPage() {
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [form, setForm] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [typeChoice, setTypeChoice] = useState(false);
-  const [step, setStep] = useState(1);
 
-  const subjects = useSubjects();
-  const languages = useLanguages();
   const bank = useBankExercises({ q: search, kind: kindFilter, scope: scope ?? 'all', page });
-
-  const save = useAction(
-    ({ id, body }) =>
-      id
-        ? api(`/api/bank/exercises/${id}`, { method: 'PUT', body })
-        : api('/api/bank/exercises', { method: 'POST', body }),
-    [['bank']],
-  );
   const remove = useAction((id) => api(`/api/bank/exercises/${id}`, { method: 'DELETE' }), [['bank']]);
 
-  /** Le formulaire s'ouvre en haut de page : sans cela on reste sur la ligne cliquée. */
+  /** L'éditeur s'ouvre en haut de page : sans cela on reste sur la ligne cliquée. */
   const toTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  /** Créer un exercice commence par choisir son type ; modifier ouvre le formulaire. */
-  function startCreation() {
+  function create(kind) {
     setNotice(null);
     setError(null);
-    setForm(null);
-    setStep(1);
-    setTypeChoice(true);
+    setEditing({ form: withKind({ ...EMPTY }, kind), readOnly: false });
     toTop();
   }
 
-  function edit(exercise) {
+  function open(exercise) {
     setNotice(null);
     setError(null);
-    setTypeChoice(false);
-    setStep(1);
-    setForm(
-      exercise
-        ? {
-            ...exercise,
-            kind: exercise.kind ?? 'code',
-            settings: exercise.settings ?? {},
-            subject_id: exercise.subject_id ?? '',
-            tags: (exercise.tags ?? []).join(', '),
-            tests: exercise.tests ?? [],
-          }
-        : { ...EMPTY },
+    setEditing({
+      form: {
+        ...exercise,
+        kind: exercise.kind ?? 'code',
+        settings: exercise.settings ?? {},
+        subject_id: exercise.subject_id ?? '',
+        tags: (exercise.tags ?? []).join(', '),
+        tests: exercise.tests ?? [],
+      },
+      readOnly: exercise.author_id !== user.id,
+    });
+    toTop();
+  }
+
+  // L'éditeur remplace la liste : ouvert depuis le bas du tableau, il se
+  // retrouvait sinon hors écran.
+  if (editing) {
+    return (
+      <BankEditor
+        key={editing.form.id ?? 'nouveau'}
+        initial={editing.form}
+        readOnly={editing.readOnly}
+        onClose={(message) => {
+          setEditing(null);
+          setNotice(message ?? null);
+          toTop();
+        }}
+      />
     );
-    toTop();
   }
 
-  async function submit(event) {
-    event.preventDefault();
-    setError(null);
-    try {
-      const withTests = needsTests(form.kind);
-      // Le barème simplifié se recalcule à l'enregistrement, comme dans l'éditeur
-      // d'évaluation : ce qui est écrit vaut ce que l'écran des points affichait.
-      const noté = isSimpleScoring(form) ? autoDistribute({ ...form, tests: form.tests ?? [] }) : form;
-      const body = {
-        title: form.title,
-        statement: form.statement,
-        language: form.language,
-        points: form.points === '' || form.points === null ? undefined : Number(form.points),
-        starter_code: withTests ? form.starter_code : '',
-        kind: form.kind,
-        settings: noté.settings,
-        subject_id: form.subject_id === '' ? null : Number(form.subject_id),
-        tags: form.tags
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-        is_shared: form.is_shared,
-        tests: withTests
-          ? noté.tests.map((test) => ({
-              ...test,
-              points: Number(test.points),
-              timeout_ms: Number(test.timeout_ms),
-            }))
-          : [],
-      };
-      await save.mutateAsync({ id: form.id, body });
-      setNotice(form.id ? 'Exercice mis à jour.' : 'Exercice ajouté à la banque.');
-      setForm(null);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
+  const filtered = Boolean(search || scope || kindFilter);
 
   return (
     <>
       <PageHeader breadcrumb="Espace enseignant" title="Banque d'exercices">
-        <Button onClick={startCreation}>+ Nouvel exercice</Button>
+        <NewExerciseMenu onPick={create} />
       </PageHeader>
 
       <Chips
@@ -275,268 +192,18 @@ export default function BankPage() {
         <Alert>{error}</Alert>
         {notice && !error && <Alert tone="success">{notice}</Alert>}
 
-        {typeChoice && (
-          <TypePicker
-            title="Quel type d'exercice voulez-vous ajouter à la banque ?"
-            onPick={(kind) => {
-              setTypeChoice(false);
-              setStep(1);
-              setForm(withKind({ ...EMPTY }, kind));
+        <div className="banque-filtres">
+          <input
+            className="search-input"
+            type="search"
+            aria-label="Rechercher un exercice"
+            placeholder="Rechercher un exercice…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
             }}
           />
-        )}
-
-        {form && (
-          <form className="card" onSubmit={submit}>
-            <h2 style={{ fontSize: 15, marginBottom: 4 }}>
-              {form.id ? "Modifier l'exercice" : 'Nouvel exercice'}
-            </h2>
-            <p className="sub" style={{ margin: '0 0 14px' }}>
-              {`Étape ${step} sur ${lastStep(form.kind)} · ${stepLabel(form.kind, step)}`}
-            </p>
-            <div className="editeur-apercu-duo">
-              <div className="editeur-apercu-champs">
-            {/* Étape 1 : l'exercice et ce que l'apprenant trouve en l'ouvrant.
-                Le classement (matière, étiquettes) ne sert qu'à retrouver
-                l'exercice dans la banque : il reste replié. */}
-            {step === 1 && (
-              <>
-              <div className="row">
-                <Field label="Intitulé" id="b-title">
-                  <input
-                    id="b-title"
-                    required
-                    autoFocus={!form.title}
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  />
-                </Field>
-                {exerciseType(form.kind).usesLanguage && (
-                  <Field label="Langage" id="b-lang">
-                    <select
-                      id="b-lang"
-                      value={form.language}
-                      onChange={(e) => setForm(withLanguage(form, e.target.value))}
-                    >
-                      {(languages.data ?? []).map((l) => (
-                        <option key={l.key} value={l.key}>
-                          {l.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-              </div>
-
-              {!hasQuestions(form.kind) && (
-                <Field label="Énoncé" id="b-statement" hint="ce que lit l'apprenant">
-                  <textarea
-                    id="b-statement"
-                    value={form.statement}
-                    onChange={(e) => setForm({ ...form, statement: e.target.value })}
-                  />
-                </Field>
-              )}
-
-              {hasQuestions(form.kind) && (
-                <QuestionListEditor
-                  kind={form.kind}
-                  name="b"
-                  settings={form.settings}
-                  onChange={(settings) => setForm({ ...form, settings })}
-                />
-              )}
-
-              {form.kind === 'truefalse' && (
-                <TrueFalseEditor
-                  settings={form.settings}
-                  onChange={(patch) => setForm({ ...form, settings: { ...form.settings, ...patch } })}
-                />
-              )}
-
-              {form.kind === 'trace' && (
-                <TraceEditor
-                  name="b-trace"
-                  settings={form.settings}
-                  onChange={(patch) => setForm({ ...form, settings: { ...form.settings, ...patch } })}
-                />
-              )}
-
-              {/* Les outils autorisés gardent leur bloc à eux, ouvert : c'est le
-                  seul réglage qu'un exercice algorithmique ne peut pas taire. */}
-              {form.kind === 'algo' && (
-                <div className="form-section">
-                  <h3 className="form-section-title">Outils autorisés</h3>
-                  <ToolboxEditor
-                    value={form.settings.allowed_elements || DEFAULT_ELEMENTS}
-                    onChange={(allowed_elements) =>
-                      setForm({ ...form, settings: { ...form.settings, allowed_elements } })
-                    }
-                    ecritureCours={Boolean(form.settings.ecriture_cours)}
-                    onEcritureCours={(ecriture_cours) =>
-                      setForm({ ...form, settings: { ...form.settings, ecriture_cours } })
-                    }
-                  />
-                </div>
-              )}
-
-              {/* Le squelette du langage est déjà posé : on ne l'ouvre que pour
-                  le réécrire. */}
-              {form.kind === 'code' && (
-                <Disclosure
-                  summary={isProject(form) ? 'Fichiers du projet' : 'Code de départ'}
-                  hint="Déjà rempli avec le squelette du langage. Ouvrez pour le modifier, ou découper le code en plusieurs fichiers."
-                  defaultOpen={isProject(form)}
-                >
-                  <ProjectFilesEditor
-                    exercise={form}
-                    name="b-starter"
-                    onChange={(patch) => setForm({ ...form, ...patch })}
-                  />
-                </Disclosure>
-              )}
-
-              <div style={{ marginTop: 14 }}>
-                <SolutionEditor
-                  kind={form.kind}
-                  name="b-sol"
-                  settings={form.settings}
-                  onChange={(settings) => setForm({ ...form, settings })}
-                />
-              </div>
-
-              <Disclosure
-                summary="Classement dans la banque"
-                hint="Facultatif : matière et étiquettes, pour retrouver l'exercice."
-              >
-                <div className="row">
-                  <Field label="Matière" id="b-subject">
-                    <select
-                      id="b-subject"
-                      value={form.subject_id}
-                      onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
-                    >
-                      <option value="">-</option>
-                      {(subjects.data ?? []).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Étiquettes" id="b-tags" hint="séparées par des virgules">
-                    <input
-                      id="b-tags"
-                      value={form.tags}
-                      onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                    />
-                  </Field>
-                </div>
-              </Disclosure>
-
-              {!needsTests(form.kind) && (
-                <p className="sub" style={{ margin: '12px 0' }}>
-                  {exerciseType(form.kind).gradingNote}
-                </p>
-              )}
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setForm(null)}>
-                  Annuler
-                </Button>
-                <Button type="button" disabled={!form.title.trim()} onClick={() => setStep(2)}>
-                  Étape suivante →
-                </Button>
-              </div>
-              </>
-            )}
-
-            {/* Étape 2 : la correction d'un bloc. Ce que la copie doit déclarer,
-                puis les tests, chacun avec sa comparaison (« trim » par défaut,
-                qui convient presque toujours). Ce que tout cela vaut se décide
-                à l'étape suivante. */}
-            {step === 2 && needsTests(form.kind) && (
-              <>
-              <div style={{ margin: '0 0 16px' }}>
-                <BaremeEditor
-                  exercise={form}
-                  criteria={criteriaOf(form)}
-                  onCriteriaChange={(criteria) =>
-                    setForm({ ...form, settings: { ...form.settings, criteria } })
-                  }
-                />
-              </div>
-
-              <TestsEditor
-                exercise={form}
-                tests={form.tests}
-                template={EMPTY_TEST}
-                showComparison
-                onChange={(tests) => setForm({ ...form, tests })}
-              />
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
-                  ← Étape précédente
-                </Button>
-                <Button type="button" onClick={() => setStep(3)}>
-                  Étape suivante →
-                </Button>
-              </div>
-              </>
-            )}
-
-            {/* La dernière étape, et elle seule : les points. Tout ce qui note la
-                copie est écrit, on peut enfin dire ce que chaque ligne vaut. */}
-            {step === lastStep(form.kind) && (
-              <>
-              <PointsEditor
-                exercise={{ ...form, tests: form.tests ?? [] }}
-                onChange={(next) => setForm({ ...form, ...next })}
-              />
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setStep(lastStep(form.kind) - 1)}
-                >
-                  ← Étape précédente
-                </Button>
-                <Button type="submit" disabled={save.isPending}>
-                  {form.id ? 'Enregistrer' : 'Ajouter à la banque'}
-                </Button>
-              </div>
-              </>
-            )}
-                </div>
-
-                <ExercisePreview form={form} />
-              </div>
-          </form>
-        )}
-
-        {!form && !typeChoice && (
-        <input
-          aria-label="Rechercher un exercice"
-          placeholder="Rechercher un exercice…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          style={{
-            height: 34,
-            borderRadius: 'var(--radius-pill)',
-            border: '1px solid var(--border)',
-            padding: '0 14px',
-            fontSize: 13,
-            width: 300,
-            maxWidth: '100%',
-          }}
-        />
-        )}
-        {!form && !typeChoice && (
           <select
             className="select-inline"
             aria-label="Type d'exercice"
@@ -548,31 +215,28 @@ export default function BankPage() {
           >
             <option value="">Tous les types</option>
             {Object.entries(KIND_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+              <option key={value} value={value}>
+                {label}
+              </option>
             ))}
           </select>
-        )}
-      </div>
+        </div>
 
-      {/* Le formulaire remplace la liste : ouvert depuis « Modifier » en bas de tableau,
-          il se retrouvait sinon hors écran, la liste occupant encore toute la page. */}
-      {!form && !typeChoice && (
-        <>
         {bank.isPending && <Loading />}
-        {bank.data?.items.length === 0 && (
-          search || scope || kindFilter ? (
+        {bank.data?.items.length === 0 &&
+          (filtered ? (
             <EmptyState variant="search" title="Aucun résultat">
               Aucun exercice ne correspond à cette recherche.
             </EmptyState>
           ) : (
-            <EmptyState
-              title="Aucun exercice dans la banque"
-              action={<Button onClick={startCreation}>Créer un exercice</Button>}
-            >
-              Créez un exercice réutilisable, ou enregistrez-en un depuis l'éditeur d'évaluation.
-            </EmptyState>
-          )
-        )}
+            <div className="banque-vide">
+              <EmptyState title="Aucun exercice dans la banque">
+                Créez un exercice réutilisable, ou enregistrez-en un depuis le panneau d'une
+                évaluation.
+              </EmptyState>
+              <TypeGrid onPick={create} />
+            </div>
+          ))}
 
         {bank.data?.items.length > 0 && (
           <>
@@ -581,67 +245,69 @@ export default function BankPage() {
                 <thead>
                   <tr>
                     <th>Exercice</th>
-                    <th>Points</th>
-                    <th>Tests</th>
-                    <th>Auteur</th>
+                    <th>Correction</th>
                     <th>Utilisé</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bank.data.items.map((exercise) => (
-                    <tr key={exercise.id}>
-                      <td>
-                        <div>{exercise.title}</div>
-                        <div className="sub">
-                          {[
-                            exerciseType(exercise.kind).badge,
-                            exerciseType(exercise.kind).usesLanguage
-                              ? exercise.language.toUpperCase()
-                              : null,
-                            ...(exercise.tags ?? []),
-                            exercise.is_shared ? 'partagé' : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </div>
-                      </td>
-                      <td>{exercise.points}</td>
-                      <td>
-                        {!needsTests(exercise.kind) ? (
-                          <Tag tone="info">auto</Tag>
-                        ) : exercise.tests.length > 0 ? (
-                          exercise.tests.length
-                        ) : (
-                          <Tag tone="warning">aucun</Tag>
-                        )}
-                      </td>
-                      <td className="sub">{exercise.author_name}</td>
-                      <td>{exercise.uses > 0 ? `${exercise.uses}×` : '-'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <Button variant="secondary" size="small" onClick={() => edit(exercise)}>
-                            {exercise.author_id === user.id
-                              ? 'Modifier'
-                              : 'Voir'}
-                          </Button>
-                          {(exercise.author_id === user.id) && (
-                            <Button
-                              variant="secondary"
-                              size="small"
-                              onClick={() => {
-                                if (window.confirm(`Supprimer « ${exercise.title} » ?`)) {
-                                  remove.mutateAsync(exercise.id).catch((e) => setError(e.message));
-                                }
-                              }}
-                            >
-                              Supprimer
-                            </Button>
+                  {bank.data.items.map((exercise) => {
+                    const mine = exercise.author_id === user.id;
+                    const kind = exercise.kind ?? 'code';
+                    return (
+                      <tr key={exercise.id}>
+                        <td>
+                          <div>{exercise.title}</div>
+                          <div className="banque-meta">
+                            <span className="panneau-tag" data-kind={kind}>
+                              {exerciseType(kind).badge}
+                            </span>
+                            <span className="sub">
+                              {[
+                                usesLanguage(kind) ? exercise.language.toUpperCase() : null,
+                                exercise.subject_name,
+                                ...(exercise.tags ?? []),
+                                exercise.is_shared ? 'partagé' : null,
+                                mine ? null : `par ${exercise.author_name ?? 'un collègue'}`,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          {!needsTests(kind) ? (
+                            <Tag tone="info">automatique</Tag>
+                          ) : exercise.tests.length > 0 ? (
+                            `${exercise.tests.length} test${exercise.tests.length > 1 ? 's' : ''}`
+                          ) : (
+                            <Tag tone="warning">aucun test</Tag>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td>{exercise.uses > 0 ? `${exercise.uses}×` : '-'}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <Button variant="secondary" size="small" onClick={() => open(exercise)}>
+                              {mine ? 'Modifier' : 'Voir'}
+                            </Button>
+                            {mine && (
+                              <Button
+                                variant="secondary"
+                                size="small"
+                                onClick={() => {
+                                  if (window.confirm(`Supprimer « ${exercise.title} » ?`)) {
+                                    remove.mutateAsync(exercise.id).catch((e) => setError(e.message));
+                                  }
+                                }}
+                              >
+                                Supprimer
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -651,10 +317,326 @@ export default function BankPage() {
               total={bank.data.total}
               onChange={setPage}
             />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Les types d'exercice, par famille : un clic ouvre l'exercice déjà réglé pour ce type. */
+function TypeGrid({ onPick, autoFocus = false }) {
+  return (
+    <div className="banque-types">
+      {typeFamilies().map((family, f) => (
+        <div key={family.name} className="banque-famille">
+          <span className="banque-famille-nom">{family.name}</span>
+          <div className="feuille-types">
+            {family.types.map((type, t) => (
+              <button
+                key={type.key}
+                type="button"
+                className="feuille-type"
+                data-kind={type.key}
+                autoFocus={autoFocus && f === 0 && t === 0}
+                onClick={() => onPick(type.key)}
+              >
+                <strong>{type.badge}</strong>
+                <span>{type.tagline}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** « + Nouvel exercice » : le type se choisit dans un menu, sans écran intermédiaire. */
+function NewExerciseMenu({ onPick }) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+
+  return (
+    <div className="banque-menu" onKeyDown={(e) => e.key === 'Escape' && close()}>
+      <Button aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        + Nouvel exercice
+      </Button>
+      {open && (
+        <>
+          <button
+            type="button"
+            className="banque-menu-voile"
+            aria-label="Fermer le menu"
+            tabIndex={-1}
+            onClick={close}
+          />
+          <div className="banque-menu-panneau" role="dialog" aria-label="Type du nouvel exercice">
+            <span className="panneau-sous-titre">Quel type d’exercice ?</span>
+            <TypeGrid
+              autoFocus
+              onPick={(kind) => {
+                close();
+                onPick(kind);
+              }}
+            />
+          </div>
         </>
       )}
-        </>
+    </div>
+  );
+}
+
+/**
+ * Un exercice de la banque, sur la feuille. `readOnly` : l'exercice d'un
+ * collègue, partagé, se consulte sans se modifier.
+ */
+function BankEditor({ initial, readOnly, onClose }) {
+  const [form, setForm] = useState(initial);
+  const [view, setView] = useState('teacher');
+  const [ui, setUi] = useState({});
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState(null);
+
+  const subjects = useSubjects();
+  const languages = useLanguages();
+  const save = useAction(
+    ({ id, body }) =>
+      id
+        ? api(`/api/bank/exercises/${id}`, { method: 'PUT', body })
+        : api('/api/bank/exercises', { method: 'POST', body }),
+    [['bank']],
+  );
+
+  // Quitter la page avec des changements non enregistrés : le navigateur prévient.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const warn = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const edit = (next) => {
+    setForm(next);
+    setDirty(true);
+  };
+  const change = (patch) => {
+    setForm((current) => ({ ...current, ...(typeof patch === 'function' ? patch(current) : patch) }));
+    setDirty(true);
+  };
+  const onUi = (patch) => setUi((current) => ({ ...current, ...patch }));
+
+  const type = exerciseType(form.kind);
+  const issues = exerciseIssues(form, { points: false });
+  const titled = form.title.trim().length >= 2;
+  const canEdit = !readOnly;
+
+  function cancel() {
+    if (dirty && !window.confirm('Abandonner les modifications de cet exercice ?')) return;
+    onClose();
+  }
+
+  async function submit() {
+    setError(null);
+    try {
+      await save.mutateAsync({ id: form.id, body: payloadOf(form) });
+      setDirty(false);
+      onClose(form.id ? `« ${form.title.trim()} » mis à jour.` : `« ${form.title.trim()} » ajouté à la banque.`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        breadcrumb={`Banque d'exercices · ${readOnly ? 'Consulter' : form.id ? 'Modifier' : 'Nouvel exercice'}`}
+        title={form.title.trim() || 'Nouvel exercice'}
+      />
+
+      <div className="feuille-barre">
+        <Segmented
+          label="Affichage de la feuille"
+          value={view}
+          options={[
+            { value: 'teacher', label: 'Avec le corrigé' },
+            { value: 'student', label: 'Vue étudiant' },
+          ]}
+          onChange={(value) => value && setView(value)}
+        />
+        <div className="feuille-barre-fin">
+          {canEdit && !titled && <span className="sub">Donnez un intitulé pour enregistrer.</span>}
+          {canEdit && titled && dirty && <span className="sub">Modifications non enregistrées</span>}
+          <Button variant="secondary" onClick={cancel}>
+            {canEdit ? 'Annuler' : 'Fermer'}
+          </Button>
+          {canEdit && (
+            <Button disabled={!titled || save.isPending} onClick={submit}>
+              {save.isPending ? 'Enregistrement…' : form.id ? 'Enregistrer' : 'Ajouter à la banque'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {(error || readOnly) && (
+        <div className="feuille-alertes">
+          <Alert>{error}</Alert>
+          {readOnly && (
+            <Alert tone="info">
+              Exercice partagé par un collègue : il se consulte ici et s’importe tel quel dans vos
+              évaluations.
+            </Alert>
+          )}
+        </div>
       )}
+
+      <div className="feuille-atelier">
+        <div className="feuille-plateau">
+          <article className="feuille-papier sujet" aria-label="Feuille de l’exercice">
+            <h2 className="sujet-bloc-titre">{type.sheetTitle}</h2>
+            {view === 'student' ? (
+              <SheetExercise exercise={form} showPoints={false} />
+            ) : (
+              <ExerciseOnSheet
+                exercise={form}
+                onChange={change}
+                canEditSubject={canEdit}
+                canEditCorrection={canEdit}
+                ui={ui}
+                onUi={onUi}
+              />
+            )}
+          </article>
+        </div>
+
+        <aside className="feuille-panneau" aria-label="Réglages de l’exercice">
+          <div className="feuille-panneau-corps">
+            <section className="panneau-section">
+              <span className="panneau-titre">Exercice</span>
+              <label className="panneau-sous-titre" htmlFor="banque-type">
+                Type
+              </label>
+              <select
+                id="banque-type"
+                className="panneau-select"
+                value={form.kind}
+                disabled={!canEdit}
+                onChange={(e) => {
+                  edit(withKind(form, e.target.value));
+                  setUi({});
+                }}
+              >
+                {typeFamilies().map((family) => (
+                  <optgroup key={family.name} label={family.name}>
+                    {family.types.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.badge}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+              {usesLanguage(form.kind) && (
+                <>
+                  <label className="panneau-sous-titre" htmlFor="banque-langage">
+                    Langage
+                  </label>
+                  <select
+                    id="banque-langage"
+                    className="panneau-select"
+                    value={form.language}
+                    disabled={!canEdit}
+                    onChange={(e) => edit(withLanguage(form, e.target.value))}
+                  >
+                    {(languages.data ?? []).map((l) => (
+                      <option key={l.key} value={l.key}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              <p className="panneau-aide">{type.gradingNote}</p>
+            </section>
+
+            {canEdit && (
+              <section className="panneau-section">
+                <span className="panneau-sous-titre">À vérifier</span>
+                {issues.length === 0 ? (
+                  <span className="panneau-etat panneau-etat--pret">Prêt : rien ne manque.</span>
+                ) : (
+                  <ul className="panneau-problemes">
+                    {issues.map((issue) => (
+                      <li key={issue}>{issue}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+
+            <ExerciseSettings
+              exercise={form}
+              change={change}
+              name="banque"
+              canEditSubject={canEdit}
+              canEditCorrection={canEdit}
+              showPoints={false}
+            />
+
+            <section className="panneau-section">
+              <span className="panneau-sous-titre">Classement</span>
+              <label className="panneau-aide" htmlFor="banque-matiere">
+                Matière
+              </label>
+              <select
+                id="banque-matiere"
+                className="panneau-select"
+                value={form.subject_id}
+                disabled={!canEdit}
+                onChange={(e) => edit({ ...form, subject_id: e.target.value })}
+              >
+                <option value="">Aucune</option>
+                {(subjects.data ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <label className="panneau-aide" htmlFor="banque-etiquettes">
+                Étiquettes, séparées par des virgules
+              </label>
+              <input
+                id="banque-etiquettes"
+                className="panneau-select"
+                value={form.tags}
+                disabled={!canEdit}
+                placeholder="boucles, tableaux…"
+                onChange={(e) => edit({ ...form, tags: e.target.value })}
+              />
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.is_shared)}
+                  disabled={!canEdit}
+                  onChange={(e) => edit({ ...form, is_shared: e.target.checked })}
+                />
+                <span>
+                  <strong>Partager avec mes collègues</strong>
+                  <span className="sub">Ils pourront l’importer dans leurs évaluations.</span>
+                </span>
+              </label>
+            </section>
+
+            <p className="panneau-aide">
+              Pas de points ici : ils se fixent dans l’évaluation, quand vous y importez
+              l’exercice.
+            </p>
+          </div>
+        </aside>
+      </div>
     </>
   );
 }

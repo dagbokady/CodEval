@@ -424,18 +424,21 @@ function Editor({ evaluationId, evaluation }) {
   /**
    * Import : copie complète de l'exercice, type et paramètres compris. Sans le
    * `kind` ni les `settings`, un QCM ou une correspondance repartait en « code ».
+   *
+   * La banque ne fixe pas de points : l'exercice importé prend sa part du total
+   * comme un exercice nouveau (parts égales tant que personne n'a pesé un
+   * exercice plus qu'un autre, zéro sinon).
    */
   function importFromBank(item) {
     const kind = item.kind ?? 'code';
-    changeExercises((list) => [
-      ...list,
-      {
+    changeExercises((list) => {
+      const imported = {
         id: null,
         _key: newKey('e'),
         title: item.title,
         statement: item.statement,
         language: item.language,
-        points: item.points,
+        points: 0,
         kind,
         settings: item.settings ?? {},
         starter_code:
@@ -443,8 +446,9 @@ function Editor({ evaluationId, evaluation }) {
             ? defaultStarter(item.language, 'code')
             : (item.starter_code ?? ''),
         tests: (item.tests ?? []).map(stripIds),
-      },
-    ]);
+      };
+      return isEvenSpread(list, total) ? spreadPoints([...list, imported], total) : [...list, imported];
+    });
     setSelected(exercises.length);
     setBankOpen(false);
     api(`/api/bank/exercises/${item.id}/used`, { method: 'POST' }).catch(() => {});
@@ -643,8 +647,6 @@ function Editor({ evaluationId, evaluation }) {
               onDistribute={() => changeExercises((list) => spreadPoints(list, total))}
               onStart={handleStart}
               startPending={pending}
-              ui={ui}
-              onUi={onUi}
             />
           </>
         )}
@@ -729,7 +731,6 @@ function BankPicker({ language, onPick, onClose }) {
               <div className="sub">
                 {[
                   KIND_LABELS[item.kind ?? 'code'],
-                  `${item.points} pts`,
                   needsTests(item.kind)
                     ? `${item.tests.length} test${item.tests.length > 1 ? 's' : ''}`
                     : 'correction auto',

@@ -402,12 +402,16 @@ function SheetSubQuestions({ exercise, showAnswerZone, answer }) {
   );
 }
 
-/** `answer` : la production de l'apprenant, reportée sur la feuille (épreuve en cours). */
+/**
+ * `answer` : la production de l'apprenant, reportée sur la feuille (épreuve en
+ * cours). `showPoints` : faux pour un exercice de la banque, qui n'en a pas.
+ */
 export function SheetExercise({
   exercise,
   number,
   showAnswerZone = true,
   showTests = false,
+  showPoints = true,
   answer,
 }) {
   const kind = exercise.kind ?? 'code';
@@ -419,9 +423,11 @@ export function SheetExercise({
         <span className="sujet-question-num">
           {label} : {exercise.title || <em className="sujet-vide">(sans intitulé)</em>}
         </span>
-        <span className="sujet-question-pts">
-          {exercise.points} pt{exercise.points > 1 ? 's' : ''}
-        </span>
+        {showPoints && (
+          <span className="sujet-question-pts">
+            {exercise.points} pt{exercise.points > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {exercise.statement && <p className="sujet-enonce">{exercise.statement}</p>}
