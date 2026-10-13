@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import { Landing, Protected } from './components/Protected';
 import { Loading } from './components/ui';
@@ -21,8 +21,6 @@ const SubmissionDetailPage = lazy(() => import('./pages/teacher/SubmissionDetail
 const ClassesPage = lazy(() => import('./pages/teacher/ClassesPage'));
 const ClassDetailPage = lazy(() => import('./pages/teacher/ClassDetailPage'));
 const BankPage = lazy(() => import('./pages/teacher/BankPage'));
-const BankEvaluationsPage = lazy(() => import('./pages/teacher/BankEvaluationsPage'));
-const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const StatsPage = lazy(() => import('./pages/teacher/StatsPage'));
 const SubjectsPage = lazy(() => import('./pages/teacher/SubjectsPage'));
 
@@ -95,10 +93,11 @@ export const router = createBrowserRouter([
       { path: '/classes', element: <Protected roles={teacher}><Lazy><ClassesPage /></Lazy></Protected> },
       { path: '/classes/:classroomId', element: <Protected roles={teacher}><Lazy><ClassDetailPage /></Lazy></Protected> },
       { path: '/banque', element: <Protected roles={teacher}><Lazy><BankPage /></Lazy></Protected> },
-      { path: '/banque/evaluations', element: <Protected roles={teacher}><Lazy><BankEvaluationsPage /></Lazy></Protected> },
+      // Les anciennes adresses mènent à la banque unique : ses sujets, ou sa communauté.
+      { path: '/banque/evaluations', element: <Navigate to="/banque?type=subject" replace /> },
       {
         path: '/communaute',
-        element: <Protected roles={['teacher', 'admin']}><Lazy><CommunityPage /></Lazy></Protected>,
+        element: <Protected roles={['teacher', 'admin']}><Lazy><BankPage /></Lazy></Protected>,
       },
       { path: '/statistiques', element: <Protected roles={teacher}><Lazy><StatsPage /></Lazy></Protected> },
       { path: '/mes-evaluations', element: <Protected roles={['student']}><Lazy><StudentHomePage /></Lazy></Protected> },

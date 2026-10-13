@@ -20,7 +20,7 @@ from sqlalchemy.orm import selectinload
 from ..db import soft_delete
 from ..audit import log
 from ..deps import DbSession, TeacherUser, require_roles
-from ..grading.matching import SALT_KEY, ensure_salt as ensure_matching_salt
+from ..grading.matching import ensure_salt as ensure_matching_salt
 from ..grading.questions import questions_of
 from ..models import (
     BankExercise,
@@ -42,8 +42,20 @@ from ..schemas import (
     CommunityItemOut,
     CommunityPublishIn,
     CommunityRatingIn,
+    CommunityShareIn,
+    CommunityShareOut,
     CommunityUseIn,
     Page,
+)
+from ..sharing import (
+    _EXERCISE_FIELDS,
+    _TEST_FIELDS,
+    BANK_EXERCISE,
+    evaluation_exercises,
+    set_share,
+    snapshot_exercise as _snapshot_exercise,
+    subject_content,
+    subject_name as _subject_name,
 )
 from .evaluations import _check_refs
 
@@ -51,39 +63,13 @@ router = APIRouter(prefix="/api/community", tags=["communauté"])
 
 MemberUser = Annotated[User, Depends(require_roles(Role.TEACHER, Role.ADMIN))]
 
-_TEST_FIELDS = (
-    "name", "stdin", "expected_stdout", "comparison", "points", "timeout_ms",
-    "target_id", "expected_type",
-)
 _ORDRE_TYPES = case(
     {"qcm": 0, "truefalse": 1, "short": 2, "algo": 3},
     value=CommunityItem.content["exercise"]["kind"].as_string(),
     else_=9,
 )
 
-_EXERCISE_FIELDS = ("title", "statement", "language", "points", "starter_code", "kind")
-
-
 # ----- Instantanés -----
-def _snapshot_exercise(exercise: Exercise | BankExercise) -> dict:
-    # Le sel d'une correspondance appartient à l'exercice où il a été tiré.
-    settings = {k: v for k, v in (exercise.settings or {}).items() if k != SALT_KEY}
-    return {
-        **{field: getattr(exercise, field) for field in _EXERCISE_FIELDS},
-        "settings": settings,
-        "tests": [
-            {
-                **{field: getattr(test, field) for field in _TEST_FIELDS},
-                "kind": test.kind.value,
-                "input_types": list(test.input_types or []),
-                "args": list(test.args or []),
-                "argv": list(test.argv or []),
-            }
-            for test in exercise.tests
-        ],
-    }
-
-
 def _test_values(data: dict) -> dict:
     values = {field: data.get(field) for field in _TEST_FIELDS if field in data}
     values["kind"] = TestKind(data.get("kind", TestKind.OFFICIAL.value))
@@ -109,11 +95,6 @@ def _subject_for(db, user: User, name: str | None) -> int | None:
             func.lower(Subject.name) == name.lower(),
         )
     )
-
-
-def _subject_name(db, subject_id: int | None) -> str | None:
-    subject = db.get(Subject, subject_id) if subject_id else None
-    return subject.name if subject else None
 
 
 # ----- Lecture -----
@@ -258,12 +239,24 @@ def _out(
         preview=_preview(item),
         **ratings.get(item.id, {}),
         can_rate=_can_rate(item, user),
+        is_mine=item.author_id == user.id,
+        visibility=item.visibility,
+        shared_from_bank=item.source_type is not None,
         content=item.content if with_content else None,
     )
 
 
-def _load(db, item_id: int) -> CommunityItem:
-    item = db.get(CommunityItem, item_id)
+def _visible(user: User):
+    """Toute la plateforme voit ce qui lui est ouvert ; l'établissement, aussi
+    ce que ses enseignants réservent à leurs collègues."""
+    return or_(
+        CommunityItem.visibility == "all",
+        CommunityItem.organization_id == user.organization_id,
+    )
+
+
+def _load(db, item_id: int, user: User) -> CommunityItem:
+    item = db.scalar(select(CommunityItem).where(CommunityItem.id == item_id, _visible(user)))
     if item is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Publication introuvable")
     return item
@@ -283,7 +276,7 @@ def list_items(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
-    filters = []
+    filters = [_visible(user)]
     if item_type:
         filters.append(CommunityItem.item_type == item_type)
     if language:
@@ -396,7 +389,7 @@ def publishable_sources(user: MemberUser, db: DbSession) -> dict:
 
 @router.get("/{item_id}", response_model=CommunityItemOut)
 def get_item(item_id: int, user: MemberUser, db: DbSession) -> CommunityItemOut:
-    return _out(db, _load(db, item_id), user, with_content=True)
+    return _out(db, _load(db, item_id, user), user, with_content=True)
 
 
 # ----- Publication -----
@@ -434,14 +427,7 @@ def publish(payload: CommunityPublishIn, user: MemberUser, db: DbSession) -> Com
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, "Évaluation introuvable dans la banque d'évaluations"
             )
-        exercises = list(
-            db.scalars(
-                select(Exercise)
-                .where(Exercise.evaluation_id == source.id)
-                .options(selectinload(Exercise.tests))
-                .order_by(Exercise.position)
-            )
-        )
+        exercises = evaluation_exercises(db, source)
         if not exercises:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_ENTITY, "Cette évaluation ne contient aucun exercice"
@@ -452,18 +438,7 @@ def publish(payload: CommunityPublishIn, user: MemberUser, db: DbSession) -> Com
             language=source.language,
             subject_name=_subject_name(db, source.subject_id),
             tags=payload.tags,
-            content={
-                "evaluation": {
-                    "kind": source.kind.value,
-                    "description": source.description,
-                    "instructions": source.instructions,
-                    "language": source.language,
-                    "duration_minutes": source.duration_minutes,
-                    "total_points": source.total_points,
-                    "rules": dict(source.rules or {}),
-                },
-                "exercises": [_snapshot_exercise(e) for e in exercises],
-            },
+            content=subject_content(source, exercises),
             exercises_count=len(exercises),
             total_points=source.total_points,
         )
@@ -479,9 +454,48 @@ def publish(payload: CommunityPublishIn, user: MemberUser, db: DbSession) -> Com
     return _out(db, item, user, with_content=True)
 
 
+# ----- Partage depuis la banque -----
+@router.put("/share", response_model=CommunityShareOut)
+def share(payload: CommunityShareIn, user: TeacherUser, db: DbSession) -> CommunityShareOut:
+    """Ouvrir un exercice ou un sujet de sa banque à ses collègues de
+    l'établissement (« organization ») ou à tous les enseignants (« all »), ou
+    cesser de le partager (« none »)."""
+    if payload.source_type == BANK_EXERCISE:
+        source = db.scalar(
+            select(BankExercise)
+            .where(
+                BankExercise.id == payload.source_id,
+                BankExercise.author_id == user.id,
+                BankExercise.organization_id == user.organization_id,
+            )
+            .options(selectinload(BankExercise.tests))
+        )
+        if source is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Exercice introuvable dans votre banque")
+    else:
+        source = db.get(Evaluation, payload.source_id)
+        if (
+            source is None
+            or not source.is_template
+            or source.teacher_id != user.id
+            or source.organization_id != user.organization_id
+        ):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Sujet introuvable dans votre banque")
+        if payload.visibility != "none" and not evaluation_exercises(db, source):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY, "Ce sujet ne contient aucun exercice"
+            )
+    item = set_share(db, payload.source_type, source, payload.visibility, user.id,
+                     user.organization_id)
+    log(db, user, user.organization_id, "community.shared", payload.source_type, source.id,
+        title=source.title, visibility=payload.visibility)
+    db.commit()
+    return CommunityShareOut(visibility=payload.visibility, item_id=item.id if item else None)
+
+
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 def unpublish(item_id: int, user: MemberUser, db: DbSession) -> None:
-    item = _load(db, item_id)
+    item = _load(db, item_id, user)
     if not _can_delete(item, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Publication d'un autre auteur")
     log(db, user, user.organization_id, "community.removed", "community_item", item.id,
@@ -496,7 +510,7 @@ def rate(
     item_id: int, payload: CommunityRatingIn, user: TeacherUser, db: DbSession
 ) -> CommunityItemOut:
     """Noter une publication de 1 à 5 étoiles ; la noter à nouveau remplace la note."""
-    item = _load(db, item_id)
+    item = _load(db, item_id, user)
     if not _can_rate(item, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "On ne note pas sa propre publication")
     rating = db.scalar(
@@ -514,7 +528,7 @@ def rate(
 
 @router.delete("/{item_id}/rating", response_model=CommunityItemOut)
 def unrate(item_id: int, user: TeacherUser, db: DbSession) -> CommunityItemOut:
-    item = _load(db, item_id)
+    item = _load(db, item_id, user)
     rating = db.scalar(
         select(CommunityRating).where(
             CommunityRating.item_id == item.id, CommunityRating.user_id == user.id
@@ -575,7 +589,7 @@ def _new_evaluation(
 def add_to_bank(item_id: int, user: TeacherUser, db: DbSession) -> dict:
     """Un exercice rejoint la banque d'exercices ; un sujet, la banque
     d'évaluations (comme modèle)."""
-    item = _load(db, item_id)
+    item = _load(db, item_id, user)
     if item.item_type == "subject":
         template = _new_evaluation(db, item, user, is_template=True)
         target = {"target": "template", "id": template.id}
@@ -604,10 +618,21 @@ def add_to_bank(item_id: int, user: TeacherUser, db: DbSession) -> dict:
     return target
 
 
+@router.post("/{item_id}/used", response_model=CommunityItemOut)
+def mark_used(item_id: int, user: TeacherUser, db: DbSession) -> CommunityItemOut:
+    """Comptabilise une reprise dans une évaluation, faite depuis l'éditeur."""
+    item = _load(db, item_id, user)
+    item.uses = (item.uses or 0) + 1
+    log(db, user, user.organization_id, "community.used", "community_item", item.id,
+        title=item.title)
+    db.commit()
+    return _out(db, item, user)
+
+
 @router.post("/{item_id}/use", status_code=status.HTTP_201_CREATED)
 def use_item(item_id: int, payload: CommunityUseIn, user: TeacherUser, db: DbSession) -> dict:
     """Tirer directement une évaluation brouillon d'une publication."""
-    item = _load(db, item_id)
+    item = _load(db, item_id, user)
     _check_refs(db, user, payload.classroom_id, None)
     evaluation = _new_evaluation(
         db, item, user, is_template=False, title=payload.title, classroom_id=payload.classroom_id

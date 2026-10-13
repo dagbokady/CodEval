@@ -156,3 +156,11 @@ export const IconCheck = () => (
     <path d="M3.5 9l3.2 3.2L13.5 5" />
   </svg>
 );
+
+/** La banque : la boîte où l'on range exercices et sujets. */
+export const IconBank = () => (
+  <svg {...base}>
+    <rect x="2" y="3" width="13" height="4" rx="1" />
+    <path d="M3.5 7v6.5a1 1 0 001 1h8a1 1 0 001-1V7M7 10h3" />
+  </svg>
+);

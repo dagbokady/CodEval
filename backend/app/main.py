@@ -87,6 +87,7 @@ for module in (
     stats,
 ):
     app.include_router(module.router)
+app.include_router(bank.library)
 
 
 @app.get("/api/health", tags=["observabilité"])

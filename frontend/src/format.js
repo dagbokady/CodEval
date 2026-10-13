@@ -129,3 +129,10 @@ export function formatExamDuration(minutes) {
 export function exerciseLabel(number) {
   return number ? `Exercice ${number}` : 'Exercice';
 }
+
+const ratingFmt = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+
+/** Une note sur 5 en chiffres : « 4,5 ». */
+export function formatRating(avg) {
+  return ratingFmt.format(avg);
+}

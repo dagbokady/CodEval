@@ -53,10 +53,12 @@ from ..services import (
     start_session,
     sync_participants,
 )
+from ..sharing import TEMPLATE, drop_shares, refresh_shares, share_states
 
 router = APIRouter(prefix="/api/evaluations", tags=["évaluations"])
 
 _STATUS_GROUPS = {
+    "draft": [EvaluationStatus.DRAFT],
     "running": [EvaluationStatus.RUNNING],
     "scheduled": [EvaluationStatus.DRAFT, EvaluationStatus.SCHEDULED],
     "corrected": [
@@ -100,7 +102,7 @@ def _to_out(db, evaluation: Evaluation, counts: dict, exercises: dict, rates: di
 def list_evaluations(
     user: TeacherUser,
     db: DbSession,
-    group: str | None = Query(default=None, pattern="^(running|scheduled|corrected)$"),
+    group: str | None = Query(default=None, pattern="^(draft|running|scheduled|corrected)$"),
     subject_id: int | None = None,
     classroom_id: int | None = None,
     page: int = Query(1, ge=1),
@@ -350,6 +352,8 @@ def list_templates(
     user: TeacherUser,
     db: DbSession,
     subject_id: int | None = None,
+    # « mine » : ses propres modèles, ceux de « Ma banque ».
+    scope: str = Query("all", pattern="^(all|mine)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
@@ -363,6 +367,8 @@ def list_templates(
     ]
     if subject_id:
         filters.append(Evaluation.subject_id == subject_id)
+    if scope == "mine":
+        filters.append(Evaluation.teacher_id == user.id)
     total = db.scalar(select(func.count(Evaluation.id)).where(*filters)) or 0
     rows = list(
         db.scalars(
@@ -383,10 +389,12 @@ def list_templates(
                 .group_by(Exercise.evaluation_id)
             ).all()
         )
+    shares = share_states(db, TEMPLATE, ids)
     items = []
     for evaluation in rows:
         item = _to_out(db, evaluation, {}, exercises, {})
         item.is_owner = evaluation.teacher_id == user.id
+        item.share = shares.get(evaluation.id, "none")
         items.append(item.model_dump())
     return Page(
         items=items,
@@ -461,6 +469,8 @@ def update_evaluation(
     if "classroom_id" in data:
         evaluation.organization_id = _home(db, user, evaluation.classroom_id)
     _follow_subject(evaluation, subject)
+    if evaluation.is_template:
+        refresh_shares(db, TEMPLATE, evaluation)
     log(db, user, user.organization_id, "evaluation.updated", "evaluation", evaluation.id,
         fields=list(data))
     db.commit()
@@ -526,6 +536,12 @@ def replace_exercises(
                 )
             soft_delete(exercise)
 
+    if evaluation.is_template:
+        # Un modèle partagé : ce que voient les collègues suit la feuille.
+        db.flush()
+        db.expire_all()
+        refresh_shares(db, TEMPLATE, evaluation)
+
     action = "correction.params_updated" if frozen else "evaluation.exercises_updated"
     log(db, user, user.organization_id, action, "evaluation", evaluation_id, count=len(payload))
     db.commit()
@@ -566,6 +582,8 @@ def delete_evaluation(evaluation_id: int, user: TeacherUser, db: DbSession) -> N
     log(db, user, user.organization_id, "evaluation.deleted", "evaluation", evaluation.id,
         title=evaluation.title)
     soft_delete(evaluation)
+    if evaluation.is_template:
+        drop_shares(db, TEMPLATE, evaluation.id)
     db.commit()
 
 

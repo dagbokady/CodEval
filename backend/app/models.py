@@ -425,7 +425,10 @@ class CommunityItem(Base, SoftDeleteMixin, TimestampMixin):
     """
 
     __tablename__ = "community_items"
-    __table_args__ = (Index("ix_community_type_created", "item_type", "created_at"),)
+    __table_args__ = (
+        Index("ix_community_type_created", "item_type", "created_at"),
+        Index("ix_community_source", "source_type", "source_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
@@ -442,6 +445,15 @@ class CommunityItem(Base, SoftDeleteMixin, TimestampMixin):
     exercises_count: Mapped[int] = mapped_column(Integer, default=1)
     total_points: Mapped[float] = mapped_column(Float, default=0.0)
     uses: Mapped[int] = mapped_column(Integer, default=0)
+    # « all » : toute la plateforme. « organization » : les collègues de
+    # l'établissement de l'auteur, et eux seuls.
+    visibility: Mapped[str] = mapped_column(String(20), default="all", server_default="all")
+    # Partage depuis la banque de l'auteur (« bank_exercise » ou « template ») :
+    # la publication suit alors l'original, qui l'actualise à chaque
+    # enregistrement et la retire s'il disparaît. Vide pour une publication
+    # détachée, figée au jour où elle a été faite.
+    source_type: Mapped[str | None] = mapped_column(String(20), default=None)
+    source_id: Mapped[int | None] = mapped_column(Integer, default=None)
 
 
 class CommunityRating(Base):

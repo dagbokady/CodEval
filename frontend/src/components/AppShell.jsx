@@ -8,6 +8,7 @@ import {
   IconAuto,
   IconMoon,
   IconSun,
+  IconBank,
   IconBell,
   IconBook,
   IconChevronDown,
@@ -46,8 +47,8 @@ function useDismiss(open, setOpen, ref) {
 }
 
 // `end` : « Mes évaluations » (/evaluations) ne doit pas rester allumé sur
-// /evaluations/nouvelle, ni « Banque d'exercices » sur /banque/evaluations :
-// deux entrées actives à la fois, et l'utilisateur ne sait plus où il est.
+// /evaluations/nouvelle : deux entrées actives à la fois, et l'utilisateur ne
+// sait plus où il est.
 function NavItem({ to, icon, label, end = false }) {
   return (
     <NavLink to={to} className="nav-item" end={end} title={label}>
@@ -80,9 +81,7 @@ const TEACHER_NAV = [
     items: [
       { to: '/classes', label: 'Mes classes', icon: <IconClasses /> },
       { to: '/matieres', label: 'Mes matières', icon: <IconBook /> },
-      { to: '/banque', label: "Banque d'exercices", icon: <IconCode />, end: true },
-      { to: '/banque/evaluations', label: "Banque d'évaluations", icon: <IconBook /> },
-      { to: '/communaute', label: 'Communauté', icon: <IconCommunity /> },
+      { to: '/banque', label: 'Banque', icon: <IconBank /> },
     ],
   },
   {
