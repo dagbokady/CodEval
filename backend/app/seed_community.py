@@ -1,15 +1,15 @@
 """Sujets ESATIC publiés dans la communauté : python -m app.seed_community
 
-Trois épreuves complètes, recopiées à l'identique des sujets papier :
+Trois épreuves complètes, recopiées trait pour trait des sujets papier :
 
 - Devoir commun surveillé, Initiation algorithmique (SRIT1, 30/11/2024) ;
 - Devoir surveillé, C avancé (M1 MBDS, 27/02/2024) ;
 - Examen 2e session, C avancé (M1 MBDS, BIHAR, SIGL, mars 2025).
 
 Chacune devient un élément « sujet » de la communauté, rattaché au premier
-administrateur. La mise en exercices suit docs/guide/creer-devoirs-et-examens.md.
-Seules les précisions dont la correction automatique a besoin (ordre de saisie,
-signatures, argument de la ligne de commande) s'ajoutent au texte du sujet.
+administrateur. Mêmes exercices, même numérotation, même barème et même texte
+que le papier : rien n'est ajouté à l'énoncé. Ce que le sujet ne fixe pas (ordre
+de saisie, signatures exactes) reste donc à corriger à la main.
 
 Rejouable : un sujet déjà publié sous le même titre est mis à jour, pas recréé.
 """
@@ -63,8 +63,12 @@ def exercise(title: str, kind: str, language: str, points: float, *, statement: 
 
 
 def question(text: str, rows: int = 4, accepted: list[str] | None = None,
-             keywords: bool = False) -> dict:
-    return {"text": text, "rows": rows, "accepted": accepted or [], "keywords_mode": keywords}
+             keywords: bool = False, points: float | None = None) -> dict:
+    """Une question-réponse ; `points` fixe sa part du barème quand le sujet la donne."""
+    q = {"text": text, "rows": rows, "accepted": accepted or [], "keywords_mode": keywords}
+    if points:
+        q["points"] = points
+    return q
 
 
 def qcm(text: str, choices: list[str], correct: int) -> dict:
@@ -132,9 +136,11 @@ def devoir_algo() -> dict:
         "evaluation": {
             "kind": "devoir",
             "description": "",
-            "instructions": "Semestre 1 / Devoir commun surveillé — Année académique : "
-                            "2024-2025\nParcours : SRIT1 A, B, C, D\n"
-                            "ECUE : INITIATION ALGORITHMIQUE — Durée : 2h00",
+            "instructions": "Semestre 1 / Devoir commun surveillé\n"
+                            "Année académique : 2024-2025\n"
+                            "Parcours : SRIT1 A, B, C, D\n"
+                            "ECUE : INITIATION ALGORITHMIQUE\n"
+                            "Durée : 2h00",
             "language": "algo",
             "duration_minutes": 120,
             "total_points": 20.0,
@@ -142,7 +148,7 @@ def devoir_algo() -> dict:
         },
         "exercises": [
             exercise(
-                "Exercice 1", "trace", "algo", 5.0,
+                "Simulation de l’algorithme CalculDeMoyenne", "trace", "algo", 5.0,
                 statement="Faire la simulation de l’algorithme ci-dessous pour laquelle "
                           "l’utilisateur a saisi 10, 11 et 12.",
                 settings={
@@ -163,7 +169,7 @@ def devoir_algo() -> dict:
                 },
             ),
             exercise(
-                "Exercice 2", "algo", "algo", 5.0,
+                "Les dix nombres suivants", "algo", "algo", 5.0,
                 statement="Ecrire un algorithme qui demande un nombre de départ à "
                           "l’utilisateur, et qui ensuite affiche les dix nombres suivants. "
                           "Par exemple, si l'utilisateur entre le nombre 17, le programme "
@@ -176,8 +182,10 @@ def devoir_algo() -> dict:
                     test("Départ 0", ["0"], " ".join(str(n) for n in range(1, 11)), 1.0),
                 ],
             ),
+            # Le sujet ne fixe pas l'ordre de saisie (jour, âge, étudiant) : pas de
+            # jeu de tests, la copie se corrige à la main.
             exercise(
-                "Exercice 3", "algo", "algo", 4.0,
+                "Tarif plein ou réduit", "algo", "algo", 4.0,
                 statement="Il y a deux tarifs : plein (7 FCFA) et réduit (4,50 FCFA). Le "
                           "tarif réduit s’applique :\n"
                           "• à tout le monde le mercredi,\n"
@@ -185,23 +193,19 @@ def devoir_algo() -> dict:
                           "• aux moins de 18 ans et plus de 65 ans SAUF les samedi et "
                           "dimanche.\n"
                           "Ecrire un Algorithme qui recueille les données nécessaires et "
-                          "annonce le prix à payer pour la place.\n\n"
-                          "Pour la correction automatique, saisir dans cet ordre : le jour "
-                          "(lundi … dimanche), l’âge, puis OUI ou NON (étudiant ?).",
-                settings={"allowed_elements": OUTILS_ALGO, "ecriture_cours": True},
-                tests=[
-                    test(nom, args, attendu, 1.0, types=["string", "int", "string"])
-                    for nom, args, attendu in [
-                        ("Mercredi", ["mercredi", "30", "NON"], "4.5"),
-                        ("Étudiant un lundi", ["lundi", "30", "OUI"], "4.5"),
-                        ("Enfant un samedi", ["samedi", "12", "NON"], "7"),
-                        ("Senior un mardi", ["mardi", "70", "NON"], "4.5"),
-                        ("Adulte un dimanche", ["dimanche", "30", "NON"], "7"),
-                    ]
-                ],
+                          "annonce le prix à payer pour la place.",
+                settings={
+                    "allowed_elements": OUTILS_ALGO,
+                    "ecriture_cours": True,
+                    "solution_notes": "LIRE(jour), LIRE(age), LIRE(etudiant)\n"
+                                      "SI jour = \"mercredi\" OU etudiant = \"OUI\" OU "
+                                      "((age < 18 OU age > 65) ET jour <> \"samedi\" ET "
+                                      "jour <> \"dimanche\") ALORS prix ← 4.5\n"
+                                      "SINON prix ← 7\nECRIRE(\"Prix à payer : \", prix)",
+                },
             ),
             exercise(
-                "Exercice 4", "algo", "algo", 6.0,
+                "Le plus grand nombre et sa position", "algo", "algo", 6.0,
                 statement="Ecrire un algorithme qui :\n"
                           "1- demande successivement plusieurs nombres à l’utilisateur, et "
                           "qui lui dise ensuite quel était le plus grand parmi ces nombres ;\n"
@@ -240,9 +244,11 @@ def devoir_c() -> dict:
         "evaluation": {
             "kind": "devoir",
             "description": "",
-            "instructions": "Devoir surveillé — Année académique : 2023-2024\n"
+            "instructions": "Devoir surveillé\n"
+                            "Année académique : 2023-2024\n"
                             "Parcours : M1 MBDS\n"
-                            "ECUE : C avancé — Durée : 2h00\n\n"
+                            "ECUE : C avancé\n"
+                            "Durée : 2h00\n\n"
                             "Important à lire :\n"
                             "- Les copies conformes seront automatiquement sanctionnées "
                             "d’une note de 0/20.\n"
@@ -258,20 +264,19 @@ def devoir_c() -> dict:
         },
         "exercises": [
             exercise(
-                "Exercice 1 Question de cours", "short", "c", 10.0,
+                "Question de cours", "short", "c", 10.0,
                 settings={
                     "questions": [
-                        question("1. Donner la définition d’une bibliothèque dynamique.",
+                        question("Donner la définition d’une bibliothèque dynamique.",
                                  accepted=["exécution", "partagée"], keywords=True),
-                        question("2. Donner la différence entre :\n"
-                                 "a. Une bibliothèque et une librairie"),
-                        question("2. Donner la différence entre :\n"
+                        question("Donner la différence entre :\n"
+                                 "a. Une bibliothèque et une librairie\n"
                                  "b. Une bibliothèque statistique et une bibliothèque "
-                                 "dynamique"),
-                        question("3. Dans un projet C à quoi servent les fichiers entête "
+                                 "dynamique", rows=8),
+                        question("Dans un projet C à quoi servent les fichiers entête "
                                  "(extension .h)"),
-                        question("4. Pourquoi utiliser les directives au préprocesseur"),
-                        question("5. Citer 3 directives au préprocesseur et les définir",
+                        question("Pourquoi utiliser les directives au préprocesseur"),
+                        question("Citer 3 directives au préprocesseur et les définir",
                                  rows=6),
                     ],
                     "solution_notes": "1. Code compilé chargé à l'exécution et partagé entre "
@@ -290,7 +295,7 @@ def devoir_c() -> dict:
                 },
             ),
             exercise(
-                "Exercice 2 programmation C", "short", "c", 10.0,
+                "programmation C", "short", "c", 10.0,
                 settings={
                     "questions": [
                         question("Proposer une approche pour réaliser une application de "
@@ -333,18 +338,21 @@ NB : (Quelques bout de code pour vous aider si et seulement si vous en avez beso
 • #define __ ;
 • #endif ;
 
-EXERCICE 1 (08 points)
 1) Donne le contenu des fichiers Etudiant.h ; Note.h, Fonctions.h, (02 pts par fonction)
-2) Donne le contenu du fichier Fonctions.c (02 pts)
+2) Donne le contenu du fichier Fonctions.c (02 pts)"""
 
-EXERCICE 2 (07 points)
-Soit la commande suivante permettant de lancer le programme final obtenu après les différentes phases de compilations :
-c :> ProgrammeMoyenne.exe 40
-1) Donne le contenu du fichier main.c (04 pts)
+SOLUTION_FICHIERS = """\
+/* ===== Note.h ===== */
+#ifndef NOTE_H
+#define NOTE_H
 
-Pour la correction automatique : le nombre d’étudiants arrive dans argv[1] ; chaque étudiant se saisit sur une ligne « matricule nom note ». Signatures : void AjouterNote(float ValeurNote, Etudiant *UnEtudiant) ; float MoyenneNotes(Etudiant *TabEtudiants, int n) ; void AfficherTout(Etudiant *TabEtudiants, int n). La moyenne de la classe est la dernière valeur affichée."""
+typedef struct Note {
+    char date[11];
+    float note;
+} Note;
 
-SOLUTION_EXAMEN = """\
+#endif
+
 /* ===== Etudiant.h ===== */
 #ifndef ETUDIANT_H
 #define ETUDIANT_H
@@ -359,26 +367,17 @@ typedef struct Etudiant {
 
 #endif
 
-/* ===== Note.h ===== */
-#ifndef NOTE_H
-#define NOTE_H
-
-typedef struct Note {
-    char date[11];
-    float note;
-} Note;
-
-#endif
-
 /* ===== Fonctions.h ===== */
 #ifndef FONCTIONS_H
 #define FONCTIONS_H
 
 #include "Etudiant.h"
 
+extern int NbEtudiants;
+
 void AjouterNote(float ValeurNote, Etudiant *UnEtudiant);
-float MoyenneNotes(Etudiant *TabEtudiants, int n);
-void AfficherTout(Etudiant *TabEtudiants, int n);
+float MoyenneNotes(Etudiant *TabEtudiants);
+void AfficherTout(Etudiant *TabEtudiants);
 
 #endif
 
@@ -386,49 +385,54 @@ void AfficherTout(Etudiant *TabEtudiants, int n);
 #include <stdio.h>
 #include "Fonctions.h"
 
+int NbEtudiants = 40;
+
 void AjouterNote(float ValeurNote, Etudiant *UnEtudiant)
 {
     UnEtudiant->note.note = ValeurNote;
 }
 
-float MoyenneNotes(Etudiant *TabEtudiants, int n)
+float MoyenneNotes(Etudiant *TabEtudiants)
 {
     float somme = 0;
-    for (int i = 0; i < n; i++) somme += TabEtudiants[i].note.note;
-    return n > 0 ? somme / n : 0;
+    for (int i = 0; i < NbEtudiants; i++) somme += TabEtudiants[i].note.note;
+    return NbEtudiants > 0 ? somme / NbEtudiants : 0;
 }
 
-void AfficherTout(Etudiant *TabEtudiants, int n)
+void AfficherTout(Etudiant *TabEtudiants)
 {
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < NbEtudiants; i++)
         printf("%s : %.2f\\n", TabEtudiants[i].nom, TabEtudiants[i].note.note);
-    printf("Moyenne de la classe : %.2f\\n", MoyenneNotes(TabEtudiants, n));
-}
+    printf("Moyenne de la classe : %.2f\\n", MoyenneNotes(TabEtudiants));
+}"""
 
-/* ===== main.c ===== */
+SOLUTION_MAIN = """\
+1) main.c
 #include <stdio.h>
 #include <stdlib.h>
 #include "Fonctions.h"
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
-        printf("Usage : %s nombre_etudiants\\n", argv[0]);
-        return 1;
-    }
-    int n = atoi(argv[1]);
-    Etudiant *TabEtudiants = (Etudiant *)malloc(n * sizeof(Etudiant));
+    if (argc < 2) return 1;
+    NbEtudiants = atoi(argv[1]);
+    Etudiant *TabEtudiants = (Etudiant *)malloc(NbEtudiants * sizeof(Etudiant));
     if (TabEtudiants == NULL) return 1;
 
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i < NbEtudiants; i++) {
         float valeur;
         scanf("%15s %39s %f", TabEtudiants[i].matricule, TabEtudiants[i].nom, &valeur);
         AjouterNote(valeur, &TabEtudiants[i]);
     }
-    AfficherTout(TabEtudiants, n);
+    AfficherTout(TabEtudiants);
     free(TabEtudiants);
     return 0;
-}"""
+}
+
+2) Commandes
+gcc -c Fonctions.c
+gcc -c main.c
+gcc Fonctions.o main.o -o ProgrammeMoyenne.exe"""
 
 
 def _etudiant_ptr(name: str) -> dict:
@@ -446,88 +450,80 @@ def examen_c() -> dict:
         "evaluation": {
             "kind": "examen",
             "description": "",
-            "instructions": "Examen 2ième session — Année académique : 2024-2025\n"
+            "instructions": "Examen 2ième session\n"
+                            "Année académique : 2024-2025\n"
                             "Parcours : M1 MBDS, BIHAR, SIGL\n"
-                            "ECUE : C avancé — Durée : 2h00",
+                            "ECUE : C avancé\n"
+                            "Durée : 2h00",
             "language": "c",
             "duration_minutes": 120,
             "total_points": 20.0,
             "rules": {},
         },
         "exercises": [
-            # Les exercices 1 et 2.1 portent sur le même programme : un seul projet,
-            # pour que main.c se compile avec les en-têtes de l'apprenant.
+            # Corrigé sur les déclarations (structures et prototypes) ; le corps des
+            # fonctions de Fonctions.c se relit à la main.
             exercise(
-                "Exercice 1 et Exercice 2 — 1) : Etudiant.h, Note.h, Fonctions.h, "
-                "Fonctions.c, main.c", "code", "c", 12.0,
+                "Etudiant.h ; Note.h ; Fonctions.h ; Fonctions.c", "code", "c", 8.0,
                 statement=ENONCE_EXAMEN,
                 settings={
                     "files": [{"name": f, "starter": ""} for f in (
-                        "Etudiant.h", "Note.h", "Fonctions.h", "Fonctions.c", "main.c")],
+                        "Etudiant.h", "Note.h", "Fonctions.h", "Fonctions.c")],
                     "criteria": [
                         {"id": "note", "kind": "struct", "name": "Note", "points": 2,
                          "fields": [{"name": "note", "type": "float"}]},
                         {"id": "etudiant", "kind": "struct", "name": "Etudiant", "points": 2,
                          "fields": [{"name": "note", "type": "custom", "ctype": "Note"}]},
                         {"id": "ajouter", "kind": "function", "name": "AjouterNote",
-                         "returns": "void", "points": 1,
+                         "returns": "void", "points": 1.34,
                          "params": [{"name": "ValeurNote", "type": "float"},
                                     _etudiant_ptr("UnEtudiant")]},
                         {"id": "moyenne", "kind": "function", "name": "MoyenneNotes",
-                         "returns": "float", "points": 0.5,
-                         "params": [_etudiant_ptr("TabEtudiants"),
-                                    {"name": "n", "type": "int"}]},
+                         "returns": "float", "points": 1.33,
+                         "params": [_etudiant_ptr("TabEtudiants")]},
                         {"id": "afficher", "kind": "function", "name": "AfficherTout",
-                         "returns": "void", "points": 0.5,
-                         "params": [_etudiant_ptr("TabEtudiants"),
-                                    {"name": "n", "type": "int"}]},
+                         "returns": "void", "points": 1.33,
+                         "params": [_etudiant_ptr("TabEtudiants")]},
                     ],
-                    "solution": SOLUTION_EXAMEN,
+                    "solution": SOLUTION_FICHIERS,
                 },
-                tests=[
-                    test("ProgrammeMoyenne.exe 3",
-                         ["E001 Kone 12", "E002 Yao 16", "E003 Traore 11"], "13", 3.0,
-                         types=["string"] * 3, argv=["3"]),
-                    test("ProgrammeMoyenne.exe 1", ["E010 Awa 20"], "20", 3.0,
-                         types=["string"], argv=["1"]),
-                ],
             ),
             exercise(
-                "Exercice 2 — 2)", "short", "c", 3.0,
+                "main.c et commandes de compilation", "short", "c", 7.0,
+                statement="Soit la commande suivante permettant de lancer le programme "
+                          "final obtenu après les différentes phases de compilations :\n\n"
+                          "c :> ProgrammeMoyenne.exe 40",
                 settings={
                     "questions": [
-                        question("Soit la commande suivante permettant de lancer le "
-                                 "programme final obtenu après les différentes phases de "
-                                 "compilations :\nc :> ProgrammeMoyenne.exe 40\n\n"
-                                 "2) Donne la suite des commandes ayant permis d’obtenir le "
-                                 "fichier ProgrammeMoyenne.exe (03 pts)",
-                                 rows=5,
+                        question("Donne le contenu du fichier main.c (04 pts)", rows=20,
+                                 points=4),
+                        question("Donne la suite des commandes ayant permis d’obtenir le "
+                                 "fichier ProgrammeMoyenne.exe (03 pts)", rows=5,
                                  accepted=["Fonctions.c", "main.c", "Fonctions.o",
                                            "-o ProgrammeMoyenne.exe"],
-                                 keywords=True),
+                                 keywords=True, points=3),
                     ],
-                    "solution_notes": "gcc -c Fonctions.c\ngcc -c main.c\n"
-                                      "gcc Fonctions.o main.o -o ProgrammeMoyenne.exe",
+                    "solution_notes": SOLUTION_MAIN,
                 },
             ),
             exercise(
-                "Exercice 3", "qcm", "c", 5.0,
+                "QCM", "qcm", "c", 5.0,
                 settings={"questions": [
-                    qcm("1. Quelle est la principale fonction d’une directive de "
+                    qcm("Quelle est la principale fonction d’une directive de "
                         "préprocesseur en C ?", [
                             "Modifier le code source avant la compilation.",
                             "Améliorer les performances du programme.",
                             "Ajouter de nouvelles fonctionnalités au langage C.",
                             "Remplacer automatiquement les erreurs de syntaxe.",
                         ], 0),
-                    qcm("2. Lors de la compilation d’un programme en C, quelle est l’étape "
+                    qcm("Lors de la compilation d’un programme en C, quelle est l’étape "
                         "effectuée en premier ?", [
                             "L’édition de liens (linking).",
                             "L’assemblage (assembly).",
                             "Le prétraitement (preprocessing).",
                             "L’exécution du programme.",
                         ], 2),
-                    qcm("3. Quelle affirmation est correcte concernant les bibliothèques "
+                    qcm("Quelle affirmation est correcte concernant les bibliothèques "
                         "dynamiques ?", [
                             "Elles sont incluses directement dans l’exécutable du programme.",
                             "Elles permettent de réduire la taille des exécutables en "
@@ -536,7 +532,7 @@ def examen_c() -> dict:
                             "l’application.",
                             "Elles sont chargées uniquement lors de la compilation.",
                         ], 1),
-                    qcm("4. Quelle est la principale différence entre une bibliothèque "
+                    qcm("Quelle est la principale différence entre une bibliothèque "
                         "statique et une bibliothèque dynamique ?", [
                             "Une bibliothèque statique est chargée à l’exécution tandis "
                             "qu’une bibliothèque dynamique est incluse à la compilation.",
@@ -547,14 +543,13 @@ def examen_c() -> dict:
                             "à l’exécution.",
                             "Les bibliothèques statiques ne peuvent pas être utilisées en C.",
                         ], 2),
-                    # Sur le sujet papier, les propositions b) et c) sont collées sur
-                    # une même ligne : ce sont deux choix distincts.
-                    qcm("5. Quelle est la conséquence d’un mauvais lien vers une "
-                        "bibliothèque dynamique ?", [
+                    # Trois propositions, comme sur le papier : la b) y réunit deux phrases.
+                    qcm("Quelle est la conséquence d’un mauvais lien vers une bibliothèque "
+                        "dynamique ?", [
                             "Le programme ne pourra pas être compilé.",
                             "Le programme risque de planter ou de ne pas s’exécuter "
-                            "correctement.",
-                            "Le programme fonctionnera mais avec des performances réduites.",
+                            "correctement.  Le programme fonctionnera mais avec des "
+                            "performances réduites.",
                             "Il n’y aura aucun effet, car les bibliothèques sont "
                             "automatiquement gérées.",
                         ], 1),

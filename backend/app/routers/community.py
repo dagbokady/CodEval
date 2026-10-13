@@ -14,7 +14,7 @@ import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import case, String, cast, func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..db import soft_delete
@@ -54,11 +54,6 @@ MemberUser = Annotated[User, Depends(require_roles(Role.TEACHER, Role.ADMIN))]
 _TEST_FIELDS = (
     "name", "stdin", "expected_stdout", "comparison", "points", "timeout_ms",
     "target_id", "expected_type",
-)
-_ORDRE_TYPES = case(
-    {"qcm": 0, "truefalse": 1, "short": 2, "algo": 3},
-    value=CommunityItem.content["exercise"]["kind"].as_string(),
-    else_=9,
 )
 
 _EXERCISE_FIELDS = ("title", "statement", "language", "points", "starter_code", "kind")
@@ -274,23 +269,16 @@ def list_items(
     user: MemberUser,
     db: DbSession,
     q: str | None = Query(default=None, max_length=120),
-    item_type: str | None = Query(default=None, pattern="^(exercise|subject)$"),
     language: str | None = None,
-    # Type d'exercice (« qcm », « truefalse », « algo »…) : n'en garde que les exercices.
-    kind: str | None = Query(default=None, max_length=20),
     scope: str = Query("all", pattern="^(all|mine|organization)$"),
-    sort: str = Query("recent", pattern="^(recent|popular|rated|type)$"),
+    sort: str = Query("recent", pattern="^(recent|popular|rated)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> Page:
-    filters = []
-    if item_type:
-        filters.append(CommunityItem.item_type == item_type)
+    # La communauté ne partage que des sujets complets.
+    filters = [CommunityItem.item_type == "subject"]
     if language:
         filters.append(CommunityItem.language == language)
-    if kind:
-        filters.append(CommunityItem.item_type == "exercise")
-        filters.append(CommunityItem.content["exercise"]["kind"].as_string() == kind)
     if scope == "mine":
         filters.append(CommunityItem.author_id == user.id)
     elif scope == "organization":
@@ -330,7 +318,6 @@ def list_items(
         .order_by(
             *order,
             *((CommunityItem.uses.desc(),) if sort == "popular" else ()),
-            *((_ORDRE_TYPES,) if sort == "type" else ()),
             CommunityItem.created_at.desc(),
             CommunityItem.id.desc(),
         )
@@ -348,22 +335,17 @@ def list_items(
 
 @router.get("/sources")
 def publishable_sources(user: MemberUser, db: DbSession) -> dict:
-    """Ce que l'utilisateur peut publier : ce qu'il a rangé dans la banque
-    d'exercices et dans la banque d'évaluations (les modèles), tout
-    l'établissement pour l'administration. Une épreuve en cours d'usage ne se
-    publie pas directement : on la met d'abord en banque."""
-    bank_filters = [BankExercise.organization_id == user.organization_id]
+    """Ce que l'utilisateur peut publier : les sujets rangés dans la banque
+    d'évaluations (les modèles), tout l'établissement pour l'administration. Une
+    épreuve en cours d'usage ne se publie pas directement : on la met d'abord en
+    banque."""
     eval_filters = [
         Evaluation.organization_id == user.organization_id,
         Evaluation.is_template.is_(True),
     ]
     if user.role is Role.TEACHER:
-        bank_filters.append(BankExercise.author_id == user.id)
         eval_filters.append(Evaluation.teacher_id == user.id)
 
-    exercises = db.scalars(
-        select(BankExercise).where(*bank_filters).order_by(BankExercise.updated_at.desc())
-    )
     evaluations = list(
         db.scalars(select(Evaluation).where(*eval_filters).order_by(Evaluation.created_at.desc()))
     )
@@ -377,10 +359,6 @@ def publishable_sources(user: MemberUser, db: DbSession) -> dict:
             ).all()
         )
     return {
-        "exercises": [
-            {"id": e.id, "title": e.title, "kind": e.kind, "language": e.language}
-            for e in exercises
-        ],
         "evaluations": [
             {
                 "id": e.id,
@@ -402,71 +380,50 @@ def get_item(item_id: int, user: MemberUser, db: DbSession) -> CommunityItemOut:
 # ----- Publication -----
 @router.post("", response_model=CommunityItemOut, status_code=status.HTTP_201_CREATED)
 def publish(payload: CommunityPublishIn, user: MemberUser, db: DbSession) -> CommunityItemOut:
-    if payload.source_type == "bank_exercise":
-        source = db.scalar(
-            select(BankExercise)
-            .where(
-                BankExercise.id == payload.source_id,
-                BankExercise.organization_id == user.organization_id,
-            )
-            .options(selectinload(BankExercise.tests))
+    # La communauté ne partage que des sujets complets, tirés de la banque d'évaluations.
+    source = db.get(Evaluation, payload.source_id)
+    if (
+        source is None
+        or source.organization_id != user.organization_id
+        or not source.is_template
+        or (user.role is Role.TEACHER and source.teacher_id != user.id)
+    ):
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "Évaluation introuvable dans la banque d'évaluations"
         )
-        if source is None or (user.role is Role.TEACHER and source.author_id != user.id):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Exercice introuvable")
-        item = CommunityItem(
-            item_type="exercise",
-            title=payload.title or source.title,
-            language=source.language,
-            subject_name=_subject_name(db, source.subject_id),
-            tags=payload.tags or list(source.tags or []),
-            content={"exercise": _snapshot_exercise(source)},
-            exercises_count=1,
-            total_points=source.points,
+    exercises = list(
+        db.scalars(
+            select(Exercise)
+            .where(Exercise.evaluation_id == source.id)
+            .options(selectinload(Exercise.tests))
+            .order_by(Exercise.position)
         )
-    else:
-        source = db.get(Evaluation, payload.source_id)
-        if (
-            source is None
-            or source.organization_id != user.organization_id
-            or not source.is_template
-            or (user.role is Role.TEACHER and source.teacher_id != user.id)
-        ):
-            raise HTTPException(
-                status.HTTP_404_NOT_FOUND, "Évaluation introuvable dans la banque d'évaluations"
-            )
-        exercises = list(
-            db.scalars(
-                select(Exercise)
-                .where(Exercise.evaluation_id == source.id)
-                .options(selectinload(Exercise.tests))
-                .order_by(Exercise.position)
-            )
+    )
+    if not exercises:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "Cette évaluation ne contient aucun exercice"
         )
-        if not exercises:
-            raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_ENTITY, "Cette évaluation ne contient aucun exercice"
-            )
-        item = CommunityItem(
-            item_type="subject",
-            title=payload.title or source.title,
-            language=source.language,
-            subject_name=_subject_name(db, source.subject_id),
-            tags=payload.tags,
-            content={
-                "evaluation": {
-                    "kind": source.kind.value,
-                    "description": source.description,
-                    "instructions": source.instructions,
-                    "language": source.language,
-                    "duration_minutes": source.duration_minutes,
-                    "total_points": source.total_points,
-                    "rules": dict(source.rules or {}),
-                },
-                "exercises": [_snapshot_exercise(e) for e in exercises],
+    item = CommunityItem(
+        item_type="subject",
+        title=payload.title or source.title,
+        language=source.language,
+        subject_name=_subject_name(db, source.subject_id),
+        tags=payload.tags,
+        content={
+            "evaluation": {
+                "kind": source.kind.value,
+                "description": source.description,
+                "instructions": source.instructions,
+                "language": source.language,
+                "duration_minutes": source.duration_minutes,
+                "total_points": source.total_points,
+                "rules": dict(source.rules or {}),
             },
-            exercises_count=len(exercises),
-            total_points=source.total_points,
-        )
+            "exercises": [_snapshot_exercise(e) for e in exercises],
+        },
+        exercises_count=len(exercises),
+        total_points=source.total_points,
+    )
     item.organization_id = user.organization_id
     item.author_id = user.id
     item.description = payload.description

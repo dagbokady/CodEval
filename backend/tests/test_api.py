@@ -2003,21 +2003,19 @@ def test_communaute_publier_recuperer_et_moderer(context):
     detail = client.get(f"/api/community/{subject_item['id']}", headers=t).json()
     assert detail["content"]["exercises"][0]["tests"][0]["expected_stdout"] == "3"
 
+    assert "exercises" in detail["preview"]
+
+    # La communauté ne partage que des sujets complets : pas d'exercice seul.
     bank = client.post(
         "/api/bank/exercises",
         headers=t,
         json={"title": "Maximum", "language": "c", "points": 4,
               "tests": [{"name": "T", "stdin": "3 9\n", "expected_stdout": "9", "points": 4}]},
     ).json()
-    exercise_item = client.post(
-        "/api/community", headers=t,
-        json={"source_type": "bank_exercise", "source_id": bank["id"]},
-    ).json()
-    assert exercise_item["title"] == "Maximum"
-    assert exercise_item["exercise_kinds"] == ["code"]
-    assert exercise_item["preview"]["kind"] == "code"
-    assert subject_item["id"] and "exercises" in client.get(
-        f"/api/community/{subject_item['id']}", headers=t).json()["preview"]
+    res = client.post("/api/community", headers=t,
+                      json={"source_type": "bank_exercise", "source_id": bank["id"]})
+    assert res.status_code == 422
+    assert "exercises" not in client.get("/api/community/sources", headers=t).json()
 
     # Un autre établissement voit la communauté et en tire des copies.
     other_admin = create_admin("Autre École", "Admin Deux", "admin2@autre.ci")
@@ -2028,25 +2026,14 @@ def test_communaute_publier_recuperer_et_moderer(context):
         "email": "prof2@autre.ci", "password": "motdepasse1"}).json()["access_token"])
 
     listing = client.get("/api/community", headers=other).json()
-    ids = [item["id"] for item in listing["items"]]
-    assert subject_item["id"] in ids and exercise_item["id"] in ids
+    assert subject_item["id"] in [item["id"] for item in listing["items"]]
+    assert all(item["item_type"] == "subject" for item in listing["items"])
     assert all(not item["can_delete"] for item in listing["items"])
-    assert client.get("/api/community?item_type=exercise", headers=other).json()["total"] >= 1
-    by_kind = client.get(f"/api/community?kind={exercise_item['exercise_kind']}", headers=other).json()
-    assert exercise_item["id"] in [i["id"] for i in by_kind["items"]]
-    assert subject_item["id"] not in [i["id"] for i in by_kind["items"]]
-    assert client.get("/api/community?kind=inexistant", headers=other).json()["total"] == 0
 
     # On ne publie pas le travail d'un autre établissement.
     res = client.post("/api/community", headers=other,
-                      json={"source_type": "bank_exercise", "source_id": bank["id"]})
+                      json={"source_type": "evaluation", "source_id": template["id"]})
     assert res.status_code == 404
-
-    res = client.post(f"/api/community/{exercise_item['id']}/to-bank", headers=other)
-    assert res.status_code == 201, res.text
-    assert res.json()["target"] == "bank_exercise"
-    copy = client.get(f"/api/bank/exercises/{res.json()['id']}", headers=other).json()
-    assert copy["tests"][0]["expected_stdout"] == "9"
 
     res = client.post(f"/api/community/{subject_item['id']}/to-bank", headers=other)
     assert res.json()["target"] == "template"
@@ -2071,33 +2058,32 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert popular[0]["id"] == subject_item["id"]
 
     # Les enseignants notent en étoiles ; l'auteur et l'administration non.
-    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=t,
+    assert client.put(f"/api/community/{subject_item['id']}/rating", headers=t,
                       json={"stars": 5}).status_code == 403
-    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=a,
+    assert client.put(f"/api/community/{subject_item['id']}/rating", headers=a,
                       json={"stars": 5}).status_code == 403
-    assert client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+    assert client.put(f"/api/community/{subject_item['id']}/rating", headers=other,
                       json={"stars": 6}).status_code == 422
-    rated = client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+    rated = client.put(f"/api/community/{subject_item['id']}/rating", headers=other,
                        json={"stars": 2}).json()
     assert (rated["rating_avg"], rated["rating_count"], rated["my_rating"]) == (2, 1, 2)
-    rated = client.put(f"/api/community/{exercise_item['id']}/rating", headers=other,
+    rated = client.put(f"/api/community/{subject_item['id']}/rating", headers=other,
                        json={"stars": 4}).json()
     assert (rated["rating_avg"], rated["rating_count"]) == (4, 1)
-    seen_by_author = client.get(f"/api/community/{exercise_item['id']}", headers=t).json()
+    seen_by_author = client.get(f"/api/community/{subject_item['id']}", headers=t).json()
     assert seen_by_author["rating_avg"] == 4 and seen_by_author["my_rating"] is None
     assert not seen_by_author["can_rate"]
     best = client.get("/api/community?sort=rated", headers=other).json()["items"]
-    assert best[0]["id"] == exercise_item["id"] and best[0]["my_rating"] == 4
-    cleared = client.delete(f"/api/community/{exercise_item['id']}/rating", headers=other).json()
+    assert best[0]["id"] == subject_item["id"] and best[0]["my_rating"] == 4
+    cleared = client.delete(f"/api/community/{subject_item['id']}/rating", headers=other).json()
     assert cleared["rating_count"] == 0 and cleared["rating_avg"] is None
 
     # L'administration publie et modère ce qui vient de son établissement.
-    assert client.post(f"/api/community/{exercise_item['id']}/use", headers=a,
+    assert client.post(f"/api/community/{subject_item['id']}/use", headers=a,
                        json={}).status_code == 403
     assert client.delete(f"/api/community/{subject_item['id']}",
                          headers=auth(other_admin)).status_code == 403
     assert client.delete(f"/api/community/{subject_item['id']}", headers=a).status_code == 204
-    assert client.delete(f"/api/community/{exercise_item['id']}", headers=t).status_code == 204
 
 
 def test_chacun_supprime_son_compte_et_l_admin_ceux_des_autres(context):

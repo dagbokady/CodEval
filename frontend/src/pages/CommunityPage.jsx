@@ -15,17 +15,11 @@ import {
   Loading,
   Menu,
   PageHeader,
-  Segmented,
   Skeleton,
   Tabs,
 } from '../components/ui';
 import { EVAL_KIND_LABELS } from '../format';
-import { KIND_LABELS, exerciseType } from '../exerciseTypes';
-
-const TYPES = [
-  { value: 'exercise', label: 'Exercices' },
-  { value: 'subject', label: 'Sujets complets' },
-];
+import { exerciseType } from '../exerciseTypes';
 
 const SCOPES = [
   { value: 'all', label: 'Toute la communauté' },
@@ -37,7 +31,6 @@ const SORTS = [
   { value: 'recent', label: 'Les plus récents' },
   { value: 'popular', label: 'Les plus repris' },
   { value: 'rated', label: 'Les mieux notés' },
-  { value: 'type', label: 'Par type (QCM, Vrai/Faux…)' },
 ];
 
 const dayFmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -155,9 +148,7 @@ export default function CommunityPage() {
   const isTeacher = user.role === 'teacher';
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
-  const itemType = params.get('type');
   const language = params.get('langage') ?? '';
-  const kind = params.get('format') ?? '';
   const scope = params.get('provenance') ?? 'all';
   const sort = params.get('tri') ?? 'recent';
 
@@ -218,7 +209,7 @@ export default function CommunityPage() {
   const languages = useLanguages();
   const languageLabel = (key) =>
     (languages.data ?? []).find((l) => l.key === key)?.label ?? key?.toUpperCase();
-  const listing = useCommunity({ q, itemType, kind, language, scope, sort });
+  const listing = useCommunity({ q, language, scope, sort });
 
   const useItem = useAction(
     (id) => api(`/api/community/${id}/use`, { method: 'POST', body: {} }),
@@ -280,16 +271,6 @@ export default function CommunityPage() {
         setFilter('q', null);
       },
     },
-    itemType && {
-      key: 'type',
-      label: TYPES.find((t) => t.value === itemType)?.label,
-      clear: () => setFilter('type', null),
-    },
-    kind && {
-      key: 'format',
-      label: KIND_LABELS[kind] ?? kind,
-      clear: () => setFilter('format', null),
-    },
     language && {
       key: 'langage',
       label: languageLabel(language),
@@ -316,7 +297,7 @@ export default function CommunityPage() {
       <PageHeader
         breadcrumb={isTeacher ? 'Espace enseignant' : 'Supervision'}
         title="Communauté"
-        meta="Exercices et sujets partagés par les enseignants de tous les établissements. Reprenez-les tels quels ou adaptez-les."
+        meta="Sujets complets partagés par les enseignants de tous les établissements. Reprenez-les tels quels ou adaptez-les."
       >
         <Button onClick={() => setPublishing(true)}>
           <IconPlus />
@@ -352,13 +333,6 @@ export default function CommunityPage() {
           </label>
 
           <div className="cm-filters">
-            <Segmented
-              label="Type de publication"
-              allLabel="Tout"
-              value={itemType}
-              onChange={(value) => setFilter('type', value)}
-              options={TYPES}
-            />
             <select
               className="select-inline"
               aria-label="Langage"
@@ -382,23 +356,6 @@ export default function CommunityPage() {
             </select>
           </div>
         </div>
-
-        {itemType !== 'subject' && (
-          <div className="cm-kind-legend" role="group" aria-label="Filtrer par type d'exercice">
-            {Object.entries(KIND_LABELS).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className="cm-kind-chip"
-                data-kind={value}
-                aria-pressed={kind === value}
-                onClick={() => setFilter('format', kind === value ? null : value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="cm-summary" aria-live="polite">
           <span className="cm-count">
@@ -922,12 +879,11 @@ function PreviewDialog({ id, onClose, actions, languageLabel }) {
 }
 
 /**
- * Publier : on choisit ce qu'on a déjà fait (un exercice de sa banque, une
- * évaluation ou un modèle), puis on le présente en deux lignes. Pour
- * l'administration, la liste couvre tout l'établissement.
+ * Publier : on choisit un sujet complet de sa banque d'évaluations, puis on le
+ * présente en deux lignes. La communauté ne partage que des sujets complets.
+ * Pour l'administration, la liste couvre tout l'établissement.
  */
 function PublishDialog({ open, onClose, onPublished }) {
-  const [sourceType, setSourceType] = useState('evaluation');
   const [sourceId, setSourceId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -940,24 +896,17 @@ function PublishDialog({ open, onClose, onPublished }) {
     ['community'],
   ]);
 
-  const options =
-    sourceType === 'evaluation'
-      ? (sources.data?.evaluations ?? []).map((e) => ({
-          value: e.id,
-          label: `${e.title} · ${e.exercises_count} exercice${e.exercises_count > 1 ? 's' : ''}`,
-          title: e.title,
-        }))
-      : (sources.data?.exercises ?? []).map((e) => ({
-          value: e.id,
-          label: `${e.title} · ${exerciseType(e.kind).badge}`,
-          title: e.title,
-        }));
+  const options = (sources.data?.evaluations ?? []).map((e) => ({
+    value: e.id,
+    label: `${e.title} · ${e.exercises_count} exercice${e.exercises_count > 1 ? 's' : ''}`,
+    title: e.title,
+  }));
 
   function submit(event) {
     event.preventDefault();
     publish
       .mutateAsync({
-        source_type: sourceType === 'evaluation' ? 'evaluation' : 'bank_exercise',
+        source_type: 'evaluation',
         source_id: Number(sourceId),
         title: title.trim() || null,
         description: description.trim(),
@@ -980,37 +929,18 @@ function PublishDialog({ open, onClose, onPublished }) {
       description="Une copie est publiée : modifier ou supprimer l'original plus tard ne la change pas."
     >
       <form onSubmit={submit}>
-        <Field
-          label="Que voulez-vous partager ?"
-          hint="On publie depuis une banque : une épreuve se met d'abord en banque, depuis « Mes évaluations »."
-        >
-          <Segmented
-            label="Que voulez-vous partager ?"
-            value={sourceType}
-            onChange={(value) => {
-              if (!value) return;
-              setSourceType(value);
-              setSourceId('');
-            }}
-            options={[
-              { value: 'evaluation', label: "Banque d'évaluations" },
-              { value: 'exercise', label: "Banque d'exercices" },
-            ]}
-          />
-        </Field>
-
         {sources.isPending ? (
           <Loading variant="inline" />
         ) : options.length === 0 ? (
           <Alert tone="info">
-            {sourceType === 'evaluation'
-              ? "Votre banque d'évaluations est vide. Depuis « Mes évaluations », le bouton « Mettre en banque » y range une épreuve : elle pourra ensuite être publiée."
-              : "Votre banque d'exercices est vide : créez-en un depuis « Banque d'exercices »."}
+            Votre banque d'évaluations est vide. Depuis « Mes évaluations », le bouton « Mettre
+            en banque » y range une épreuve : elle pourra ensuite être publiée.
           </Alert>
         ) : (
           <Field
-            label={sourceType === 'evaluation' ? 'Évaluation en banque' : 'Exercice en banque'}
+            label="Sujet de votre banque d'évaluations"
             id="community-source"
+            hint="On publie depuis la banque : une épreuve s'y range depuis « Mes évaluations »."
           >
             <select
               id="community-source"
