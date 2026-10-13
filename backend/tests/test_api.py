@@ -820,8 +820,12 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
     options = grid["right_options"]
     assert sorted(o["text"] for o in options) == ["constant", "linéaire", "quadratique"]
     assert all(set(o) == {"token", "text"} for o in options)
+    # La colonne de gauche arrive mélangée elle aussi : chaque élément porte la
+    # clé sous laquelle la copie le relie.
+    assert sorted(p["key"] for p in grid["pairs"]) == ["0", "1", "2"]
 
     by_text = {o["text"]: o["token"] for o in options}
+    key_of = {p["left"]: p["key"] for p in grid["pairs"]}
     client.put(
         f"/api/me/evaluations/{eid}/exercises/{exercise['id']}",
         headers=s,
@@ -829,9 +833,9 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
             "code": _json.dumps(
                 {
                     "matches": {
-                        "0": by_text["constant"],
-                        "1": by_text["linéaire"],
-                        "2": by_text["constant"],
+                        key_of["O(1)"]: by_text["constant"],
+                        key_of["O(n)"]: by_text["linéaire"],
+                        key_of["O(n²)"]: by_text["constant"],
                     }
                 }
             ),
@@ -854,6 +858,46 @@ def test_correspondance_ne_livre_pas_son_corrige_a_l_apprenant(context):
     rows = client.get(f"/api/me/results/{eid}", headers=s).json()["exercises"][0]["matches"]
     assert [r["chosen"] for r in rows] == ["constant", "linéaire", "constant"]
     assert [r["correct"] for r in rows] == [True, True, False]
+
+
+def test_chaque_apprenant_recoit_sa_propre_grille_melangee():
+    """Les deux colonnes d'une correspondance sont mélangées, autrement pour chacun."""
+    from app.grading.matching import resolve
+    from app.models import Exercise
+    from app.routers.student import _hide_matching
+
+    pairs = [{"left": f"g{i}", "right": f"d{i}"} for i in range(8)]
+    exercise = Exercise(
+        id=906, evaluation_id=1, position=1, title="Relier", statement="",
+        language="c", points=4, starter_code="", kind="matching",
+        settings={"_matching_salt": "sel", "questions": [{"text": "", "pairs": pairs}]},
+    )
+    question = exercise.settings["questions"][0]
+    first = _hide_matching(question, exercise, 0, participant=11)
+    second = _hide_matching(question, exercise, 0, participant=12)
+
+    def lefts(grid):
+        return [p["left"] for p in grid["pairs"]]
+
+    def rights(grid):
+        return [o["text"] for o in grid["right_options"]]
+
+    # Deux voisins ne voient pas la même grille, ni à gauche ni à droite…
+    assert lefts(first) != lefts(second)
+    assert rights(first) != rights(second)
+    # … et les deux colonnes ne suivent pas le même tirage.
+    assert [p["key"] for p in first["pairs"]] != [
+        o["text"][1:] for o in first["right_options"]
+    ]
+    # Le même apprenant retrouve sa grille à chaque rechargement.
+    assert _hide_matching(question, exercise, 0, participant=11) == first
+    # La clé de gauche est le rang d'origine, le jeton de droite y renvoie.
+    for grid in (first, second):
+        assert sorted(lefts(grid)) == sorted(p["left"] for p in pairs)
+        for pair in grid["pairs"]:
+            assert pair["left"] == f"g{pair['key']}"
+        for option in grid["right_options"]:
+            assert resolve(option["token"], "sel", len(pairs)) == int(option["text"][1:])
 
 
 def test_le_sel_d_une_correspondance_survit_a_une_modification(context):
@@ -2084,6 +2128,105 @@ def test_communaute_publier_recuperer_et_moderer(context):
     assert client.delete(f"/api/community/{subject_item['id']}",
                          headers=auth(other_admin)).status_code == 403
     assert client.delete(f"/api/community/{subject_item['id']}", headers=a).status_code == 204
+
+
+def test_banque_partage_depuis_ma_banque(context):
+    """Ma banque réunit exercices et sujets ; le partage s'y règle en trois
+    portées et suit l'original tant qu'il dure."""
+    t = auth(context["teacher"])
+    exercise = client.post(
+        "/api/bank/exercises",
+        headers=t,
+        json={"title": "Minimum partagé", "language": "c", "points": 4,
+              "tests": [{"name": "T", "stdin": "3 9\n", "expected_stdout": "3", "points": 4}]},
+    ).json()
+    assert exercise["share"] == "none"
+    source = client.post(
+        "/api/evaluations", headers=t,
+        json={"title": "Sujet de banque", "language": "python", "total_points": 20},
+    ).json()
+    client.put(f"/api/evaluations/{source['id']}/exercises", headers=t,
+               json=[{"title": "Somme", "language": "python", "points": 20}])
+    template = client.post(f"/api/evaluations/{source['id']}/save-as-template", headers=t).json()
+
+    library = client.get("/api/bank/library", headers=t).json()["items"]
+    keys = [(item["source"], item["id"]) for item in library]
+    assert ("exercise", exercise["id"]) in keys and ("subject", template["id"]) in keys
+    only_subjects = client.get("/api/bank/library?kind=subject", headers=t).json()["items"]
+    assert {item["source"] for item in only_subjects} == {"subject"}
+    assert client.get("/api/bank/library?q=minimum", headers=t).json()["items"][0]["id"] == (
+        exercise["id"])
+
+    # Un collègue du même établissement, et un enseignant d'ailleurs.
+    client.post("/api/users", headers=auth(context["admin"]),
+                json={"email": "collegue@test.ci", "full_name": "Collègue", "role": "teacher",
+                      "password": "motdepasse1"})
+    colleague = auth(client.post("/api/auth/login", json={
+        "email": "collegue@test.ci", "password": "motdepasse1"}).json()["access_token"])
+    outsider_admin = create_admin("École Lointaine", "Admin Trois", "admin3@loin.ci")
+    client.post("/api/users", headers=auth(outsider_admin),
+                json={"email": "prof3@loin.ci", "full_name": "Prof Trois", "role": "teacher",
+                      "password": "motdepasse1"})
+    outsider = auth(client.post("/api/auth/login", json={
+        "email": "prof3@loin.ci", "password": "motdepasse1"}).json()["access_token"])
+
+    def titles(headers):
+        return [i["title"] for i in client.get("/api/community?page_size=100",
+                                               headers=headers).json()["items"]]
+
+    # La communauté ne partage que des sujets complets : pas d'exercice seul.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "bank_exercise", "source_id": exercise["id"],
+        "visibility": "organization"})
+    assert res.status_code == 422
+    assert "Minimum partagé" not in titles(colleague)
+
+    # Établissement : les collègues seuls.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "template", "source_id": template["id"], "visibility": "organization"})
+    assert res.status_code == 200, res.text
+    subject_item = res.json()["item_id"]
+    assert "Sujet de banque" in titles(colleague)
+    assert "Sujet de banque" not in titles(outsider)
+    assert client.get(f"/api/community/{subject_item}", headers=outsider).status_code == 404
+    mine = client.get("/api/evaluations/templates?scope=mine", headers=t).json()["items"]
+    assert next(i for i in mine if i["id"] == template["id"])["share"] == "organization"
+    assert client.get("/api/evaluations/templates?scope=mine",
+                      headers=colleague).json()["total"] == 0
+
+    # Tous les enseignants : la même publication s'ouvre à la plateforme.
+    res = client.put("/api/community/share", headers=t, json={
+        "source_type": "template", "source_id": template["id"], "visibility": "all"})
+    assert res.json()["item_id"] == subject_item
+    assert "Sujet de banque" in titles(outsider)
+    shared = client.get(f"/api/community/{subject_item}", headers=outsider).json()
+    assert shared["shared_from_bank"] and not shared["is_mine"]
+
+    # Retoucher l'original actualise ce qui est partagé.
+    client.put(f"/api/evaluations/{template['id']}/exercises", headers=t,
+               json=[{"title": "Somme", "language": "python", "points": 10},
+                     {"title": "Produit", "language": "python", "points": 10}])
+    detail = client.get(f"/api/community/{subject_item}", headers=colleague).json()
+    assert detail["exercises_count"] == 2
+
+    # Une reprise depuis l'éditeur se compte.
+    assert client.post(f"/api/community/{subject_item}/used",
+                       headers=outsider).json()["uses"] == 1
+
+    # On ne partage que sa propre banque.
+    assert client.put("/api/community/share", headers=colleague, json={
+        "source_type": "template", "source_id": template["id"],
+        "visibility": "all"}).status_code == 404
+
+    # Ne plus partager retire la publication.
+    client.put("/api/community/share", headers=t, json={
+        "source_type": "template", "source_id": template["id"], "visibility": "none"})
+    assert client.get(f"/api/community/{subject_item}", headers=colleague).status_code == 404
+    assert client.delete(f"/api/bank/exercises/{exercise['id']}", headers=t).status_code == 204
+
+    # Les brouillons se listent à part, pour y ajouter un exercice.
+    drafts = client.get("/api/evaluations?group=draft", headers=t).json()["items"]
+    assert drafts and all(d["status"] == "draft" for d in drafts)
 
 
 def test_chacun_supprime_son_compte_et_l_admin_ceux_des_autres(context):

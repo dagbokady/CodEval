@@ -16,6 +16,7 @@ import TraceGrid from './TraceGrid';
 import { isProject, projectFiles, starterText } from '../project';
 import { exerciseLabel, formatExamDuration, formatExamDate } from '../format';
 import {
+  CRITERION_PROMPTS,
   callableCriteria,
   criteriaOf,
   describeCriterion,
@@ -167,8 +168,9 @@ function QcmChoices({ question, answer }) {
  * Correspondance : deux colonnes que l'apprenant relie au crayon. Pas de numéro
  * ni de lettre : un point derrière chaque élément de gauche, un point devant
  * chaque élément de droite : les attaches se font face, le trait passe entre elles.
- * Pendant l'épreuve le serveur n'envoie que `right_options`, déjà mélangée : la
- * disposition des colonnes ne révèle donc rien.
+ * Pendant l'épreuve le serveur envoie les deux colonnes déjà mélangées : la
+ * disposition ne révèle donc rien. Un élément de gauche porte alors sa clé
+ * (`key`), celle sous laquelle la copie le relie.
  */
 function MatchingColumns({ question, answer }) {
   const pairs = question.pairs ?? [];
@@ -222,9 +224,13 @@ function MatchingColumns({ question, answer }) {
       )}
       <ul className="sujet-colonne sujet-colonne--gauche">
         {pairs.map((pair, index) => (
-          <li key={index}>
+          <li key={pair.key ?? index}>
             <span>{pair.left || <em className="sujet-vide">(élément vide)</em>}</span>
-            <span className="sujet-attache" data-attache={`g:${index}`} aria-hidden="true" />
+            <span
+              className="sujet-attache"
+              data-attache={`g:${pair.key ?? index}`}
+              aria-hidden="true"
+            />
           </li>
         ))}
       </ul>
@@ -313,7 +319,7 @@ function SheetCriteria({ exercise }) {
     <ol className="sujet-parts">
       {criteria.map((criterion) => (
         <li key={criterion.id}>
-          <span>{DEMANDE[criterion.kind] ?? 'À écrire :'}</span>
+          <span>{CRITERION_PROMPTS[criterion.kind] ?? 'À écrire :'}</span>
           <code className="sujet-signature">{describeCriterion(criterion)}</code>
           <span className="sujet-question-pts">
             {criterion.points} pt{criterion.points > 1 ? 's' : ''}
@@ -323,18 +329,6 @@ function SheetCriteria({ exercise }) {
     </ol>
   );
 }
-
-const DEMANDE = {
-  variable: 'Déclarez la variable :',
-  function: 'Écrivez la fonction :',
-  struct: 'Définissez la structure :',
-  // Les exigences d'un exercice algorithmique se lisent dans les mots du cours.
-  algo_variable: 'Déclarez la variable :',
-  algo_constante: 'Déclarez la constante :',
-  algo_type: 'Définissez le type :',
-  algo_fonction: 'Écrivez la fonction :',
-  algo_structure: 'Employez la structure :',
-};
 
 /**
  * Les jeux de tests montrés comme des exemples d'exécution : « on entre ceci,
@@ -408,12 +402,16 @@ function SheetSubQuestions({ exercise, showAnswerZone, answer }) {
   );
 }
 
-/** `answer` : la production de l'apprenant, reportée sur la feuille (épreuve en cours). */
+/**
+ * `answer` : la production de l'apprenant, reportée sur la feuille (épreuve en
+ * cours). `showPoints` : faux pour un exercice de la banque, qui n'en a pas.
+ */
 export function SheetExercise({
   exercise,
   number,
   showAnswerZone = true,
   showTests = false,
+  showPoints = true,
   answer,
 }) {
   const kind = exercise.kind ?? 'code';
@@ -425,9 +423,11 @@ export function SheetExercise({
         <span className="sujet-question-num">
           {label} : {exercise.title || <em className="sujet-vide">(sans intitulé)</em>}
         </span>
-        <span className="sujet-question-pts">
-          {exercise.points} pt{exercise.points > 1 ? 's' : ''}
-        </span>
+        {showPoints && (
+          <span className="sujet-question-pts">
+            {exercise.points} pt{exercise.points > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {exercise.statement && <p className="sujet-enonce">{exercise.statement}</p>}

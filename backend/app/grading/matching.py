@@ -52,8 +52,20 @@ def tokens(salt: str, count: int, question: int = 0) -> dict[str, int]:
     return {token_for(salt, index, question): index for index in range(count)}
 
 
+def participant_seed(base: int, participant: int, side: str) -> int:
+    """Graine du mélange d'une colonne, propre à un apprenant.
+
+    Deux voisins ne doivent pas voir les éléments dans le même ordre : la graine
+    mêle l'exercice et sa grille (`base`), la participation de l'apprenant et la
+    colonne, pour que la gauche et la droite ne suivent pas le même tirage.
+    """
+    offset = 1 if side == "left" else 2
+    seed = (base * 1_000_003 + (participant or 0) * 7_919 + offset * 104_729) % 2_147_483_647
+    return seed or 1
+
+
 def shuffled_order(count: int, seed: int) -> list[int]:
-    """Mélange reproductible : le même exercice garde le même ordre d'affichage,
+    """Mélange reproductible : une même graine donne toujours le même ordre,
     sinon les propositions sauteraient d'un rechargement à l'autre."""
     order = list(range(count))
     state = ((seed or 1) * 2654435761) % 2147483647

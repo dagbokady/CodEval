@@ -22,14 +22,34 @@ export function useEvaluation(id) {
   });
 }
 
-/** La banque d'évaluations : les épreuves complètes mises de côté pour resservir. */
-export function useEvaluationTemplates({ subjectId, page = 1 } = {}) {
-  const params = new URLSearchParams({ page: String(page), page_size: '20' });
-  if (subjectId) params.set('subject_id', String(subjectId));
+/** Les brouillons de l'enseignant : là où ajouter un exercice pris dans la banque. */
+export function useDrafts() {
   return useQuery({
-    queryKey: key('evaluation-templates', subjectId, page),
-    queryFn: () => api(`/api/evaluations/templates?${params}`),
+    queryKey: ['evaluations', 'brouillons'],
+    queryFn: () => api('/api/evaluations?group=draft&page_size=8'),
+  });
+}
+
+/** Une liste qui se charge au fil du défilement, page après page. */
+function nextPage(last) {
+  return last.page * last.page_size < last.total ? last.page + 1 : undefined;
+}
+
+/**
+ * Ma banque : ses exercices et ses sujets (modèles d'épreuve) réunis, les
+ * derniers retouchés d'abord. `kind` : un type d'exercice, ou « subject ».
+ */
+export function useLibrary({ q, kind, enabled = true } = {}) {
+  const params = new URLSearchParams({ page_size: '30' });
+  if (q) params.set('q', q);
+  if (kind) params.set('kind', kind);
+  return useInfiniteQuery({
+    queryKey: key('library', kind, q),
+    queryFn: ({ pageParam }) => api(`/api/bank/library?${params}&page=${pageParam}`),
+    initialPageParam: 1,
+    getNextPageParam: nextPage,
     placeholderData: (prev) => prev,
+    enabled,
   });
 }
 
@@ -94,22 +114,31 @@ export function useBankExercises({ q, language, kind, scope = 'all', subjectId, 
   });
 }
 
-/** La communauté : exercices et sujets complets publiés par tous les établissements. */
 /**
- * La communauté se charge au fil du défilement : chaque page arrive quand on
- * approche du bas de la liste.
+ * La communauté : exercices et sujets partagés par les enseignants, de tous les
+ * établissements ou du sien. Elle se charge au fil du défilement.
  */
-export function useCommunity({ q, language, scope = 'all', sort = 'recent' }) {
-  const params = new URLSearchParams({ page_size: '18', scope, sort });
+export function useCommunity({
+  q,
+  itemType,
+  kind,
+  language,
+  scope = 'all',
+  sort = 'popular',
+  enabled = true,
+} = {}) {
+  const params = new URLSearchParams({ page_size: '30', scope, sort });
   if (q) params.set('q', q);
+  if (kind) params.set('kind', kind);
+  if (itemType) params.set('item_type', itemType);
   if (language) params.set('language', language);
   return useInfiniteQuery({
-    queryKey: key('community', scope, sort, language, q),
+    queryKey: key('community', scope, sort, itemType, kind, language, q),
     queryFn: ({ pageParam }) => api(`/api/community?${params}&page=${pageParam}`),
     initialPageParam: 1,
-    getNextPageParam: (last) =>
-      last.page * last.page_size < last.total ? last.page + 1 : undefined,
+    getNextPageParam: nextPage,
     placeholderData: (prev) => prev,
+    enabled,
   });
 }
 

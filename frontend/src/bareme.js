@@ -205,6 +205,19 @@ export const COMPARISONS = [
   },
 ];
 
+/** Ce que le sujet demande, devant chaque déclaration exigée. */
+export const CRITERION_PROMPTS = {
+  variable: 'Déclarez la variable :',
+  function: 'Écrivez la fonction :',
+  struct: 'Définissez la structure :',
+  // Les exigences d'un exercice algorithmique se lisent dans les mots du cours.
+  algo_variable: 'Déclarez la variable :',
+  algo_constante: 'Déclarez la constante :',
+  algo_type: 'Définissez le type :',
+  algo_fonction: 'Écrivez la fonction :',
+  algo_structure: 'Employez la structure :',
+};
+
 const KIND_BY_KEY = Object.fromEntries(CRITERION_KINDS.map((k) => [k.key, k]));
 
 export function criterionKind(key) {

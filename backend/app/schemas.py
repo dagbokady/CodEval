@@ -604,6 +604,8 @@ class BankExerciseOut(ORMModel):
     uses: int
     created_at: datetime
     updated_at: datetime
+    # Portée du partage depuis la banque : « none », « organization » ou « all ».
+    share: str = "none"
     author_id: int
     author_name: str | None = None
     subject_name: str | None = None
@@ -619,6 +621,19 @@ class CommunityPublishIn(BaseModel):
     title: str | None = Field(default=None, min_length=2, max_length=200)
     description: str = Field(default="", max_length=2000)
     tags: list[str] = Field(default_factory=list, max_length=10)
+
+
+class CommunityShareIn(BaseModel):
+    """Partager un exercice ou un sujet de sa banque, ou cesser de le partager."""
+
+    source_type: Literal["bank_exercise", "template"]
+    source_id: int
+    visibility: Literal["none", "organization", "all"]
+
+
+class CommunityShareOut(BaseModel):
+    visibility: Literal["none", "organization", "all"]
+    item_id: int | None = None
 
 
 class CommunityUseIn(BaseModel):
@@ -655,6 +670,11 @@ class CommunityItemOut(BaseModel):
     my_rating: int | None = None
     # Faux pour l'auteur (on ne note pas son propre travail) et l'administration.
     can_rate: bool = False
+    is_mine: bool = False
+    # « all » : toute la plateforme ; « organization » : l'établissement de l'auteur.
+    visibility: str = "all"
+    # Partagée depuis la banque de son auteur : elle suit l'original.
+    shared_from_bank: bool = False
     content: dict | None = None
 
 
@@ -720,6 +740,8 @@ class EvaluationOut(ORMModel):
     # Renseigné pour les modèles de la banque : la banque est ouverte à tout
     # l'établissement, mais seul son auteur peut retoucher un modèle.
     is_owner: bool = False
+    # Modèles seulement : portée du partage (« none », « organization », « all »).
+    share: str | None = None
 
 
 class EvaluationDetailOut(EvaluationOut):
@@ -833,6 +855,9 @@ class StudentExamOut(BaseModel):
     seconds_left: int
     server_time: datetime
     exercises: list[ExercisePublicOut]
+    # Graine du mélange des propositions de QCM, propre à l'apprenant : deux
+    # voisins ne voient pas les choix dans le même ordre.
+    shuffle_seed: int = 0
     drafts: dict[int, str]
     saved_exercise_ids: list[int]
     incidents: int

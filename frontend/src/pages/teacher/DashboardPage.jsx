@@ -60,7 +60,7 @@ export default function DashboardPage() {
      telle quelle plus tard. L'épreuve d'origine n'est pas touchée. */
   const bankEval = useAction(
     (id) => api(`/api/evaluations/${id}/save-as-template`, { method: 'POST' }),
-    [['evaluation-templates']],
+    [['library']],
   );
 
   const changeTab = (value) => {
@@ -261,7 +261,7 @@ function ExamSheet({
             </Button>
             {banked ? (
               <span className="exam-sheet-notice" role="status">
-                ✓ Copiée en banque · <Link to="/banque/evaluations">Voir</Link>
+                ✓ Copiée en banque · <Link to="/banque?type=subject">Voir</Link>
               </span>
             ) : (
               <Button

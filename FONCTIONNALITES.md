@@ -179,32 +179,53 @@ il nomme l'épreuve pour la classe et dans les listes.
 restent dans `grading/languages.py`, prêtes à être rouvertes en ajoutant leur
 clé à `ENABLED_LANGUAGES`.
 
-### 4.2 Les quatre étapes de l'assistant
+### 4.2 L'éditeur sur la feuille
 
-L'éditeur d'évaluation se traverse toujours dans le même ordre :
+Il n'y a plus d'étapes : l'enseignante compose son sujet **sur la feuille
+elle-même**, mise en page comme celle que recevra la classe
+(`components/SheetEditor.jsx`). Chaque texte de la feuille est un champ sans
+cadre, qui ne se révèle qu'au survol.
 
-| # | Étape | Ce qui s'y décide |
-|---|---|---|
-| 1 | Paramètres | l'en-tête de l'épreuve (§4.1), et, repliées dessous, les **modalités de passage** (surveillance, sorties autorisées, délai d'entrée, annonce, corrigé) |
-| 2 | Exercices | type, intitulé, énoncé, questions, et l'environnement de l'apprenant sur la même carte : la **boîte à outils** d'un exercice algorithmique (bloc toujours visible), le **code de départ** d'un exercice de code (déjà rempli, replié) |
-| 3 | Correction | ce que la copie doit contenir, et sur quoi elle est exécutée ; la comparaison se règle sur chaque test (« trim » par défaut) |
-| 4 | **Points & publication** | ce que vaut chaque exercice (et, au barème détaillé, chaque déclaration et chaque test), puis un seul bouton qui enregistre et publie |
+- **L'en-tête** porte ce que demandait l'ancienne étape « Paramètres » : la
+  classe à la place du nom de classe, la matière à la place de l'intitulé du
+  concours, et dans le cartouche le titre, la durée et le barème total. Les
+  consignes s'écrivent juste dessous.
+- **Chaque exercice** se lit dans l'ordre du sujet : son intitulé, ses points
+  entre parenthèses, son énoncé, puis ce qu'il demande. Les déclarations
+  exigées d'un exercice de code figurent sur le sujet de l'étudiant : elles
+  s'écrivent à l'encre de la feuille, et se **collent en C tel quel**
+  (prototypes, structures, variables globales, lus par `cDeclarations.js`).
+- **Le corrigé s'écrit à l'encre rouge**, là où l'étudiant répondra : la lettre
+  de la bonne réponse d'un QCM s'entoure d'un clic, V ou F se cerclent, la
+  réponse attendue d'une question de cours s'écrit à la main sur les lignes,
+  les cases attendues d'une simulation sont rouges, et les jeux de tests d'un
+  exercice pratique tiennent dans un encadré « Corrigé » (une ligne par test :
+  ce qu'on tape, ce qui doit s'afficher, et les arguments si le programme en
+  reçoit). Un éditeur détaillé reste à portée pour les tests qui appellent une
+  fonction ou dont on veut régler les types. Les libellés fixes restent gris :
+  le rouge ne sert qu'à ce que l'enseignante écrit.
+- **La note posée** en haut à droite, comme sur une copie corrigée, dit les
+  points répartis sur le total annoncé (« il manque 2 pts »). Tant qu'aucun
+  exercice n'a été pesé plus qu'un autre, un nouvel exercice repartage le
+  total à parts égales.
+- **Le panneau voisin** (`components/SheetPanel.jsx`) tient ce qui n'a pas de
+  place sur une feuille. Sans exercice sélectionné : l'ouverture, le type
+  d'épreuve, les **modalités de passage** et la liste des exercices avec ce qui
+  leur manque. Un exercice sélectionné : la comparaison des sorties, les
+  fichiers de départ, les outils autorisés, le barème détaillé, le corrigé
+  montré aux étudiants, et les gestes pour le déplacer, le dupliquer, le
+  ranger dans la banque ou le retirer. Un clic hors de tout exercice ramène
+  aux réglages de l'épreuve.
+- **« Vue étudiant »** montre la feuille exacte que recevra la classe, sans
+  encre rouge.
 
-Trois principes tiennent cet ordre :
+**Publier** enregistre et publie d'un même geste, après avoir vérifié que la
+classe est choisie, que chaque exercice est complet (`sheetEditor.js` :
+intitulé, tests, bonne réponse entourée…) et que les points tombent juste.
+Après la clôture, le sujet est figé : seul le corrigé (l'encre rouge) et les
+points restent modifiables.
 
-- **les points viennent en dernier.** On ne pèse pas un test au moment de
-  l'écrire, sans savoir combien il y en aura : ni l'éditeur de barème ni la
-  carte d'un test ne portent de champ « points ». Tout se pose à l'étape 4,
-  barème complet sous les yeux. Tant qu'aucun exercice n'a été pesé plus qu'un
-  autre, le total annoncé y arrive **déjà réparti à parts égales** ;
-- **les modalités partent des valeurs par défaut** réglées dans Paramètres :
-  elles conviennent presque toujours, et restent repliées sous les paramètres
-  de l'épreuve plutôt que d'occuper une étape traversée sans rien y changer ;
-- **l'environnement se règle avant la correction**, et de la même façon pour les
-  deux exercices pratiques : c'est la même question posée deux fois : que
-  trouve l'apprenant devant lui en ouvrant l'exercice ?
-
-La banque d'exercices (§5) suit la même trame, exercice par exercice.
+La banque d'exercices (§5) garde son assistant, exercice par exercice.
 
 ### 4.3 Les exercices
 
@@ -237,9 +258,16 @@ Le corrigé ne quitte jamais le serveur avant publication : le drapeau `correct`
 d'un choix de QCM, la véracité d'une affirmation Vrai/Faux et la liste des
 réponses acceptées d'une question-réponse sont retirés de ce qui descend sur le
 poste de l'apprenant. Pour une correspondance le
-**rang d'une paire est sa réponse** le serveur n'envoie donc que les éléments
-de gauche et une liste mélangée d'éléments de droite désignés par des **jetons
-opaques**, que lui seul sait rattacher.
+**rang d'une paire est sa réponse** : le serveur n'envoie donc que les éléments
+de gauche, chacun avec sa clé de rattachement, et les éléments de droite
+désignés par des **jetons opaques**, que lui seul sait rattacher.
+
+**Chaque apprenant reçoit son propre ordre.** Les deux colonnes d'une
+correspondance sont mélangées chacune de son côté, et les propositions d'un QCM
+aussi, avec une graine qui mêle l'exercice, la question et la participation
+(`matching.participant_seed`, `shuffle_seed` de l'épreuve) : deux voisins ne
+voient pas la même grille, et un même apprenant retrouve la sienne à chaque
+rechargement.
 
 ### 4.4 La structure imposée et les outils autorisés (exercices algorithmiques)
 
@@ -248,7 +276,7 @@ partie déclarative (Constante, Type, Variable), un corps entre Début et Fin.
 Cette structure est posée par l'éditeur et l'apprenant ne peut pas la défaire :
 elle n'est ni une option de l'exercice ni un choix de l'enseignante.
 
-Ce qui se règle exercice par exercice, à l'étape 3, c'est l'**outillage** :
+Ce qui se règle exercice par exercice, dans le panneau de l'éditeur, c'est l'**outillage** :
 quels éléments l'apprenant a le droit de poser dans ce squelette. La liste est
 celle de `frontend/src/algoVocabulary.js` : les trois rubriques déclaratives, les
 entrées/sorties, les conditions (SI, et le SINON qu'on peut interdire à part),
@@ -277,7 +305,8 @@ extension `.c`/`.h` (ou `.cpp`/`.hpp`), au moins un fichier source.
 Chaque exercice de code ou d'algorithme porte une liste de cas de test :
 
 - **nom**, **entrée standard**, **sortie attendue**, **délai** (ms) : les
-  **points**, eux, se posent à la dernière étape (§4.2) ;
+  **points**, eux, se partagent à parts égales, ou se règlent ligne à ligne
+  dans le barème détaillé du panneau (§4.2) ;
 - **mode de comparaison** : `trim` (à l'espacement de fin près), `exact`
   (au caractère près), `numeric` (tolérance 1e-6 sur les nombres) ou
   `last_numbers` (« Nombres affichés » : seuls les derniers nombres de la sortie
@@ -332,7 +361,7 @@ Exercices réutilisables, indépendants des évaluations : titre, énoncé, lang
 type, points, code de départ ou outils autorisés, étiquettes, jeux de tests,
 matière.
 
-L'assistant de création suit la trame de l'éditeur d'évaluation (§4.2), en
+L'assistant de création travaille exercice par exercice, en
 trois écrans pour un exercice pratique : **énoncé et environnement** (intitulé,
 énoncé, **outils autorisés** pour un exercice algorithmique ou **code de départ**
 pour un exercice de code, corrigé ; matière et étiquettes repliées) →
