@@ -186,7 +186,7 @@ button { font: inherit; }
 .shell-badge {
   position: absolute; top: 1px; right: 0;
   min-width: 15px; height: 15px; border-radius: 8px;
-  background: var(--danger); color: #fff;
+  background: var(--danger); color: var(--text-inverse);
   font-size: 9.5px; font-weight: 600; line-height: 15px;
   text-align: center; padding: 0 4px;
   box-shadow: 0 0 0 2px var(--bg-sidebar);
@@ -267,7 +267,7 @@ button { font: inherit; }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 32px; padding: 0 12px; border-radius: var(--radius);
-  border: 1px solid transparent; background: var(--primary); color: #fff;
+  border: 1px solid transparent; background: var(--primary); color: var(--text-inverse);
   font-size: 13.5px; font-weight: 500; line-height: 1; cursor: pointer; white-space: nowrap;
   transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
@@ -1841,9 +1841,9 @@ tr.row-confirm:hover { background: none; }
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
   background: var(--bg-card); color: var(--text-faint); box-shadow: inset 0 0 0 1.5px var(--border-strong);
 }
-.rs-step--done .rs-step-mark { background: var(--success-dot); color: #fff; box-shadow: none; }
+.rs-step--done .rs-step-mark { background: var(--success-dot); color: var(--text-inverse); box-shadow: none; }
 .rs-step--current .rs-step-mark {
-  background: var(--primary); color: #fff; box-shadow: 0 0 0 4px var(--primary-light);
+  background: var(--primary); color: var(--text-inverse); box-shadow: 0 0 0 4px var(--primary-light);
 }
 .rs-step-text { display: grid; gap: 1px; min-width: 0; }
 .rs-step-text strong { font-size: 13px; font-weight: 600; color: var(--text-title); }
@@ -2275,7 +2275,7 @@ tr.row-confirm:hover { background: none; }
 }
 .wizard-step.is-done .wizard-step-num { background: var(--primary-light); color: var(--primary); }
 .wizard-step[aria-current='step'] { color: var(--text-title); font-weight: 600; background: var(--bg-nav-active); }
-.wizard-step[aria-current='step'] .wizard-step-num { background: var(--primary); color: #fff; }
+.wizard-step[aria-current='step'] .wizard-step-num { background: var(--primary); color: var(--text-inverse); }
 .wizard-progress { height: 3px; margin: 10px -32px 0; background: var(--border-soft); }
 .wizard-progress span { display: block; height: 100%; background: var(--primary); transition: width 0.25s ease; }
 
@@ -3102,7 +3102,7 @@ tr.row-confirm:hover { background: none; }
   flex: none; width: 10px; height: 10px; border-radius: 50%;
   background: var(--bg-card); border: 2px solid var(--text-muted);
 }
-.match-item--relie { border-color: var(--primary); background: var(--primary-soft, var(--bg-nav-active)); }
+.match-item--relie { border-color: var(--primary); background: var(--primary-light); }
 .match-item--relie .match-point { background: var(--primary); border-color: var(--primary); }
 .match-item--arme { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
 .match-item--correct { border-color: var(--success, #16a34a); }

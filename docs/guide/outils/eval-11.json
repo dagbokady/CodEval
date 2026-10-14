@@ -1,0 +1,345 @@
+{
+  "id": 11,
+  "title": "Examen 2e session — C avancé",
+  "kind": "examen",
+  "description": "",
+  "instructions": "ECUE : C avancé · Examen 2e session · Parcours : M1 MBDS, BIHAR, SIGL · Année académique 2024-2025",
+  "language": "c",
+  "duration_minutes": 120,
+  "scheduled_start": null,
+  "status": "draft",
+  "total_points": 20,
+  "rules": {},
+  "started_at": null,
+  "ends_at": null,
+  "closed_at": null,
+  "validated_at": null,
+  "classroom_id": 6,
+  "subject_id": 5,
+  "classroom_name": "M1 MBDS",
+  "subject_name": "C avancé",
+  "participants_count": 0,
+  "exercises_count": 3,
+  "success_rate": null,
+  "is_owner": false,
+  "exercises": [
+    {
+      "id": 46,
+      "position": 1,
+      "title": "Exercices 1 et 2.1 — Programme modulaire : moyenne d'une classe",
+      "statement": "On se propose d'écrire un programme en C permettant de calculer la moyenne des notes d'une classe de 40 étudiants et d'afficher le nom et la note des 40 étudiants ainsi que la moyenne de la classe.\n• Les structures des données : Etudiant (matricule, nom, note) ; Note (date, note).\n• Les fonctions et procédures : AjouterNote (ValeurNote, &UnEtudiant) ; MoyenneNotes (&TabEtudiants) retourne un réel ; AfficherTout (&TabEtudiants).\nPour une organisation modulaire du code, on crée les 5 fichiers suivants : Etudiant.h ; Note.h ; Fonctions.h ; Fonctions.c ; main.c.\nNB (facultatif) : (type*)malloc(count*sizeof(type)) ; #include <stdio.h> ; #include <stdlib.h> ; #ifndef ; #define ; #endif.\n\nEXERCICE 1 (8 pts) — 1) Donnez le contenu des fichiers Etudiant.h, Note.h, Fonctions.h (2 pts chacun). 2) Donnez le contenu du fichier Fonctions.c (2 pts).\nEXERCICE 2.1 (4 pts) — Le programme final se lance par « ProgrammeMoyenne.exe 40 ». Donnez le contenu du fichier main.c.\n\nPour la correction : le nombre d'étudiants arrive dans argv[1] ; chaque étudiant se saisit sur une ligne « matricule nom note ». Signatures : void AjouterNote(float ValeurNote, Etudiant *UnEtudiant) ; float MoyenneNotes(Etudiant *TabEtudiants, int n) ; void AfficherTout(Etudiant *TabEtudiants, int n). La moyenne est la dernière valeur affichée.",
+      "language": "c",
+      "points": 12,
+      "starter_code": "",
+      "kind": "code",
+      "settings": {
+        "files": [
+          {
+            "name": "Etudiant.h",
+            "starter": ""
+          },
+          {
+            "name": "Note.h",
+            "starter": ""
+          },
+          {
+            "name": "Fonctions.h",
+            "starter": ""
+          },
+          {
+            "name": "Fonctions.c",
+            "starter": ""
+          },
+          {
+            "name": "main.c",
+            "starter": ""
+          }
+        ],
+        "criteria": [
+          {
+            "id": "note",
+            "kind": "struct",
+            "name": "Note",
+            "fields": [
+              {
+                "name": "note",
+                "type": "float"
+              }
+            ],
+            "points": 2
+          },
+          {
+            "id": "etudiant",
+            "kind": "struct",
+            "name": "Etudiant",
+            "fields": [
+              {
+                "name": "note",
+                "type": "custom",
+                "ctype": "Note"
+              }
+            ],
+            "points": 2
+          },
+          {
+            "id": "ajouter",
+            "kind": "function",
+            "name": "AjouterNote",
+            "params": [
+              {
+                "name": "ValeurNote",
+                "type": "float"
+              },
+              {
+                "name": "UnEtudiant",
+                "type": "custom",
+                "ctype": "Etudiant *"
+              }
+            ],
+            "points": 1,
+            "returns": "void"
+          },
+          {
+            "id": "moyenne",
+            "kind": "function",
+            "name": "MoyenneNotes",
+            "params": [
+              {
+                "name": "TabEtudiants",
+                "type": "custom",
+                "ctype": "Etudiant *"
+              },
+              {
+                "name": "n",
+                "type": "int"
+              }
+            ],
+            "points": 0.5,
+            "returns": "float"
+          },
+          {
+            "id": "afficher",
+            "kind": "function",
+            "name": "AfficherTout",
+            "params": [
+              {
+                "name": "TabEtudiants",
+                "type": "custom",
+                "ctype": "Etudiant *"
+              },
+              {
+                "name": "n",
+                "type": "int"
+              }
+            ],
+            "points": 0.5,
+            "returns": "void"
+          }
+        ],
+        "solution": "/* ===== Etudiant.h ===== */\n#ifndef ETUDIANT_H\n#define ETUDIANT_H\n\n#include \"Note.h\"\n\ntypedef struct Etudiant {\n    char matricule[16];\n    char nom[40];\n    Note note;\n} Etudiant;\n\n#endif\n\n/* ===== Note.h ===== */\n#ifndef NOTE_H\n#define NOTE_H\n\ntypedef struct Note {\n    char date[11];\n    float note;\n} Note;\n\n#endif\n\n/* ===== Fonctions.h ===== */\n#ifndef FONCTIONS_H\n#define FONCTIONS_H\n\n#include \"Etudiant.h\"\n\nvoid AjouterNote(float ValeurNote, Etudiant *UnEtudiant);\nfloat MoyenneNotes(Etudiant *TabEtudiants, int n);\nvoid AfficherTout(Etudiant *TabEtudiants, int n);\n\n#endif\n\n/* ===== Fonctions.c ===== */\n#include <stdio.h>\n#include \"Fonctions.h\"\n\nvoid AjouterNote(float ValeurNote, Etudiant *UnEtudiant)\n{\n    UnEtudiant->note.note = ValeurNote;\n}\n\nfloat MoyenneNotes(Etudiant *TabEtudiants, int n)\n{\n    float somme = 0;\n    for (int i = 0; i < n; i++) somme += TabEtudiants[i].note.note;\n    return n > 0 ? somme / n : 0;\n}\n\nvoid AfficherTout(Etudiant *TabEtudiants, int n)\n{\n    for (int i = 0; i < n; i++)\n        printf(\"%s : %.2f\\n\", TabEtudiants[i].nom, TabEtudiants[i].note.note);\n    printf(\"Moyenne de la classe : %.2f\\n\", MoyenneNotes(TabEtudiants, n));\n}\n\n/* ===== main.c ===== */\n#include <stdio.h>\n#include <stdlib.h>\n#include \"Fonctions.h\"\n\nint main(int argc, char *argv[])\n{\n    if (argc < 2) {\n        printf(\"Usage : %s nombre_etudiants\\n\", argv[0]);\n        return 1;\n    }\n    int n = atoi(argv[1]);\n    Etudiant *TabEtudiants = (Etudiant *)malloc(n * sizeof(Etudiant));\n    if (TabEtudiants == NULL) return 1;\n\n    for (int i = 0; i < n; i++) {\n        float valeur;\n        scanf(\"%15s %39s %f\", TabEtudiants[i].matricule, TabEtudiants[i].nom, &valeur);\n        AjouterNote(valeur, &TabEtudiants[i]);\n    }\n    AfficherTout(TabEtudiants, n);\n    free(TabEtudiants);\n    return 0;\n}"
+      },
+      "tests": [
+        {
+          "id": 74,
+          "name": "ProgrammeMoyenne.exe 3",
+          "kind": "official",
+          "stdin": "",
+          "expected_stdout": "13",
+          "comparison": "last_numbers",
+          "points": 3,
+          "timeout_ms": 3000,
+          "target_id": null,
+          "input_types": [
+            "string",
+            "string",
+            "string"
+          ],
+          "expected_type": "string",
+          "args": [
+            "E001 Kone 12",
+            "E002 Yao 16",
+            "E003 Traore 11"
+          ],
+          "argv": [
+            "3"
+          ],
+          "position": 1
+        },
+        {
+          "id": 75,
+          "name": "ProgrammeMoyenne.exe 1",
+          "kind": "official",
+          "stdin": "",
+          "expected_stdout": "20",
+          "comparison": "last_numbers",
+          "points": 3,
+          "timeout_ms": 3000,
+          "target_id": null,
+          "input_types": [
+            "string"
+          ],
+          "expected_type": "string",
+          "args": [
+            "E010 Awa 20"
+          ],
+          "argv": [
+            "1"
+          ],
+          "position": 2
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "position": 2,
+      "title": "Exercice 2.2 — Les commandes de compilation",
+      "statement": "",
+      "language": "c",
+      "points": 3,
+      "starter_code": "",
+      "kind": "short",
+      "settings": {
+        "questions": [
+          {
+            "rows": 5,
+            "text": "Soit la commande suivante permettant de lancer le programme final obtenu après les différentes phases de compilation :\nc:> ProgrammeMoyenne.exe 40\n\nDonnez la suite des commandes ayant permis d'obtenir le fichier ProgrammeMoyenne.exe.",
+            "accepted": [
+              "Fonctions.c",
+              "main.c",
+              "Fonctions.o",
+              "-o ProgrammeMoyenne.exe"
+            ],
+            "keywords_mode": true
+          }
+        ]
+      },
+      "tests": []
+    },
+    {
+      "id": 48,
+      "position": 3,
+      "title": "Exercice 3 — QCM",
+      "statement": "",
+      "language": "c",
+      "points": 5,
+      "starter_code": "",
+      "kind": "qcm",
+      "settings": {
+        "questions": [
+          {
+            "text": "Quelle est la principale fonction d'une directive de préprocesseur en C ?",
+            "choices": [
+              {
+                "text": "Modifier le code source avant la compilation.",
+                "correct": true
+              },
+              {
+                "text": "Améliorer les performances du programme.",
+                "correct": false
+              },
+              {
+                "text": "Ajouter de nouvelles fonctionnalités au langage C.",
+                "correct": false
+              },
+              {
+                "text": "Remplacer automatiquement les erreurs de syntaxe.",
+                "correct": false
+              }
+            ],
+            "multiple": false
+          },
+          {
+            "text": "Lors de la compilation d'un programme en C, quelle est l'étape effectuée en premier ?",
+            "choices": [
+              {
+                "text": "L'édition de liens (linking).",
+                "correct": false
+              },
+              {
+                "text": "L'assemblage (assembly).",
+                "correct": false
+              },
+              {
+                "text": "Le prétraitement (preprocessing).",
+                "correct": true
+              },
+              {
+                "text": "L'exécution du programme.",
+                "correct": false
+              }
+            ],
+            "multiple": false
+          },
+          {
+            "text": "Quelle affirmation est correcte concernant les bibliothèques dynamiques ?",
+            "choices": [
+              {
+                "text": "Elles sont incluses directement dans l'exécutable du programme.",
+                "correct": false
+              },
+              {
+                "text": "Elles permettent de réduire la taille des exécutables en partageant du code.",
+                "correct": true
+              },
+              {
+                "text": "Elles ne peuvent pas être mises à jour sans recompiler l'application.",
+                "correct": false
+              },
+              {
+                "text": "Elles sont chargées uniquement lors de la compilation.",
+                "correct": false
+              }
+            ],
+            "multiple": false
+          },
+          {
+            "text": "Quelle est la principale différence entre une bibliothèque statique et une bibliothèque dynamique ?",
+            "choices": [
+              {
+                "text": "Une bibliothèque statique est chargée à l'exécution tandis qu'une bibliothèque dynamique est incluse à la compilation.",
+                "correct": false
+              },
+              {
+                "text": "Une bibliothèque dynamique est plus rapide qu'une bibliothèque statique.",
+                "correct": false
+              },
+              {
+                "text": "Une bibliothèque statique est intégrée directement dans l'exécutable, tandis qu'une bibliothèque dynamique est chargée à l'exécution.",
+                "correct": true
+              },
+              {
+                "text": "Les bibliothèques statiques ne peuvent pas être utilisées en C.",
+                "correct": false
+              }
+            ],
+            "multiple": false
+          },
+          {
+            "text": "Quelle est la conséquence d'un mauvais lien vers une bibliothèque dynamique ?",
+            "choices": [
+              {
+                "text": "Le programme ne pourra pas être compilé.",
+                "correct": false
+              },
+              {
+                "text": "Le programme risque de planter ou de ne pas s'exécuter correctement.",
+                "correct": true
+              },
+              {
+                "text": "Le programme fonctionnera mais avec des performances réduites.",
+                "correct": false
+              },
+              {
+                "text": "Il n'y aura aucun effet, car les bibliothèques sont automatiquement gérées.",
+                "correct": false
+              }
+            ],
+            "multiple": false
+          }
+        ]
+      },
+      "tests": []
+    }
+  ],
+  "sheet_header": null
+}
