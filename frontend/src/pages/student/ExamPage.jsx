@@ -1321,8 +1321,8 @@ function QcmQuestion({ question, rank, seed, value, onChange, readOnly }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
               borderRadius: 8, border: '1.5px solid',
-              borderColor: isSelected ? 'var(--primary, #3b82f6)' : 'var(--border, #e2e8f0)',
-              background: isSelected ? 'var(--primary-soft, #eff6ff)' : 'transparent',
+              borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
+              background: isSelected ? 'var(--primary-light)' : 'transparent',
               cursor: readOnly ? 'default' : 'pointer',
               transition: 'all 0.15s',
             }}

@@ -1,0 +1,851 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Guide enseignant · CodEval</title>
+<style>
+@page { size: A4; margin: 14mm 15mm 17mm; }
+:root { --red:#E0353B; --blue:#1F5BD8; --green:#15803D; --ink:#16181D; --muted:#5B6270; --line:#E3E6EB; --soft:#F5F7FA; --brand:#2357D9; }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--ink); font: 10pt/1.45 -apple-system, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+h1 { font-size: 30pt; line-height:1.1; margin:0 0 10px; letter-spacing:-.5px; }
+h2 { font-size: 15pt; margin: 18px 0 8px; color: var(--ink); break-after: avoid; }
+h3.sub-h { font-size: 12.5pt; margin: 18px 0 6px; padding-top: 8px; border-top: 2px solid var(--line); break-after: avoid; }
+h4 { font-size: 10.5pt; margin: 0 0 6px; break-after: avoid; }
+p { margin: 0 0 8px; }
+code { font: 8.8pt/1.3 "SF Mono", Menlo, monospace; background: var(--soft); padding: 0 3px; border-radius: 3px; }
+a { color: var(--brand); text-decoration: none; }
+.break { break-before: page; }
+.cover { height: 262mm; display:flex; flex-direction:column; }
+.cover-band { background: linear-gradient(135deg, #2357D9, #1B3FA8); color:#fff; border-radius: 14px; padding: 34px 32px 30px; }
+.cover-band .brand { font: 600 11pt/1 "SF Mono", Menlo, monospace; opacity:.9; margin-bottom: 26px; }
+.cover-band p { font-size: 12pt; opacity:.93; max-width: 135mm; }
+.cards { display:grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.card { border:1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 9pt; }
+.card .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .08em; color: var(--brand); font-weight:700; }
+.card b.t { display:block; font-size: 11pt; margin: 4px 0 6px; }
+.card ul { margin: 6px 0 0; padding-left: 14px; }
+.cover-foot { margin-top:auto; font-size: 8.5pt; color: var(--muted); }
+.part-title { background: var(--ink); color:#fff; border-radius: 12px; padding: 22px 24px; margin-bottom: 14px; }
+.part-title .l { font: 700 34pt/1 -apple-system, sans-serif; opacity:.35; float:right; }
+.part-title h1 { font-size: 20pt; margin: 0 0 4px; }
+.part-title p { margin:0; opacity:.8; }
+.fiche { break-before: page; border-left: 6px solid var(--brand); background: var(--soft); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 0 0 10px; }
+.fiche h2 { margin: 2px 0 6px; font-size: 16pt; }
+.fiche-num { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--brand); }
+.pill { display:inline-block; font-size: 8.5pt; font-weight:600; background: var(--brand); color:#fff; border-radius: 99px; padding: 2px 9px; margin-right: 6px; }
+.pill-soft { background:#fff; color: var(--ink); border:1px solid var(--line); font-weight: 500; }
+.paper { border: 1px solid #D9D6CC; background: #FBFAF6; border-radius: 8px; padding: 8px 10px 10px; margin: 8px 0 12px; break-inside: avoid; }
+.paper-label { font-size: 7.5pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #8A8370; margin-bottom: 4px; }
+.paper img { display:block; max-width: 100%; margin: 4px auto 0; }
+.step { break-inside: avoid; margin: 12px 0 14px; }
+.shot { margin: 0; }
+.shot img { display:block; border:1px solid var(--line); border-radius: 6px; max-width: 100%; }
+.lead, .after { font-size: 9.3pt; color: #333; }
+.after { margin-top: 4px; }
+ol.marks { list-style:none; padding:0; margin: 7px 0 0; }
+ol.marks li { display:flex; gap:8px; margin: 3px 0; align-items: flex-start; }
+.b { flex:none; display:inline-block; width:18px; height:18px; border-radius:50%; background: var(--red); color:#fff; font: 700 9.5px/18px -apple-system, sans-serif; text-align:center; margin-top: 1px; }
+.b.blue { background: var(--blue); } .b.green { background: var(--green); }
+.pair { display:grid; grid-template-columns: 1.45fr 1fr; gap: 14px; align-items: start; break-inside: avoid; }
+.pair .step { margin: 8px 0; }
+.note { border-radius: 8px; padding: 9px 12px; margin: 10px 0 12px; font-size: 9.3pt; break-inside: avoid; background: #EEF3FF; border: 1px solid #C9D7FB; }
+.note strong { display:block; margin-bottom: 3px; color: var(--blue); }
+.note-warn { background: #FFF7E8; border-color: #F2D8A2; } .note-warn strong { color: #9A5B00; }
+table.data { width:100%; border-collapse: collapse; font-size: 8.8pt; margin: 8px 0 14px; break-inside: avoid; }
+table.data th { text-align:left; background: var(--soft); font-weight:600; }
+table.data th, table.data td { border-bottom: 1px solid var(--line); padding: 5px 7px; vertical-align: top; }
+.legend { display:grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 12px; }
+.legend div { border:1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 9pt; display:flex; gap:8px; }
+.flow { display:grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 12px; }
+.flow div { border:1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 8.8pt; }
+.flow b { display:block; color: var(--brand); }
+.toc ul { padding-left: 16px; margin: 3px 0 8px; } .toc > ul { padding-left: 0; list-style: none; } .toc li { margin: 2px 0; font-size: 9.5pt; }
+</style></head><body>
+
+<section class="cover">
+  <div class="cover-band">
+    <div class="brand">&lt;/&gt; CodEval</div>
+    <h1>Saisir vos sujets<br>dans CodEval</h1>
+    <p>Guide enseignant, exercice par exercice. Chaque exercice a sa fiche : l’extrait du sujet papier, puis une capture annotée pour chaque geste, du bouton « Ajouter un exercice » jusqu’à la publication.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><span class="k">A · Devoir commun · SRIT1</span><b class="t">Initiation algorithmique</b>30/11/2024 · 2 h · 20 pts<ul><li>Ex. 1 Simulation (5)</li><li>Ex. 2 Dix nombres suivants (5)</li><li>Ex. 3 Tarif plein ou réduit (4)</li><li>Ex. 4 Le plus grand et sa position (6)</li></ul></div>
+    <div class="card"><span class="k">B · Devoir surveillé · M1 MBDS</span><b class="t">C avancé</b>27/02/2024 · 2 h · 20 pts<ul><li>Ex. 1 Questions de cours (10)</li><li>Ex. 2 Gestion d’un stock (10)</li></ul></div>
+    <div class="card"><span class="k">C · Examen 2e session · M1</span><b class="t">C avancé</b>mars 2025 · 2 h · 20 pts<ul><li>Ex. 1 et 2.1 Programme en 5 fichiers (12)</li><li>Ex. 2.2 Commandes de compilation (3)</li><li>Ex. 3 QCM (5)</li></ul></div>
+  </div>
+  <p class="cover-foot">Captures réalisées sur CodEval en octobre 2026, avec le compte de démonstration « Prof Démo ».</p>
+</section>
+
+<section class="break">
+  <h2 style="margin-top:0">Avant de commencer</h2>
+  <p><b>Lire les captures.</b> Les numéros des pastilles renvoient à la liste sous chaque capture.</p>
+  <div class="legend">
+    <div><span class="b ">1</span><span><b>Rouge</b> : ce que vous faites (cliquer, taper, cocher).</span></div>
+    <div><span class="b blue">2</span><span><b>Bleu</b> : ce qu’il faut lire ou vérifier.</span></div>
+    <div><span class="b green">3</span><span><b>Vert</b> : tout est prêt.</span></div>
+  </div>
+  <p><b>Les quatre étapes d’une épreuve.</b> On les parcourt avec les boutons du bas de l’écran. Une fois l’épreuve enregistrée, le fil des étapes en haut de page permet de revenir en arrière.</p>
+  <div class="flow">
+    <div><b>1 · Paramètres</b>Titre, type, classe, matière, durée, consignes.</div>
+    <div><b>2 · Exercices</b>Le type, l’énoncé, les réponses attendues de chaque exercice.</div>
+    <div><b>3 · Correction</b>Les jeux de tests des exercices pratiques.</div>
+    <div><b>4 · Points & publication</b>Ce que vaut chaque exercice, puis publier.</div>
+  </div>
+  <p><b>Il vous faut d’abord</b> une <b>matière</b> (menu <i>Mes matières</i>) — elle fixe le langage : Algorithmique pour <i>Initiation algorithmique</i>, C pour <i>C avancé</i> — et une <b>classe</b> (menu <i>Mes classes</i>), que les étudiants rejoignent avec son code.</p>
+  <h2>Quel type pour quel exercice</h2>
+  <table class="data"><thead><tr><th>Exercice du sujet</th><th>Type à choisir</th><th>Correction</th><th>Fiche</th></tr></thead><tbody><tr><td>Algo, ex. 1 : simulation de CalculDeMoyenne</td><td><b>Simulation</b></td><td>automatique, case par case</td><td>A.1</td></tr><tr><td>Algo, ex. 2, 3, 4 : écrire un algorithme</td><td><b>Algorithmique</b></td><td>automatique, jeux de tests</td><td>A.2 à A.5</td></tr><tr><td>C devoir, ex. 1 : questions de cours</td><td><b>Question-réponse</b></td><td>mots-clés ou à la main</td><td>B.1</td></tr><tr><td>C devoir, ex. 2 : gestion d’un stock</td><td><b>Question-réponse</b></td><td>à la main</td><td>B.2</td></tr><tr><td>C examen, ex. 1 et 2.1 : les 5 fichiers</td><td><b>Code</b>, plusieurs fichiers</td><td>déclarations et tests</td><td>C.1, C.4</td></tr><tr><td>C examen, ex. 2.2 : commandes de compilation</td><td><b>Question-réponse</b></td><td>mots-clés</td><td>C.2</td></tr><tr><td>C examen, ex. 3 : QCM</td><td><b>QCM</b></td><td>automatique</td><td>C.3</td></tr></tbody></table>
+  <h2>Sommaire</h2>
+  <div class="toc"><ul><li><b>A. Devoir d'initiation algorithmique</b><ul><li><a href="#A0">A.0 Créer l’épreuve (étape 1 « Paramètres »)</a></li><li><a href="#A1">A.1 Exercice 1 — Simulation de l’algorithme CalculDeMoyenne</a></li><li><a href="#A2">A.2 Exercice 2 — Les dix nombres suivants</a></li><li><a href="#A3">A.3 Exercice 3 — Tarif plein ou réduit</a></li><li><a href="#A4">A.4 Exercice 4 — Le plus grand nombre et sa position</a></li><li><a href="#A5">A.5 Étape 3 « Correction » : les jeux de tests des exercices 2, 3 et 4</a></li><li><a href="#A6">A.6 Étape 4 « Points & publication »</a></li></ul></li><li><b>B. Devoir surveillé de C avancé</b><ul><li><a href="#B0">B.0 Créer l’épreuve (étape 1 « Paramètres »)</a></li><li><a href="#B1">B.1 Exercice 1 — Questions de cours</a></li><li><a href="#B2">B.2 Exercice 2 — Programmation C : gestion d’un stock</a></li><li><a href="#B3">B.3 Étapes 3 et 4</a></li></ul></li><li><b>C. Examen 2e session de C avancé</b><ul><li><a href="#C0">C.0 Créer l’épreuve (étape 1 « Paramètres »)</a></li><li><a href="#C1">C.1 Exercices 1 et 2.1 — Le programme modulaire en cinq fichiers</a></li><li><a href="#C2">C.2 Exercice 2.2 — Les commandes de compilation</a></li><li><a href="#C3">C.3 Exercice 3 — QCM</a></li><li><a href="#C4">C.4 Étape 3 « Correction » : le programme en cinq fichiers</a></li><li><a href="#C5">C.5 Étape 4 « Points & publication »</a></li></ul></li><li><b><a href="#M">Aide-mémoire</a></b></li></ul></div>
+</section>
+
+<section class="break">
+  <div class="part-title"><span class="l">A</span><h1>Devoir d'initiation algorithmique</h1><p>Devoir commun surveillé · SRIT1 A, B, C, D · 30/11/2024 · 2 h · 20 points</p></div>
+  <h2 id="A0">A.0 Créer l’épreuve (étape 1 « Paramètres »)</h2><p>L’en-tête du sujet donne le titre, la durée et le public :</p>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/algo-entete.png" alt=""></div>
+<section class="step ">
+    <h4>Ouvrir le formulaire</h4>
+    <p class="lead">Dans le menu de gauche, cliquez sur <b>Créer une évaluation</b>.</p>
+    <figure class="shot small"><img src="captures/algo/p0-menu.png" alt=""></figure>
+    
+    
+  </section>
+<section class="step ">
+    <h4>Le titre et le type</h4>
+    
+    <figure class="shot "><img src="captures/algo/p1-epreuve.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Titre : <b>Devoir commun — Initiation algorithmique</b>. Il figure en tête du sujet.</span></li><li><span class="b ">2</span><span>Type : <b>Devoir</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La classe et la matière</h4>
+    
+    <figure class="shot "><img src="captures/algo/p2-pour-qui.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Classe : <b>SRIT1 A</b>. Sans classe, l’épreuve reste un brouillon que personne ne voit.</span></li><li><span class="b ">4</span><span>Matière : <b>Initiation algorithmique</b>. Elle impose le pseudo-code : aucun langage n’est demandé.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La durée, le barème et les consignes</h4>
+    
+    <figure class="shot "><img src="captures/algo/p3-deroulement.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>Durée : bouton <b>2h</b> (le champ affiche 120 minutes).</span></li><li><span class="b ">6</span><span>Barème total : <b>20</b>.</span></li><li><span class="b blue">7</span><span>Cette phrase confirme que la copie se compose en blocs de pseudo-code.</span></li><li><span class="b ">8</span><span>Consignes : recopiez l’en-tête du sujet (ECUE, semestre, parcours, année). L’étudiant les lit avant de commencer.</span></li></ol>
+    <p class="after">Laissez <b>Ouverture</b> vide si vous lancerez la session vous-même. Les <b>Modalités de passage</b> (repliées) reprennent vos réglages par défaut.</p>
+  </section>
+<section class="step ">
+    <h4>Enregistrer</h4>
+    
+    <figure class="shot "><img src="captures/algo/p4-enregistrer.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">9</span><span><b>Enregistrer et continuer</b> crée l’épreuve en brouillon et ouvre l’étape 2 « Exercices ».</span></li></ol>
+    
+  </section>
+<header class="fiche" id="A1">
+        <div class="fiche-num">Exercice 1 · 5 points</div>
+        <h2>Simulation de l’algorithme CalculDeMoyenne</h2>
+        <div class="fiche-meta"><span class="pill">Type : Simulation</span><span class="pill pill-soft">Correction : automatique, case par case</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/algo-ex1.png" alt=""></div>
+<section class="step ">
+    <h4>Ajouter l’exercice</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Cliquez sur <b>+ Ajouter un exercice</b>, en haut à droite de l’étape 2.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot medium"><img src="captures/algo/e1-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span>Cliquez sur la carte <b>Simulation</b>. Le formulaire apparaît en dessous, déjà réglé pour ce type.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>L’intitulé et l’énoncé</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Simulation de l’algorithme CalculDeMoyenne</b>.</span></li><li><span class="b ">4</span><span>Le type est déjà rempli. N’y touchez pas : changer de type vide l’exercice.</span></li><li><span class="b ">5</span><span>Énoncé : « Faire la simulation de l’algorithme ci-dessous pour laquelle l’utilisateur a saisi 10, 11 et 12. »</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>L’algorithme à simuler</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-04-algorithme.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">6</span><span>Copiez-collez l’algorithme du sujet, numéros de ligne compris. Remplacez les barres « | » du document Word par des espaces. Sur la feuille de l’étudiant, il s’affiche en police fixe et coloré.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Le tableau, au départ</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-05-tableau-vide.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">7</span><span>Cliquez dans le titre d’une colonne pour le changer.</span></li><li><span class="b ">8</span><span><b>fournie</b> : la colonne est déjà remplie sur la feuille de l’étudiant et n’est pas notée. Laissez-la cochée pour les numéros d’instruction.</span></li><li><span class="b ">9</span><span><b>+ Ajouter une ligne</b> : une ligne par instruction exécutée.</span></li><li><span class="b ">10</span><span><b>+ Ajouter une colonne</b> : une colonne par variable, plus la condition et l’écran.</span></li></ol>
+    <p class="after">Pour ce sujet : <b>7 colonnes</b> (N°, Note, SommeDesNotes, NombreDeNotesSaisies, MoyenneDesNotes, Condition (l. 3), Écran) et <b>20 lignes</b> : instructions 1 et 2, trois tours de boucle (3, 4, 5, 6, 7), le dernier test (3), puis 9 et 10.</p>
+  </section>
+<section class="step ">
+    <h4>Le tableau rempli (partie gauche)</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-06-tableau-gauche.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">11</span><span>Les colonnes des variables, nommées comme dans l’algorithme.</span></li><li><span class="b ">12</span><span>N° : l’ordre d’exécution, recopié sur la feuille de l’étudiant.</span></li><li><span class="b ">13</span><span>Dans chaque case, la valeur prise par la variable à cette instruction, comme sur votre corrigé papier.</span></li><li><span class="b ">14</span><span>Une case vide n’est pas notée : l’étudiant peut la laisser vide ou recopier la valeur précédente.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Le tableau rempli (partie droite)</h4>
+    <p class="lead">Le tableau défile horizontalement : les dernières colonnes sont à droite.</p>
+    <figure class="shot "><img src="captures/algo/e1-07-tableau-droite.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">15</span><span>Condition : VRAI ou FAUX à chaque test du TANTQUE (trois fois VRAI, puis FAUX).</span></li><li><span class="b ">16</span><span>Écran : le texte affiché par ECRIRE.</span></li><li><span class="b ">17</span><span>Plusieurs réponses admises : séparez-les par « | ». Ici, avec ou sans espace entre « 3 » et « note(s) ».</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>Comment les cases sont notées</strong><div>Chaque case remplie vaut une part égale des points : 20 cases pour 5 points, soit 0,25 point par case. Les nombres se comparent par leur valeur (<code>10</code> = <code>10,0</code> = <code>10.00</code>). Le texte se compare sans tenir compte des majuscules, des accents ni de la ponctuation (<code>vrai</code> = <code>VRAI</code>).</div></aside>
+<section class="step ">
+    <h4>Le corrigé (facultatif)</h4>
+    
+    <figure class="shot "><img src="captures/algo/e1-08-corrige.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">18</span><span>Ouvrez <b>Corrigé proposé aux étudiants</b> et écrivez l’explication. Les étudiants la voient avec leur note, si l’épreuve propose le corrigé.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Vérifier l’aperçu</h4>
+    
+    <figure class="shot medium"><img src="captures/algo/e1-09-apercu.png" alt=""></figure>
+    <ol class="marks"><li><span class="b blue">19</span><span>À droite, l’aperçu montre la feuille de l’étudiant : l’algorithme, puis le tableau vide avec la colonne N° remplie.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="A2">
+        <div class="fiche-num">Exercice 2 · 5 points</div>
+        <h2>Les dix nombres suivants</h2>
+        <div class="fiche-meta"><span class="pill">Type : Algorithmique</span><span class="pill pill-soft">Correction : automatique, par jeux de tests (§ A.5)</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/algo-ex2.png" alt=""></div>
+<section class="step ">
+    <h4>Ajouter l’exercice</h4>
+    
+    <figure class="shot "><img src="captures/algo/e2-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>. Le nouvel exercice s’ajoute sous le précédent.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot medium"><img src="captures/algo/e2-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span>Cliquez sur <b>Algorithmique</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>L’intitulé et l’énoncé</h4>
+    
+    <figure class="shot "><img src="captures/algo/e2-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Les dix nombres suivants</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li><li><span class="b ">5</span><span>Énoncé : recopiez celui du sujet, exemple compris.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les outils autorisés</h4>
+    
+    <figure class="shot "><img src="captures/algo/e2-04-outils.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">6</span><span>Les blocs que l’étudiant pourra poser. Le vocabulaire de base est coché d’office : Constante, Variable, LIRE, ECRIRE, Affectation, SI, SINON, POUR, TANTQUE.</span></li><li><span class="b ">7</span><span>Cochez en plus <b>SINONSI</b> et <b>REPETER</b> s’ils ont été vus en cours. Un bloc décoché est refusé à la correction.</span></li><li><span class="b ">8</span><span><b>ECRIRE comme au cours</b> : laissez coché.</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>Et les tests ?</strong><div>Les jeux de tests de cet exercice se règlent à l’étape 3, une fois les quatre énoncés saisis : voir § A.5.</div></aside>
+<header class="fiche" id="A3">
+        <div class="fiche-num">Exercice 3 · 4 points</div>
+        <h2>Tarif plein ou réduit</h2>
+        <div class="fiche-meta"><span class="pill">Type : Algorithmique</span><span class="pill pill-soft">Correction : automatique, par jeux de tests (§ A.5)</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/algo-ex3.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/algo/e3-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/algo/e3-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Algorithmique</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé et l’énoncé</h4>
+    
+    <figure class="shot "><img src="captures/algo/e3-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Tarif plein ou réduit</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li><li><span class="b ">5</span><span>Énoncé : recopiez le sujet.</span></li><li><span class="b blue">!</span><span>Ajoutez une dernière phrase : « Données à saisir, dans cet ordre : le jour, l’âge, puis OUI ou NON ». Les tests envoient les valeurs dans un ordre fixe : l’étudiant doit les lire dans le même ordre. Les messages affichés restent libres.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les outils autorisés</h4>
+    
+    <figure class="shot "><img src="captures/algo/e3-04-outils.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">6</span><span>Les mêmes blocs qu’à l’exercice 2.</span></li><li><span class="b ">7</span><span>SINONSI est utile ici. Cochez aussi REPETER.</span></li><li><span class="b ">8</span><span>ECRIRE comme au cours : laissez coché.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="A4">
+        <div class="fiche-num">Exercice 4 · 6 points</div>
+        <h2>Le plus grand nombre et sa position</h2>
+        <div class="fiche-meta"><span class="pill">Type : Algorithmique</span><span class="pill pill-soft">Correction : automatique, par jeux de tests (§ A.5)</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/algo-ex4.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/algo/e4-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/algo/e4-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Algorithmique</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé et l’énoncé</h4>
+    
+    <figure class="shot "><img src="captures/algo/e4-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Le plus grand nombre et sa position</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li><li><span class="b ">5</span><span>Énoncé : recopiez le sujet, avec le NB et l’exemple d’exécution.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les outils autorisés</h4>
+    
+    <figure class="shot "><img src="captures/algo/e4-04-outils.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">6</span><span>Les mêmes blocs qu’aux exercices 2 et 3.</span></li><li><span class="b ">7</span><span>SINONSI et REPETER cochés.</span></li><li><span class="b ">8</span><span>ECRIRE comme au cours.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Passer à l’étape 3</h4>
+    
+    <figure class="shot "><img src="captures/algo/x-etape-suivante.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">9</span><span><b>Étape suivante</b> enregistre les quatre exercices et ouvre l’étape 3 « Correction ».</span></li></ol>
+    
+  </section>
+<h2 id="A5">A.5 Étape 3 « Correction » : les jeux de tests des exercices 2, 3 et 4</h2><p>Un test fait tourner l’algorithme de l’étudiant avec des valeurs choisies, puis compare ce qu’il affiche à ce que vous attendez. Seuls les exercices pratiques passent par cette étape : la simulation se corrige sur son tableau.</p>
+<section class="step ">
+    <h4>Vue d’ensemble</h4>
+    
+    <figure class="shot "><img src="captures/algo/c0-vue.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>La colonne de gauche liste les exercices à tester. Cliquez sur celui à régler.</span></li><li><span class="b blue">2</span><span>Le compteur « Prêts à être corrigés » : 0 / 3 au départ.</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>La comparaison « Nombres affichés »</strong><div>Avec ce mode, vous n’écrivez que les nombres attendus <b>à la fin</b> de l’affichage. Les invites (« Entrez le nombre numéro 1 : ») et les phrases de l’étudiant sont ignorées : <code>Le plus grand est : 15 / C’était le n° 3</code> passe pour <code>15 3</code>. Les décimaux s’écrivent avec un point ou une virgule (<code>4,50</code> = <code>4.5</code>).</div></aside>
+<h3 class="sub-h">Exercice 2 — Les dix nombres suivants</h3>
+<section class="step ">
+    <h4>Ajouter un test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c2-01-ajouter-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span><b>+ Ajouter un premier test</b>. « Ce que l’algorithme doit contenir » reste vide : seuls les tests notent la copie.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Remplir le test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c2-02-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">4</span><span>Nom du test : <b>Départ 17</b>.</span></li><li><span class="b ">5</span><span><b>+ Valeur d’entrée</b>, puis la valeur que l’étudiant tape : <b>17</b> (type Entier).</span></li><li><span class="b ">6</span><span>Écran : <b>18 19 20 21 22 23 24 25 26 27</b>.</span></li><li><span class="b ">7</span><span>Comparaison : <b>Nombres affichés</b>.</span></li></ol>
+    <p class="after">La phrase grise sous le test le résume : relisez-la.</p>
+  </section>
+<section class="step ">
+    <h4>Les autres tests</h4>
+    
+    <figure class="shot "><img src="captures/algo/c2-03-liste.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">8</span><span><b>Dupliquer</b> copie le test : changez le nom, la valeur et le résultat attendu.</span></li><li><span class="b blue">9</span><span>Le <b>Récapitulatif des tests</b> les relit d’un coup d’œil.</span></li></ol>
+    
+  </section>
+<table class="data"><thead><tr><th>Test</th><th>Valeur envoyée</th><th>Écran attendu</th></tr></thead><tbody><tr><td>Départ 17</td><td>17</td><td>18 19 … 27</td></tr><tr><td>Départ négatif</td><td>-3</td><td>-2 -1 0 … 7</td></tr><tr><td>Départ 0</td><td>0</td><td>1 2 … 10</td></tr></tbody></table>
+<h3 class="sub-h">Exercice 3 — Tarif plein ou réduit</h3>
+<section class="step ">
+    <h4>Choisir l’exercice</h4>
+    
+    <figure class="shot "><img src="captures/algo/c3-00-choisir.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Cliquez sur <b>Tarif plein ou réduit</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Ajouter un test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c3-01-ajouter-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>+ Ajouter un premier test</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Remplir le test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c3-02-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Nom : <b>Mercredi</b>.</span></li><li><span class="b ">4</span><span>Trois valeurs, dans l’ordre de l’énoncé : <b>mercredi</b> (type Chaîne), <b>30</b> (Entier), <b>NON</b> (Chaîne). Le type se change dans la liste à droite de chaque valeur.</span></li><li><span class="b ">5</span><span>Écran : <b>4.5</b>.</span></li><li><span class="b ">6</span><span>Comparaison : <b>Nombres affichés</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les cinq tests</h4>
+    
+    <figure class="shot "><img src="captures/algo/c3-03-liste.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">7</span><span>Dupliquez quatre fois et changez les valeurs.</span></li><li><span class="b blue">8</span><span>Relisez le récapitulatif.</span></li></ol>
+    
+  </section>
+<table class="data"><thead><tr><th>Test</th><th>Valeurs envoyées</th><th>Écran attendu</th></tr></thead><tbody><tr><td>Mercredi</td><td>mercredi · 30 · NON</td><td>4.5</td></tr><tr><td>Étudiant un lundi</td><td>lundi · 30 · OUI</td><td>4.5</td></tr><tr><td>Enfant un samedi</td><td>samedi · 12 · NON</td><td>7</td></tr><tr><td>Senior un mardi</td><td>mardi · 70 · NON</td><td>4.5</td></tr><tr><td>Adulte un dimanche</td><td>dimanche · 30 · NON</td><td>7</td></tr></tbody></table>
+<h3 class="sub-h">Exercice 4 — Le plus grand nombre et sa position</h3>
+<section class="step ">
+    <h4>Choisir l’exercice</h4>
+    
+    <figure class="shot "><img src="captures/algo/c4-00-choisir.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Cliquez sur <b>Le plus grand nombre et sa position</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Ajouter un test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c4-01-ajouter-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>+ Ajouter un premier test</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Remplir le test</h4>
+    
+    <figure class="shot "><img src="captures/algo/c4-02-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Nom : <b>Exemple du sujet</b>.</span></li><li><span class="b ">4</span><span>Cinq valeurs entières : <b>12, 5, 15, 10</b>, puis <b>0</b> qui arrête la saisie.</span></li><li><span class="b ">5</span><span>Écran : <b>15 3</b>, le plus grand puis sa position.</span></li><li><span class="b ">6</span><span>Comparaison : <b>Nombres affichés</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les trois tests</h4>
+    
+    <figure class="shot "><img src="captures/algo/c4-03-liste.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">7</span><span>Dupliquez, puis retirez une valeur avec le bouton <b>−</b> pour les tests plus courts.</span></li><li><span class="b blue">8</span><span>Relisez le récapitulatif.</span></li></ol>
+    
+  </section>
+<table class="data"><thead><tr><th>Test</th><th>Valeurs envoyées</th><th>Écran attendu</th></tr></thead><tbody><tr><td>Exemple du sujet</td><td>12 · 5 · 15 · 10 · 0</td><td>15 3</td></tr><tr><td>Le plus grand en premier</td><td>3 · 1 · 2 · 0</td><td>3 1</td></tr><tr><td>Que des négatifs</td><td>-5 · -2 · -9 · 0</td><td>-2 2</td></tr></tbody></table>
+<section class="step ">
+    <h4>Tout est prêt</h4>
+    
+    <figure class="shot "><img src="captures/algo/c9-rail-pret.png" alt=""></figure>
+    <ol class="marks"><li><span class="b green">9</span><span>Les trois exercices sont cochés en vert. <b>Étape suivante</b> ouvre les points.</span></li></ol>
+    
+  </section>
+<h2 id="A6">A.6 Étape 4 « Points & publication »</h2>
+<section class="step ">
+    <h4>Les points</h4>
+    
+    <figure class="shot "><img src="captures/algo/p5-points.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>À l’arrivée, CodEval partage les 20 points à parts égales. Corrigez : <b>5, 5, 4, 6</b>.</span></li><li><span class="b ">2</span><span>Le total doit faire <b>20 / 20</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Publier</h4>
+    
+    <figure class="shot "><img src="captures/algo/p6-publier.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span><b>Enregistrer et publier</b> : l’épreuve apparaît chez les étudiants de la classe, qui composeront une fois la session lancée. Avec une date d’ouverture, le bouton devient « Enregistrer et programmer ».</span></li><li><span class="b ">4</span><span><b>Lancer la session</b> ouvre l’épreuve tout de suite.</span></li></ol>
+    
+  </section>
+</section>
+<section class="break">
+  <div class="part-title"><span class="l">B</span><h1>Devoir surveillé de C avancé</h1><p>M1 MBDS · 27/02/2024 · 2 h · 20 points</p></div>
+  <h2 id="B0">B.0 Créer l’épreuve (étape 1 « Paramètres »)</h2>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cdevoir-entete.png" alt=""></div>
+<section class="step ">
+    <h4>Le titre et le type</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p1-epreuve.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Titre : <b>Devoir surveillé — C avancé</b>.</span></li><li><span class="b ">2</span><span>Type : <b>Devoir</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La classe et la matière</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p2-pour-qui.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Classe : <b>M1 MBDS</b>.</span></li><li><span class="b ">4</span><span>Matière : <b>C avancé</b>. Elle fixe le langage : C.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La durée, le barème et les consignes</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p3-deroulement.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>Durée : <b>2h</b>.</span></li><li><span class="b ">6</span><span>Barème : <b>20</b>.</span></li><li><span class="b blue">7</span><span>Le langage des exercices de code : C, fixé par la matière.</span></li><li><span class="b ">8</span><span>Consignes : l’en-tête et le bloc « Important à lire ».</span></li></ol>
+    
+  </section>
+<aside class="note note-warn"><strong>« 1 pt pour la propreté de la copie »</strong><div>Cette consigne n’a pas d’équivalent pour une copie tapée. Gardez des exercices sur 20 et ajoutez le point à la main sur la copie corrigée, avec <b>Modifier la note de cet exercice</b>. Chaque ajustement est enregistré avec son motif.</div></aside>
+<section class="step ">
+    <h4>Enregistrer</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p4-enregistrer.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">9</span><span><b>Enregistrer et continuer</b>.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="B1">
+        <div class="fiche-num">Exercice 1 · 10 points</div>
+        <h2>Questions de cours</h2>
+        <div class="fiche-meta"><span class="pill">Type : Question-réponse</span><span class="pill pill-soft">Correction : mots-clés (question 1) et correction à la main (questions 2 à 6)</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cdevoir-ex1.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Question-réponse</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Question de cours</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li></ol>
+    <p class="after">Pas de champ « Énoncé » : avec ce type, chaque question porte son propre texte.</p>
+  </section>
+<section class="step ">
+    <h4>La question 1, notée sur mots-clés</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-04-question1.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>Question posée : « Donner la définition d’une bibliothèque dynamique. »</span></li><li><span class="b ">6</span><span>Cochez <b>Noter sur les mots-clés présents</b> : chaque mot-clé retrouvé dans la réponse rapporte sa part.</span></li><li><span class="b ">7</span><span>Les mots-clés : <b>exécution</b>, <b>partagée</b>. Majuscules, accents et ponctuation sont ignorés.</span></li><li><span class="b ">8</span><span><b>+ Ajouter un mot-clé</b> pour chacun.</span></li><li><span class="b ">9</span><span><b>Lignes de réponse sur le sujet</b> : la place laissée sur la version imprimée.</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>Trois façons de corriger une question</strong><div><b>Aucune réponse listée</b> : la question vous est signalée pour une correction à la main.<br><b>Formulations acceptées</b> (case décochée) : la réponse doit correspondre à l’une d’elles.<br><b>Mots-clés</b> (case cochée) : chaque mot-clé présent rapporte une part égale des points.</div></aside>
+<section class="step ">
+    <h4>Les questions suivantes</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-05-question2.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">10</span><span><b>+ Ajouter une question</b> : elle s’ajoute en dessous, ouverte.</span></li><li><span class="b ">11</span><span>Question 2 : « Donner la différence entre une bibliothèque et une librairie. »</span></li><li><span class="b blue">12</span><span>Aucune réponse listée : vous la corrigerez à la main.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les six questions</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-06-liste.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">13</span><span>Six questions : les 10 points se partagent également entre elles.</span></li><li><span class="b ">14</span><span>Les sous-questions 2.a et 2.b deviennent deux questions séparées.</span></li><li><span class="b ">15</span><span><b>Tout replier</b> / <b>Tout déplier</b> pour relire.</span></li></ol>
+    
+  </section>
+<table class="data"><thead><tr><th>N°</th><th>Question</th><th>Correction</th></tr></thead><tbody><tr><td>1</td><td>Donner la définition d’une bibliothèque dynamique.</td><td>mots-clés : exécution, partagée</td></tr><tr><td>2</td><td>Différence entre une bibliothèque et une librairie.</td><td>à la main</td></tr><tr><td>3</td><td>Différence entre une bibliothèque statique et une bibliothèque dynamique.</td><td>à la main</td></tr><tr><td>4</td><td>Dans un projet C, à quoi servent les fichiers en-tête (.h) ?</td><td>à la main</td></tr><tr><td>5</td><td>Pourquoi utiliser les directives au préprocesseur ?</td><td>à la main</td></tr><tr><td>6</td><td>Citer 3 directives au préprocesseur et les définir.</td><td>à la main</td></tr></tbody></table>
+<section class="step ">
+    <h4>Le corrigé (facultatif)</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e1-07-corrige.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">16</span><span>Les réponses attendues, montrées aux étudiants avec les notes.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="B2">
+        <div class="fiche-num">Exercice 2 · 10 points</div>
+        <h2>Programmation C : gestion d’un stock</h2>
+        <div class="fiche-meta"><span class="pill">Type : Question-réponse</span><span class="pill pill-soft">Correction : à la main</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cdevoir-ex2.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e2-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e2-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Question-réponse</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e2-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Programmation C : gestion d’un stock</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La question</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e2-04-question.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>La consigne du sujet.</span></li><li><span class="b blue">6</span><span>Aucune réponse listée : correction à la main.</span></li><li><span class="b ">7</span><span>Lignes de réponse : <b>12</b>, pour une réponse longue.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Le corrigé</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/e2-05-corrige.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">8</span><span>La démarche attendue dans <b>Explications</b> : modules, gardes d’inclusion, compilation séparée.</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>Une réponse en code plutôt qu’en texte ?</strong><div>Créez alors un exercice <b>Code</b> à plusieurs fichiers (<code>produit.h</code>, <code>stock.h</code>, <code>stock.c</code>, <code>main.c</code>), comme au § C.1.</div></aside>
+<h2 id="B3">B.3 Étapes 3 et 4</h2>
+<section class="step ">
+    <h4>Étape 3 : rien à régler</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/c0-rien.png" alt=""></figure>
+    <ol class="marks"><li><span class="b blue">1</span><span>Aucun exercice pratique : passez directement à l’étape suivante.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les points</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p5-points.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>10</b> et <b>10</b>.</span></li><li><span class="b ">2</span><span>Total : 20 / 20.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Publier</h4>
+    
+    <figure class="shot "><img src="captures/cdevoir/p6-publier.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span><b>Enregistrer et publier</b>.</span></li><li><span class="b ">4</span><span>ou <b>Lancer la session</b>.</span></li></ol>
+    
+  </section>
+</section>
+<section class="break">
+  <div class="part-title"><span class="l">C</span><h1>Examen 2e session de C avancé</h1><p>M1 MBDS, BIHAR, SIGL · mars 2025 · 2 h · 20 points</p></div>
+  <h2 id="C0">C.0 Créer l’épreuve (étape 1 « Paramètres »)</h2>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cexamen-entete.png" alt=""></div>
+<section class="step ">
+    <h4>Le titre et le type</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p1-epreuve.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Titre : <b>Examen 2e session — C avancé</b>.</span></li><li><span class="b ">2</span><span>Type : <b>Examen</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La classe et la matière</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p2-pour-qui.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Classe : <b>M1 MBDS</b>.</span></li><li><span class="b ">4</span><span>Matière : <b>C avancé</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La durée, le barème et les consignes</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p3-deroulement.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span><b>2h</b>.</span></li><li><span class="b ">6</span><span><b>20</b>.</span></li><li><span class="b blue">7</span><span>Langage : C.</span></li><li><span class="b ">8</span><span>L’en-tête du sujet.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Enregistrer</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p4-enregistrer.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">9</span><span><b>Enregistrer et continuer</b>.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="C1">
+        <div class="fiche-num">Exercices 1 et 2.1 · 12 points</div>
+        <h2>Le programme modulaire en cinq fichiers</h2>
+        <div class="fiche-meta"><span class="pill">Type : Code (plusieurs fichiers)</span><span class="pill pill-soft">Correction : automatique : déclarations attendues et tests (§ C.4)</span></div>
+      </header>
+<aside class="note note-info"><strong>Pourquoi un seul exercice ?</strong><div>Les exercices 1 et 2.1 demandent les fichiers d’un <b>même programme</b> : les en-têtes et <code>Fonctions.c</code> (8 pts), puis <code>main.c</code> (4 pts). Réunis en un exercice de 12 points, l’étudiant écrit tout dans un même projet, et la correction peut le compiler et l’exécuter.</div></aside>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cexamen-commun.png" alt=""><img src="captures/sujets/cexamen-ex1.png" alt=""><img src="captures/sujets/cexamen-ex2.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Code</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé et l’énoncé</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Exercices 1 et 2.1 — Programme modulaire : moyenne d’une classe</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li><li><span class="b ">5</span><span>Énoncé : le texte commun du sujet, les questions 1, 2 et 2.1, puis ce que la correction doit connaître : les signatures exactes, le nombre d’étudiants lu dans <code>argv[1]</code>, une ligne « matricule nom note » par étudiant.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Passer en projet</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-04-code-depart.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">6</span><span>Ouvrez <b>Code de départ</b>.</span></li><li><span class="b ">7</span><span>Choisissez <b>Plusieurs fichiers (projet : .h et .c)</b>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les cinq fichiers</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-05-fichiers.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">8</span><span>Renommez les fichiers dans l’ordre des onglets : <b>Etudiant.h</b>, <b>Note.h</b>, <b>Fonctions.h</b>, <b>Fonctions.c</b>, <b>main.c</b>.</span></li><li><span class="b ">9</span><span>Code de départ : laissez vide, l’étudiant écrit tout.</span></li><li><span class="b ">10</span><span><b>+ Fichier</b> : le projet naît avec trois fichiers, ajoutez les deux autres.</span></li><li><span class="b blue">11</span><span>La correction compile tous les fichiers .c ensemble.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Le corrigé (facultatif)</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e1-06-corrige.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">12</span><span>La solution type : le contenu des cinq fichiers.</span></li></ol>
+    
+  </section>
+<header class="fiche" id="C2">
+        <div class="fiche-num">Exercice 2.2 · 3 points</div>
+        <h2>Les commandes de compilation</h2>
+        <div class="fiche-meta"><span class="pill">Type : Question-réponse</span><span class="pill pill-soft">Correction : automatique, sur mots-clés</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cexamen-ex2.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e2-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e2-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>Question-réponse</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e2-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Exercice 2.2 — Les commandes de compilation</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La question</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e2-04-question.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>La question, avec la commande <code>c:&gt; ProgrammeMoyenne.exe 40</code>.</span></li><li><span class="b ">6</span><span>Cochez <b>Noter sur les mots-clés présents</b>.</span></li><li><span class="b ">7</span><span>Les quatre mots-clés : <b>Fonctions.c</b>, <b>main.c</b>, <b>Fonctions.o</b>, <b>-o ProgrammeMoyenne.exe</b>.</span></li></ol>
+    
+  </section>
+<aside class="note note-info"><strong>Exemple de notation</strong><div>Une compilation séparée puis une édition de liens contient les quatre mots-clés : 3 / 3. Une seule commande (<code>gcc Fonctions.c main.c -o ProgrammeMoyenne.exe</code>) n’a pas le fichier objet : 3 mots-clés sur 4, soit 2,25 / 3.</div></aside>
+<header class="fiche" id="C3">
+        <div class="fiche-num">Exercice 3 · 5 points</div>
+        <h2>QCM</h2>
+        <div class="fiche-meta"><span class="pill">Type : QCM</span><span class="pill pill-soft">Correction : automatique</span></div>
+      </header>
+<div class="paper"><div class="paper-label">Sur le sujet papier</div><img src="captures/sujets/cexamen-ex3.png" alt=""></div>
+<div class="pair"><section class="step half">
+    <h4>Ajouter</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e3-01-ajouter.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>+ Ajouter un exercice</b>.</span></li></ol>
+    
+  </section><section class="step half">
+    <h4>Choisir le type</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e3-02-type.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">2</span><span><b>QCM</b>.</span></li></ol>
+    
+  </section></div>
+<section class="step ">
+    <h4>L’intitulé</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e3-03-entete.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Intitulé : <b>Exercice 3 — QCM</b>.</span></li><li><span class="b ">4</span><span>Le type, déjà choisi.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>La question 1</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e3-04-question1.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>La question.</span></li><li><span class="b ">6</span><span>Les quatre propositions, sans « a) » devant : l’étudiant les verra dans un ordre mélangé.</span></li><li><span class="b ">7</span><span>Cochez la bonne réponse.</span></li><li><span class="b ">8</span><span>Deux choix au départ : <b>+ Ajouter un choix</b> deux fois.</span></li><li><span class="b ">9</span><span><b>Plusieurs réponses possibles</b> : laissez décoché.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les questions 2 à 5</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/e3-05-question5.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">10</span><span><b>+ Ajouter une question</b> pour chacune.</span></li><li><span class="b ">11</span><span>Question 5 : dans le PDF, les propositions b) et c) sont collées sur une ligne. Saisissez-les comme deux choix.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les cinq questions</h4>
+    
+    <figure class="shot medium"><img src="captures/cexamen/e3-06-liste.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">12</span><span>Cinq questions : 1 point chacune.</span></li></ol>
+    
+  </section>
+<table class="data"><thead><tr><th>Question</th><th>Bonne réponse</th></tr></thead><tbody><tr><td>1. Fonction d’une directive de préprocesseur</td><td>a) Modifier le code source avant la compilation</td></tr><tr><td>2. Première étape de la compilation</td><td>c) Le prétraitement</td></tr><tr><td>3. Bibliothèques dynamiques</td><td>b) Réduire la taille des exécutables en partageant du code</td></tr><tr><td>4. Statique / dynamique</td><td>c) Statique intégrée à l’exécutable, dynamique chargée à l’exécution</td></tr><tr><td>5. Mauvais lien vers une bibliothèque dynamique</td><td>b) Le programme risque de planter</td></tr></tbody></table>
+<h2 id="C4">C.4 Étape 3 « Correction » : le programme en cinq fichiers</h2><p>L’exercice de code se corrige de deux façons : les <b>déclarations</b> que la copie doit contenir (structures, fonctions avec leur signature), puis les <b>tests</b> qui compilent et lancent le programme entier.</p>
+<section class="step ">
+    <h4>Vue d’ensemble</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c0-vue.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span>Le seul exercice pratique de l’examen.</span></li><li><span class="b blue">2</span><span>Questions et QCM : rien à régler ici.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Ajouter une déclaration</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-01-choix.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Cliquez sur <b>+ Ajouter une déclaration</b>, puis <b>Structure attendue</b> pour Note et Etudiant.</span></li><li><span class="b ">4</span><span><b>Fonction attendue</b> pour les trois fonctions.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les structures</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-02-structures.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">5</span><span>Le nom de la structure : <b>Note</b>.</span></li><li><span class="b ">6</span><span>Le champ <b>note</b>, de type <b>Décimal simple précision</b> (float). Un champ existe déjà : <b>+ Champ</b> en ajoute d’autres.</span></li><li><span class="b ">7</span><span>Pour <b>Etudiant</b>, le champ note est de type <b>Autre type</b> : écrivez <code>Note</code>, comme en C.</span></li><li><span class="b blue">8</span><span>La déclaration telle qu’elle sera cherchée dans la copie.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Une fonction</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-03-fonction.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">9</span><span>Le nom exact : <b>AjouterNote</b>.</span></li><li><span class="b ">10</span><span>Retourne : <b>Rien (affiche seulement)</b>, c’est-à-dire void.</span></li><li><span class="b ">11</span><span><b>+ Paramètre</b> : ValeurNote (Décimal simple précision), puis UnEtudiant.</span></li><li><span class="b ">12</span><span>UnEtudiant : <b>Autre type</b>, puis <code>Etudiant *</code>.</span></li><li><span class="b blue">13</span><span>La signature vérifiée à la compilation.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les deux autres fonctions</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-04-declarations.png" alt=""></figure>
+    <ol class="marks"><li><span class="b blue">14</span><span><code>float MoyenneNotes(Etudiant *TabEtudiants, int n)</code>.</span></li><li><span class="b blue">15</span><span><code>void AfficherTout(Etudiant *TabEtudiants, int n)</code>.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Ajouter un test</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-05-ajouter-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">16</span><span><b>+ Ajouter un premier test</b>. Les fonctions reçoivent un <code>Etudiant *</code> : un test ne peut pas les appeler seules, il lance le programme entier.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Remplir le test</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-06-test.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">17</span><span>Le test compile tous les fichiers et lance le programme.</span></li><li><span class="b ">18</span><span>Trois valeurs de type <b>Chaîne</b>, une par étudiant : <b>E001 Kone 12</b>, <b>E002 Yao 16</b>, <b>E003 Traore 11</b>.</span></li><li><span class="b ">19</span><span>Arguments de la ligne de commande : <b>3</b>. Il remplace le 40 de <code>ProgrammeMoyenne.exe 40</code>.</span></li><li><span class="b ">20</span><span>Écran : <b>13</b>, la moyenne (12 + 16 + 11) / 3.</span></li><li><span class="b ">21</span><span>Comparaison : <b>Nombres affichés</b>. Seule la moyenne, dernière valeur affichée, est vérifiée : la présentation de la liste reste libre.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Les deux tests</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/c1-07-tests.png" alt=""></figure>
+    <ol class="marks"><li><span class="b blue">22</span><span>Dupliquez pour un second test : argument <b>1</b>, valeur <b>E010 Awa 20</b>, écran <b>20</b>.</span></li></ol>
+    
+  </section>
+<h2 id="C5">C.5 Étape 4 « Points & publication »</h2>
+<section class="step ">
+    <h4>Les points</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p5-points.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">1</span><span><b>12</b>, <b>3</b> et <b>5</b>.</span></li><li><span class="b ">2</span><span>Total : 20 / 20.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Le détail du barème de l’exercice 1</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p5b-detail.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">3</span><span>Cliquez sur <b>Détail du barème</b>.</span></li><li><span class="b ">4</span><span>Cochez <b>Peser chaque ligne moi-même</b>. Sinon, les 12 points se partagent à parts égales entre les sept lignes.</span></li><li><span class="b ">5</span><span>Note 2, Etudiant 2, AjouterNote 1, MoyenneNotes 0,5, AfficherTout 0,5 : 6 points de déclarations. Puis 3 + 3 points de tests.</span></li><li><span class="b ">6</span><span>Le barème de l’exercice : 12 / 12.</span></li></ol>
+    
+  </section>
+<section class="step ">
+    <h4>Publier</h4>
+    
+    <figure class="shot "><img src="captures/cexamen/p6-publier.png" alt=""></figure>
+    <ol class="marks"><li><span class="b ">7</span><span><b>Enregistrer et publier</b>.</span></li><li><span class="b ">8</span><span>ou <b>Lancer la session</b>.</span></li></ol>
+    
+  </section>
+</section>
+
+<section class="break" id="M">
+  <h2 style="margin-top:0">Aide-mémoire</h2>
+  <table class="data"><thead><tr><th>Type</th><th>Ce que vous saisissez</th><th>Comment c’est corrigé</th></tr></thead><tbody><tr><td>Simulation</td><td>L’algorithme, le tableau attendu (colonnes, lignes), les colonnes fournies</td><td>Case par case ; case vide non notée ; « | » pour plusieurs réponses</td></tr><tr><td>Algorithmique</td><td>L’énoncé, les blocs autorisés, puis les tests à l’étape 3</td><td>Exécution sur les tests ; « Nombres affichés » ignore les messages</td></tr><tr><td>Code</td><td>L’énoncé, les fichiers du projet, puis déclarations et tests à l’étape 3</td><td>Déclarations cherchées dans tous les fichiers ; programme compilé et lancé</td></tr><tr><td>Question-réponse</td><td>Une question par point du sujet ; mots-clés ou formulations, ou rien</td><td>Mots-clés : une part par mot présent ; rien : correction à la main</td></tr><tr><td>QCM</td><td>Les questions, leurs propositions, la bonne réponse cochée</td><td>Automatique ; propositions mélangées pour l’étudiant</td></tr></tbody></table>
+  <h2>Avant de publier</h2>
+  <ul>
+    <li>La classe est choisie à l’étape 1, sinon l’épreuve reste un brouillon invisible.</li>
+    <li>Chaque exercice pratique est coché en vert à l’étape 3.</li>
+    <li>L’ordre de saisie des données est écrit dans l’énoncé quand il y en a plusieurs.</li>
+    <li>Le total des points fait 20 à l’étape 4.</li>
+    <li>L’aperçu, à droite de l’étape 2, montre le sujet tel que l’étudiant le recevra.</li>
+  </ul>
+  <h2>Après l’épreuve</h2>
+  <p>À la clôture, lancez la correction. Les questions sans réponse listée vous sont signalées pour une correction à la main. Sur chaque copie, <b>Modifier la note de cet exercice</b> permet un ajustement (le point de propreté, par exemple), enregistré avec son motif. Publiez ensuite les résultats : les étudiants voient leur copie annotée et, si l’épreuve le propose, le corrigé.</p>
+  <p><b>Réutiliser un exercice.</b> « Enregistrer dans la banque », sous chaque exercice, le range dans votre banque. Il se retrouve ensuite avec « Importer depuis la banque » dans une autre épreuve.</p>
+</section>
+
+<script>
+  // Toutes les captures à la même échelle (prises en 2x) : 0,64 de la taille écran, sans déborder.
+  for (const img of document.querySelectorAll('.shot img')) {
+    const fig = img.closest('.shot');
+    const k = fig.classList.contains('small') ? 0.5 : fig.classList.contains('medium') ? 0.5 : 0.64;
+    img.style.width = Math.min(img.naturalWidth / 2 * k, fig.clientWidth) + 'px';
+  }
+  for (const img of document.querySelectorAll('.paper img')) img.style.width = Math.min(img.naturalWidth / 2.6 * 1.15, img.parentElement.clientWidth - 4) + 'px';
+</script>
+</body></html>

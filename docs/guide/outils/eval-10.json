@@ -1,0 +1,105 @@
+{
+  "id": 10,
+  "title": "Devoir surveillé — C avancé",
+  "kind": "devoir",
+  "description": "",
+  "instructions": "ECUE : C avancé · Parcours : M1 MBDS · Année académique 2023-2024\nImportant à lire :\n- Les copies conformes seront automatiquement sanctionnées d'une note de 0/20.\n- Tout document est formellement interdit.\n- Tout appareil électronique doit être éteint (téléphone, ordinateur, tablette, etc.).",
+  "language": "c",
+  "duration_minutes": 120,
+  "scheduled_start": null,
+  "status": "draft",
+  "total_points": 20,
+  "rules": {},
+  "started_at": null,
+  "ends_at": null,
+  "closed_at": null,
+  "validated_at": null,
+  "classroom_id": 6,
+  "subject_id": 5,
+  "classroom_name": "M1 MBDS",
+  "subject_name": "C avancé",
+  "participants_count": 0,
+  "exercises_count": 2,
+  "success_rate": null,
+  "is_owner": false,
+  "exercises": [
+    {
+      "id": 44,
+      "position": 1,
+      "title": "Question de cours",
+      "statement": "",
+      "language": "c",
+      "points": 10,
+      "starter_code": "",
+      "kind": "short",
+      "settings": {
+        "questions": [
+          {
+            "rows": 4,
+            "text": "Donner la définition d'une bibliothèque dynamique.",
+            "accepted": [
+              "exécution",
+              "partagée"
+            ],
+            "keywords_mode": true
+          },
+          {
+            "rows": 4,
+            "text": "Donner la différence entre une bibliothèque et une librairie.",
+            "accepted": [],
+            "keywords_mode": false
+          },
+          {
+            "rows": 4,
+            "text": "Donner la différence entre une bibliothèque statique et une bibliothèque dynamique.",
+            "accepted": [],
+            "keywords_mode": false
+          },
+          {
+            "rows": 4,
+            "text": "Dans un projet C, à quoi servent les fichiers en-tête (extension .h) ?",
+            "accepted": [],
+            "keywords_mode": false
+          },
+          {
+            "rows": 4,
+            "text": "Pourquoi utiliser les directives au préprocesseur ?",
+            "accepted": [],
+            "keywords_mode": false
+          },
+          {
+            "rows": 4,
+            "text": "Citer 3 directives au préprocesseur et les définir.",
+            "accepted": [],
+            "keywords_mode": false
+          }
+        ],
+        "solution_notes": "1. Code compilé chargé à l'exécution et partagé entre programmes (.so, .dll).\n2. « Librairie » est un faux ami de library : le terme juste est bibliothèque.\n3. Statique : copiée dans l'exécutable à l'édition de liens. Dynamique : chargée à l'exécution, partagée, mise à jour sans recompiler.\n4. Les .h déclarent l'interface d'un module (prototypes, types, constantes).\n5. Transformer le source avant compilation : inclusions, macros, compilation conditionnelle, gardes d'inclusion.\n6. #include, #define, #ifndef/#endif…"
+      },
+      "tests": []
+    },
+    {
+      "id": 45,
+      "position": 2,
+      "title": "Programmation C : gestion d'un stock",
+      "statement": "",
+      "language": "c",
+      "points": 10,
+      "starter_code": "",
+      "kind": "short",
+      "settings": {
+        "questions": [
+          {
+            "rows": 12,
+            "text": "Proposer une approche pour réaliser une application de gestion d'un stock. Votre approche devra être modulaire.",
+            "accepted": [],
+            "keywords_mode": false
+          }
+        ],
+        "solution_notes": "Découpage attendu : un module produit (produit.h : la structure Produit), un module stock (stock.h : prototypes ; stock.c : ajout, retrait, recherche, valeur du stock), un main.c qui pilote le menu ; gardes d'inclusion dans chaque .h ; compilation séparée puis édition de liens."
+      },
+      "tests": []
+    }
+  ],
+  "sheet_header": null
+}
